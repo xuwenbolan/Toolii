@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import cv2
 import numpy as np
@@ -147,10 +147,10 @@ def _alpha_background_quality(cutout_png_bytes: bytes | None) -> dict[str, objec
 def check_photo_compliance(
     image_bytes: bytes,
     *,
-    faces: list[dict[str, object]] | None = None,
+    faces: list[dict[str, Any]] | None = None,
     cutout_png_bytes: bytes | None = None,
     detection_engine: str | None = None,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     image = open_image(image_bytes)
     width, height = image.size
     gray = _to_gray_array(image)

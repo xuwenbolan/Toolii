@@ -6,15 +6,15 @@ from fastapi import Depends
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.core.file_validation import validate_image_bytes
-from app.core.rate_limiter import dynamic_rate_limit, limiter
+from app.core.rate_limiter import dynamic_rate_limit, dynamic_rate_limit_heavy, limiter
 from app.core.task_limiter import acquire_task_slot
 from app.models.user import User
 from app.schemas.image import FileResult
 from app.schemas.photo import (
     PhotoExportRequest,
     PhotoLayoutRequest,
-    PhotoProcessRequest,
-    PhotoProcessResponse,
+    PhotoPreviewRequest,
+    PhotoPreviewResponse,
     PhotoStandard,
     PhotoUploadResponse,
 )
@@ -28,7 +28,7 @@ def _max_image_bytes() -> int:
 
 
 @router.post("/upload", response_model=PhotoUploadResponse)
-@limiter.limit(dynamic_rate_limit)
+@limiter.limit(dynamic_rate_limit_heavy)
 async def upload(
     request: Request,
     file: UploadFile = File(...),
@@ -39,7 +39,7 @@ async def upload(
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
         validate_image_bytes(data)
-        return await PhotoService().upload_and_detect(
+        return await PhotoService().upload_and_prepare(
             image_bytes=data,
             filename=file.filename or "photo",
             content_type=file.content_type or "application/octet-stream",
@@ -48,19 +48,18 @@ async def upload(
         sem.release()
 
 
-@router.post("/process", response_model=PhotoProcessResponse)
+@router.post("/preview", response_model=PhotoPreviewResponse)
 @limiter.limit(dynamic_rate_limit)
-async def process(
+async def preview(
     request: Request,
-    payload: PhotoProcessRequest,
-) -> PhotoProcessResponse:
+    payload: PhotoPreviewRequest,
+) -> PhotoPreviewResponse:
     sem = await acquire_task_slot(request)
     try:
-        return await PhotoService().process(
+        return await PhotoService().preview(
             upload_id=payload.upload_id,
             standard_code=payload.standard,
             background_color=payload.background_color,
-            model_tier=payload.model_tier,
         )
     finally:
         sem.release()

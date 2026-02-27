@@ -9,7 +9,7 @@ from app.core.config import settings
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
-from app.schemas.image import BatchResponse, FileResult
+from app.schemas.image import FileResult
 from app.services.image_service import ImageService
 
 router = APIRouter(prefix=f"{settings.api_prefix}/image", tags=["image"])
@@ -121,40 +121,23 @@ async def scan_enhance(
         sem.release()
 
 
-@router.post("/batch", response_model=BatchResponse)
+@router.post("/remove-bg", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
-async def batch(
+async def remove_bg(
     request: Request,
-    files: list[UploadFile] = File(...),
-    action: str = Form("compress"),
-    output_format: str | None = Form(None),
-    quality: int | None = Form(None),
-    target_kb: int | None = Form(None),
-) -> BatchResponse:
-    if len(files) > settings.max_batch_files:
-        raise HTTPException(status_code=413, detail="Too many files")
-
+    file: UploadFile = File(...),
+    model_name: str = Form("silueta"),
+) -> FileResult:
     sem = await acquire_task_slot(request)
     try:
-        total = 0
-        payload: list[tuple[str, bytes]] = []
-        max_total = settings.max_batch_total_mb * 1024 * 1024
-        for f in files:
-            data = await f.read()
-            total += len(data)
-            if total > max_total:
-                raise HTTPException(status_code=413, detail="Batch too large")
-            if len(data) > _max_image_bytes():
-                raise HTTPException(status_code=413, detail="File too large")
-            validate_image_bytes(data)
-            payload.append((f.filename or "image", data))
-
-        return await ImageService().batch(
-            files=payload,
-            action=action,
-            output_format=output_format,
-            quality=quality,
-            target_kb=target_kb,
+        data = await file.read()
+        if len(data) > _max_image_bytes():
+            raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
+        return await ImageService().remove_bg(
+            image_bytes=data,
+            filename=file.filename or "image",
+            model_name=model_name,
         )
     finally:
         sem.release()

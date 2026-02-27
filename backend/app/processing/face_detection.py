@@ -635,7 +635,7 @@ def _detect_with_haar(img: np.ndarray) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def detect_faces(image_bytes: bytes) -> dict[str, object]:
+def detect_faces(image_bytes: bytes) -> dict[str, Any]:
     img = _decode_image(image_bytes)
 
     # Try MediaPipe first

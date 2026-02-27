@@ -31,6 +31,7 @@ class PhotoUploadResponse(BaseModel):
     faces: list[FaceBox]
     detection_engine: str
     warnings: list[str] = []
+    compliance: ComplianceResult
 
 
 class ComplianceCheckItem(BaseModel):
@@ -54,18 +55,16 @@ class CropBox(BaseModel):
     h: int
 
 
-class PhotoProcessRequest(BaseModel):
+class PhotoPreviewRequest(BaseModel):
     upload_id: str
     standard: str
     background_color: str = Field(default="#FFFFFF")
-    model_tier: str = Field(default="fast")
 
 
-class PhotoProcessResponse(BaseModel):
+class PhotoPreviewResponse(BaseModel):
     processed_id: str
     standard: PhotoStandard
     background_color: str
-    model_used: str
     preview_data_url: str
     compliance: ComplianceResult
     crop_box: CropBox

@@ -119,6 +119,25 @@ async def pages(
         sem.release()
 
 
+@router.post("/split", response_model=FileResult)
+@limiter.limit(dynamic_rate_limit)
+async def split(
+    request: Request,
+    validated: tuple[UploadFile, bytes] = Depends(validate_pdf_upload),
+    ranges: str = Form(...),
+) -> FileResult:
+    sem = await acquire_task_slot(request)
+    try:
+        file, data = validated
+        return await PdfService().split(
+            pdf_bytes=data,
+            filename=file.filename or "document.pdf",
+            ranges=ranges,
+        )
+    finally:
+        sem.release()
+
+
 @router.post("/from-images", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def from_images(

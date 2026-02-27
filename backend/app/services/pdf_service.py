@@ -10,15 +10,16 @@ from app.processing.pdf_compress import compress_pdf
 from app.processing.pdf_from_images import images_to_pdf
 from app.processing.pdf_merge import merge_pdfs
 from app.processing.pdf_pages import edit_pdf_pages
+from app.processing.pdf_split import split_pdf
 from app.schemas.pdf import FileResult, PdfPagesOperation
-from app.services.file_service import FileService
+from app.services.file_service import FileService, StoredFile
 
 
 class PdfService:
     def __init__(self) -> None:
         self._files = FileService()
 
-    def _to_result(self, stored, *, filename: str) -> FileResult:  # type: ignore[no-untyped-def]
+    def _to_result(self, stored: StoredFile, *, filename: str) -> FileResult:
         return FileResult(
             file_id=stored.file_id,
             filename=filename,
@@ -95,6 +96,24 @@ class PdfService:
 
         out_name = f"{self._safe_stem(filename, 'document')}-{op_value}.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
+        return self._to_result(stored, filename=out_name)
+
+    async def split(self, *, pdf_bytes: bytes, filename: str, ranges: str) -> FileResult:
+        ranges = ranges.strip()
+        if not ranges:
+            raise AppError(code="MISSING_RANGES", message="ranges 不能为空", status_code=400)
+
+        loop = asyncio.get_running_loop()
+        try:
+            zip_bytes = await loop.run_in_executor(
+                None,
+                partial(split_pdf, pdf_bytes, ranges=ranges),
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise AppError(code="PDF_PROCESS_FAILED", message=f"PDF 拆分失败: {exc}", status_code=400) from exc
+
+        out_name = f"{self._safe_stem(filename, 'document')}-split.zip"
+        stored = self._files.save_bytes(data=zip_bytes, filename=out_name, content_type="application/zip")
         return self._to_result(stored, filename=out_name)
 
     async def from_images(

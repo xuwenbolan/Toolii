@@ -22,9 +22,9 @@ from app.processing.face_detection import detect_faces, select_primary_face
 from app.processing.photo_cropper import crop_id_photo
 from app.processing.photo_layout import create_print_layout
 from app.schemas.image import FileResult
-from app.schemas.photo import PhotoProcessResponse, PhotoStandard, PhotoUploadResponse
+from app.schemas.photo import ComplianceResult, CropBox, FaceBox, PhotoPreviewResponse, PhotoStandard, PhotoUploadResponse
 from app.services.credit_service import CreditService
-from app.services.file_service import FileService
+from app.services.file_service import FileService, StoredFile
 
 
 @dataclass
@@ -36,6 +36,10 @@ class UploadSession:
     height: int
     faces: list[dict[str, Any]]
     detection_engine: str
+    cutout_file_id: str
+    bg_removal_model: str
+    compliance: dict[str, Any]
+    warnings: list[str]
     created_at: float
 
 
@@ -124,7 +128,7 @@ class PhotoService:
             raise AppError(code="STANDARD_NOT_FOUND", message="证件照规格不存在", status_code=404)
         return item
 
-    def _to_file_result(self, stored, *, filename: str) -> FileResult:  # type: ignore[no-untyped-def]
+    def _to_file_result(self, stored: StoredFile, *, filename: str) -> FileResult:
         return FileResult(
             file_id=stored.file_id,
             filename=filename,
@@ -157,23 +161,14 @@ class PhotoService:
         return session
 
     @staticmethod
-    def _model_name_for_tier(model_tier: str) -> str:
-        mapping = {
-            "fast": "silueta",
-            "balanced": "u2net_human_seg",
-            "hq": "birefnet-portrait",
-        }
-        return mapping.get(model_tier, "silueta")
-
-    @staticmethod
     def _build_upload_warnings(
-        detection: dict[str, object],
+        detection: dict[str, Any],
         width: int,
         height: int,
     ) -> list[str]:
         warnings: list[str] = []
         engine = str(detection.get("engine", ""))
-        faces = list(detection.get("faces", []))  # type: ignore[arg-type]
+        faces = list(detection.get("faces", []))
         face_count = len(faces)
 
         if engine == "fallback-center" or face_count == 0:
@@ -202,69 +197,103 @@ class PhotoService:
 
         return warnings
 
-    async def upload_and_detect(
+    async def upload_and_prepare(
         self,
         *,
         image_bytes: bytes,
         filename: str,
         content_type: str,
     ) -> PhotoUploadResponse:
+        """Phase 1 (heavy): face detection + background removal + compliance check."""
         loop = asyncio.get_running_loop()
         try:
             detection = await loop.run_in_executor(None, partial(detect_faces, image_bytes))
         except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PHOTO_DETECT_FAILED", message="人脸检测失败，请确认上传的是有效图片", status_code=400) from exc
 
-        stored = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
-        upload_id = uuid.uuid4().hex
         width = int(detection["width"])
         height = int(detection["height"])
+        faces = [dict(item) for item in detection["faces"]]
+        engine = str(detection["engine"])
+        warnings = self._build_upload_warnings(detection, width, height)
+
+        # Background removal (the expensive step)
+        try:
+            cutout_png, bg_meta = await loop.run_in_executor(
+                None,
+                partial(remove_background, image_bytes, model_name="silueta"),
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise AppError(code="PHOTO_BG_REMOVE_FAILED", message="背景去除失败", status_code=400) from exc
+
+        # Compliance check
+        try:
+            compliance = await loop.run_in_executor(
+                None,
+                partial(
+                    check_photo_compliance,
+                    image_bytes,
+                    faces=faces,
+                    cutout_png_bytes=cutout_png,
+                    detection_engine=engine,
+                ),
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise AppError(code="PHOTO_COMPLIANCE_FAILED", message="合规检测失败", status_code=400) from exc
+
+        # Save original image and cutout PNG to disk
+        stored_original = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
+        stored_cutout = self._files.save_bytes(data=cutout_png, filename=f"cutout-{filename}.png", content_type="image/png")
+
+        upload_id = uuid.uuid4().hex
+        model_used = str(bg_meta.get("model") or bg_meta.get("engine") or "fallback")
 
         session = UploadSession(
             upload_id=upload_id,
-            file_id=stored.file_id,
+            file_id=stored_original.file_id,
             filename=filename,
             width=width,
             height=height,
-            faces=[dict(item) for item in detection["faces"]],  # type: ignore[index]
-            detection_engine=str(detection["engine"]),
+            faces=faces,
+            detection_engine=engine,
+            cutout_file_id=stored_cutout.file_id,
+            bg_removal_model=model_used,
+            compliance=compliance,
+            warnings=warnings,
             created_at=time.time(),
         )
         await self._store_upload_session(session)
 
-        warnings = self._build_upload_warnings(detection, width, height)
-
         return PhotoUploadResponse(
             upload_id=upload_id,
             filename=filename,
-            width=session.width,
-            height=session.height,
-            faces=session.faces,  # type: ignore[arg-type]
-            detection_engine=session.detection_engine,
+            width=width,
+            height=height,
+            faces=[FaceBox.model_validate(f) for f in faces],
+            detection_engine=engine,
             warnings=warnings,
+            compliance=ComplianceResult.model_validate(compliance),
         )
 
-    async def process(
+    async def preview(
         self,
         *,
         upload_id: str,
         standard_code: str,
         background_color: str,
-        model_tier: str,
-    ) -> PhotoProcessResponse:
+    ) -> PhotoPreviewResponse:
+        """Phase 2 (light): crop + composite + watermark using cached cutout PNG."""
         upload = await self._get_upload_session(upload_id)
         standard = self._get_standard(standard_code)
+
         original = self._files.get(upload.file_id)
         image_bytes = original.path.read_bytes()
+        cutout_stored = self._files.get(upload.cutout_file_id)
+        cutout_png = cutout_stored.path.read_bytes()
         face = select_primary_face(upload.faces)
-        model_name = self._model_name_for_tier(model_tier)
 
         loop = asyncio.get_running_loop()
         try:
-            cutout_png, bg_meta = await loop.run_in_executor(
-                None,
-                partial(remove_background, image_bytes, model_name=model_name),
-            )
             processed_png, crop_meta = await loop.run_in_executor(
                 None,
                 partial(
@@ -276,21 +305,11 @@ class PhotoService:
                     background_color=background_color,
                 ),
             )
-            compliance = await loop.run_in_executor(
-                None,
-                partial(
-                    check_photo_compliance,
-                    image_bytes,
-                    faces=upload.faces,
-                    cutout_png_bytes=cutout_png,
-                    detection_engine=upload.detection_engine,
-                ),
-            )
             preview_png = await loop.run_in_executor(None, partial(_watermark_preview, processed_png))
         except AppError:
             raise
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_PROCESS_FAILED", message="证件照处理失败", status_code=400) from exc
+            raise AppError(code="PHOTO_PREVIEW_FAILED", message="证件照预览生成失败", status_code=400) from exc
 
         out_name = f"{standard_code}-id-photo.png"
         stored = self._files.save_bytes(data=processed_png, filename=out_name, content_type="image/png")
@@ -302,21 +321,20 @@ class PhotoService:
                 file_id=stored.file_id,
                 standard_code=standard_code,
                 background_color=background_color,
-                model_used=str(bg_meta.get("model") or bg_meta.get("engine") or "fallback"),
+                model_used=upload.bg_removal_model,
                 created_at=time.time(),
             )
         )
 
         preview_data_url = "data:image/png;base64," + base64.b64encode(preview_png).decode("ascii")
         crop_box = crop_meta["crop_box"]
-        return PhotoProcessResponse(
+        return PhotoPreviewResponse(
             processed_id=processed_id,
             standard=PhotoStandard.model_validate(standard),
             background_color=background_color,
-            model_used=str(bg_meta.get("model") or bg_meta.get("engine") or "fallback"),
             preview_data_url=preview_data_url,
-            compliance=compliance,  # type: ignore[arg-type]
-            crop_box=crop_box,  # type: ignore[arg-type]
+            compliance=ComplianceResult.model_validate(upload.compliance),
+            crop_box=CropBox.model_validate(crop_box),
             output_width=int(crop_meta["output_width"]),
             output_height=int(crop_meta["output_height"]),
         )

@@ -10,13 +10,3 @@ class FileResult(BaseModel):
     content_type: str
     download_url: str
     expires_in: int
-
-
-class BatchItem(BaseModel):
-    input_filename: str
-    output: FileResult
-
-
-class BatchResponse(BaseModel):
-    archive: FileResult
-    items: list[BatchItem]

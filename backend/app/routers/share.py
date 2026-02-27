@@ -23,7 +23,7 @@ from app.services.share_service import ShareService
 router = APIRouter(prefix=f"{settings.api_prefix}/share", tags=["share"])
 
 
-def _as_utc(value):  # type: ignore[no-untyped-def]
+def _as_utc(value: datetime | None) -> datetime | None:
     if value is None:
         return None
     if getattr(value, "tzinfo", None) is None:

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import os
-import zipfile
 from functools import partial
+from typing import Iterable
 
 from app.core.config import settings
 from app.core.exceptions import AppError
+from app.processing.background_removal import remove_background
 from app.processing.image_compress import compress_image
 from app.processing.image_convert import convert_image
-from app.processing.image_mosaic import mosaic_image
+from app.processing.image_mosaic import MosaicRegion, mosaic_image
 from app.processing.scan_enhance import enhance_scan
-from app.schemas.image import BatchItem, BatchResponse, FileResult
-from app.services.file_service import FileService
+from app.schemas.image import FileResult
+from app.services.file_service import FileService, StoredFile
 
 
 def _safe_stem(filename: str) -> str:
@@ -30,8 +30,6 @@ def _ext_for_mime(content_type: str) -> str:
         return ".png"
     if ct == "image/webp":
         return ".webp"
-    if ct == "application/zip":
-        return ".zip"
     return ""
 
 
@@ -39,7 +37,7 @@ class ImageService:
     def __init__(self) -> None:
         self._files = FileService()
 
-    def _to_result(self, stored, *, filename: str) -> FileResult:  # type: ignore[no-untyped-def]
+    def _to_result(self, stored: StoredFile, *, filename: str) -> FileResult:
         return FileResult(
             file_id=stored.file_id,
             filename=filename,
@@ -125,9 +123,9 @@ class ImageService:
         *,
         image_bytes: bytes,
         filename: str,
-        regions,
+        regions: Iterable[MosaicRegion] | None,
         pixel_size: int,
-    ) -> FileResult:  # type: ignore[no-untyped-def]
+    ) -> FileResult:
         loop = asyncio.get_running_loop()
         try:
             out, mime = await loop.run_in_executor(
@@ -161,56 +159,27 @@ class ImageService:
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
         return self._to_result(stored, filename=out_name)
 
-    async def batch(
+    async def remove_bg(
         self,
         *,
-        files: list[tuple[str, bytes]],
-        action: str,
-        output_format: str | None = None,
-        quality: int | None = None,
-        target_kb: int | None = None,
-    ) -> BatchResponse:
-        if action not in {"compress", "convert"}:
-            raise AppError(code="INVALID_ACTION", message="batch action 仅支持 compress/convert", status_code=400)
+        image_bytes: bytes,
+        filename: str,
+        model_name: str = "silueta",
+    ) -> FileResult:
+        valid_models = {"silueta", "u2net_human_seg", "birefnet-portrait"}
+        if model_name not in valid_models:
+            raise AppError(code="INVALID_MODEL", message="model_name 无效", status_code=400)
 
-        items: list[BatchItem] = []
-        zip_buf = io.BytesIO()
+        loop = asyncio.get_running_loop()
+        try:
+            out, _meta = await loop.run_in_executor(
+                None,
+                partial(remove_background, image_bytes, model_name=model_name),
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="背景移除失败", status_code=400) from exc
 
-        with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for input_name, image_bytes in files:
-                if action == "compress":
-                    result = await self.compress(
-                        image_bytes=image_bytes,
-                        filename=input_name,
-                        quality=quality,
-                        target_kb=target_kb,
-                        output_format=output_format,
-                    )
-                else:
-                    if not output_format:
-                        raise AppError(code="MISSING_OUTPUT_FORMAT", message="output_format 必填", status_code=400)
-                    result = await self.convert(
-                        image_bytes=image_bytes,
-                        filename=input_name,
-                        output_format=output_format,
-                        quality=quality,
-                    )
+        out_name = f"{_safe_stem(filename)}-nobg.png"
+        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
+        return self._to_result(stored, filename=out_name)
 
-                # Fetch actual bytes for archiving (we already stored it on disk).
-                stored = self._files.get(result.file_id)
-                zf.write(stored.path, arcname=result.filename)
-
-                items.append(BatchItem(input_filename=input_name, output=result))
-
-        archive_name = f"toolii-batch{_ext_for_mime('application/zip')}"
-        archive_bytes = zip_buf.getvalue()
-        archive_stored = self._files.save_bytes(
-            data=archive_bytes,
-            filename=archive_name,
-            content_type="application/zip",
-        )
-
-        return BatchResponse(
-            archive=self._to_result(archive_stored, filename=archive_name),
-            items=items,
-        )

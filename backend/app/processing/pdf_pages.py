@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from typing import Literal
+from typing import Any, Literal
 
 
 PdfPagesOperation = Literal["rotate", "delete", "extract", "reorder"]
@@ -19,7 +19,7 @@ def _normalize_pages(total_pages: int, pages: list[int] | None) -> list[int]:
     return normalized
 
 
-def _rotate_page(page, angle: int):  # type: ignore[no-untyped-def]
+def _rotate_page(page: Any, angle: int) -> Any:
     if hasattr(page, "rotate"):
         return page.rotate(angle)
 
