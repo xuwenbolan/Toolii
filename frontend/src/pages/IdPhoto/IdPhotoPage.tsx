@@ -163,7 +163,7 @@ export function IdPhotoPage() {
       })
       if (controller.signal.aborted) return
       setPreviewResult(result)
-    } catch (err) {
+    } catch {
       if (controller.signal.aborted) return
       setPreviewError(t('preview.failed'))
     } finally {
@@ -252,7 +252,7 @@ export function IdPhotoPage() {
                 setUploadResult(result)
                 // Auto-trigger first preview with current settings
                 void refreshPreview(result.upload_id, selectedStandardCode, backgroundColor)
-              } catch (err) {
+              } catch {
                 uploadTask.setError(t('upload.failed'))
               }
             }}
