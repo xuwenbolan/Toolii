@@ -72,6 +72,13 @@ def dynamic_rate_limit(key: str) -> str:
     return settings.rate_limit_anon
 
 
+def dynamic_rate_limit_heavy(key: str) -> str:
+    """Stricter rate limit for compute-heavy endpoints (e.g. background removal)."""
+    if key.startswith("user:"):
+        return settings.rate_limit_heavy_auth
+    return settings.rate_limit_heavy_anon
+
+
 def register_rate_limiter(app: FastAPI) -> None:
     app.add_middleware(SlowAPIMiddleware)
 

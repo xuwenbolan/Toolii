@@ -12,6 +12,7 @@ class UserPublic(BaseModel):
 
     is_active: bool = True
     email_verified: bool = False
+    is_admin: bool = False
 
 
 class ChangePasswordRequest(BaseModel):

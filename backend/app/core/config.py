@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = Field(default="CHANGE_ME", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
-    refresh_token_expire_days: int = Field(default=7, alias="REFRESH_TOKEN_EXPIRE_DAYS")
+    refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS")
 
     google_oauth_client_id: str | None = Field(default=None, alias="GOOGLE_OAUTH_CLIENT_ID")
 
@@ -43,6 +43,8 @@ class Settings(BaseSettings):
 
     rate_limit_anon: str = Field(default="10/minute", alias="RATE_LIMIT_ANON")
     rate_limit_auth: str = Field(default="20/minute", alias="RATE_LIMIT_AUTH")
+    rate_limit_heavy_anon: str = Field(default="5/minute", alias="RATE_LIMIT_HEAVY_ANON")
+    rate_limit_heavy_auth: str = Field(default="12/minute", alias="RATE_LIMIT_HEAVY_AUTH")
 
     max_concurrent_tasks_per_key: int = Field(default=3, alias="MAX_CONCURRENT_TASKS_PER_KEY")
 

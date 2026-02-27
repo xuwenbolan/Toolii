@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db as _get_db
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import ForbiddenError, UnauthorizedError
 from app.core.security import decode_jwt_token
 from app.core.token_blacklist import token_blacklist
 from app.models.user import User
@@ -62,4 +62,12 @@ async def get_current_user(
 ) -> User:
     if user is None:
         raise UnauthorizedError()
+    return user
+
+
+async def get_admin_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    if not user.is_admin:
+        raise ForbiddenError("Admin access required")
     return user

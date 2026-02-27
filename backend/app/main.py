@@ -28,6 +28,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.logging_config import setup_logging
+
+setup_logging(
+    level="DEBUG" if settings.env == "dev" else "INFO",
+    json_output=settings.env != "dev",
+)
+
 from app.core.error_handlers import register_error_handlers
 from app.core.rate_limiter import limiter, register_rate_limiter
 from app.core.security_headers import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
@@ -36,7 +43,8 @@ from app.core.scheduler import scheduler, setup_scheduler
 from app.core.token_blacklist import token_blacklist
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
-from app.routers import auth, credits, download, image, pdf, photo, share, users
+from app.routers import auth, credits, download, history, image, pdf, photo, share, users
+from app.routers.admin import router as admin_router
 
 
 def create_app() -> FastAPI:
@@ -64,6 +72,8 @@ def create_app() -> FastAPI:
     app.include_router(image.router)
     app.include_router(pdf.router)
     app.include_router(download.router)
+    app.include_router(history.router)
+    app.include_router(admin_router)
 
     @app.get(f"{settings.api_prefix}/health")
     async def health() -> dict[str, str]:
