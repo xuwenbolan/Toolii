@@ -51,7 +51,6 @@ export function OverviewPage() {
               <Link to="/dashboard/transactions">{t('overview.viewTransactions')}</Link>
             </Button>
           </div>
-          <p>{t('overview.devNote')}</p>
         </CardContent>
       </Card>
 

@@ -1,0 +1,151 @@
+{
+  "title": "管理后台",
+  "backToSite": "返回前台",
+  "nav": {
+    "dashboard": "仪表盘",
+    "users": "用户管理",
+    "cards": "卡密管理",
+    "operations": "运营数据"
+  },
+  "dashboard": {
+    "totalUsers": "用户总数",
+    "newUsersToday": "今日新增",
+    "activeUsers7d": "7日活跃",
+    "totalRevenue": "总收入",
+    "revenueToday": "今日收入",
+    "totalToolUses": "工具使用总量",
+    "toolUsesToday": "今日使用量",
+    "trend30d": "30日趋势",
+    "trendUsers": "新用户",
+    "trendToolUses": "工具使用",
+    "trendRevenue": "收入",
+    "toolRanking": "工具使用排名"
+  },
+  "users": {
+    "title": "用户管理",
+    "searchPlaceholder": "搜索邮箱或姓名...",
+    "filterAll": "全部",
+    "filterActive": "活跃",
+    "filterDisabled": "已禁用",
+    "id": "ID",
+    "email": "邮箱",
+    "name": "姓名",
+    "balance": "余额",
+    "status": "状态",
+    "createdAt": "注册时间",
+    "actions": "操作",
+    "active": "活跃",
+    "disabled": "已禁用",
+    "viewDetail": "查看",
+    "enable": "启用",
+    "disable": "禁用",
+    "detail": {
+      "title": "用户详情",
+      "back": "返回用户列表",
+      "basicInfo": "基本信息",
+      "emailVerified": "邮箱已验证",
+      "admin": "管理员",
+      "adjustCredits": "调整余额",
+      "adjustAmount": "调整数量",
+      "adjustDesc": "调整说明",
+      "adjustSubmit": "确认调整",
+      "adjustSuccess": "余额调整成功",
+      "recentLogins": "最近登录",
+      "loginIp": "IP 地址",
+      "loginUserAgent": "浏览器",
+      "loginTime": "时间",
+      "recentTransactions": "最近交易",
+      "txType": "类型",
+      "txAmount": "金额",
+      "txBalanceBefore": "变动前",
+      "txBalanceAfter": "变动后",
+      "txDescription": "说明",
+      "txTime": "时间",
+      "recentProcessing": "最近使用",
+      "procTool": "工具",
+      "procStatus": "状态",
+      "procTime": "时间"
+    }
+  },
+  "cards": {
+    "title": "卡密管理",
+    "generate": "生成卡密",
+    "count": "数量",
+    "credits": "面额",
+    "cardType": "类型",
+    "prefix": "前缀",
+    "expiresDays": "有效天数",
+    "generateSubmit": "生成",
+    "generatedCodes": "生成的卡密",
+    "copyAll": "复制全部",
+    "exportCsv": "导出CSV",
+    "copied": "已复制",
+    "summary": {
+      "unused": "未使用",
+      "redeemed": "已兑换",
+      "expired": "已过期",
+      "disabled": "已作废",
+      "totalIssued": "发行总额",
+      "totalRedeemed": "兑换总额"
+    },
+    "id": "ID",
+    "status": "状态",
+    "redeemedBy": "兑换人",
+    "expiresAt": "过期时间",
+    "redeemedAt": "兑换时间",
+    "createdAt": "创建时间",
+    "disableCard": "作废"
+  },
+  "operations": {
+    "title": "运营数据",
+    "tabs": {
+      "toolUsage": "工具使用",
+      "transactions": "流水查询",
+      "shareLinks": "分享链接",
+      "revenue": "收入报表"
+    },
+    "toolUsage": {
+      "days": "天数",
+      "allTools": "全部工具",
+      "tool": "工具",
+      "date": "日期",
+      "total": "总数",
+      "success": "成功",
+      "fail": "失败"
+    },
+    "transactions": {
+      "allTypes": "全部类型",
+      "type": "类型",
+      "user": "用户",
+      "amount": "金额",
+      "description": "说明",
+      "time": "时间"
+    },
+    "shareLinks": {
+      "allStatus": "全部状态",
+      "from": "发起人",
+      "to": "接收人",
+      "amount": "金额",
+      "status": "状态",
+      "time": "时间"
+    },
+    "revenue": {
+      "granularity": "粒度",
+      "day": "日",
+      "week": "周",
+      "month": "月",
+      "period": "时段",
+      "credits": "积分",
+      "transactions": "交易数",
+      "totalCredits": "总积分",
+      "totalTransactions": "总交易数"
+    }
+  },
+  "common": {
+    "loading": "加载中...",
+    "noData": "暂无数据",
+    "previous": "上一页",
+    "next": "下一页",
+    "close": "关闭"
+  }
+}

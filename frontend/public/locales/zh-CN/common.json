@@ -63,9 +63,16 @@
     "orSelectBelow": "或使用下方按钮选择文件",
     "progress": "上传进度"
   },
+  "preview": {
+    "before": "处理前",
+    "after": "处理后",
+    "input": "输入文件",
+    "output": "输出结果"
+  },
   "errors": {
     "fileTooLarge": "文件过大（> {{size}}MB）",
     "fileTooLargeShort": "文件过大",
-    "processingFailed": "处理失败，请稍后再试。"
+    "processingFailed": "处理失败，请稍后再试。",
+    "emailNotVerified": "请先验证邮箱后再使用此功能。"
   }
 }

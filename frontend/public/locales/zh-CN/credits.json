@@ -124,7 +124,6 @@
     "redeemPage": "兑换页",
     "shareCredits": "分享 Credits",
     "viewTransactions": "查看流水",
-    "devNote": "Phase 6 已接入证件照导出扣费、卡密兑换基础能力与分享领取流程。",
     "recentTransactions": "最近交易",
     "allTransactions": "全部流水",
     "noTransactions": "暂无交易流水"
@@ -140,8 +139,12 @@
   "processingHistory": {
     "seoTitle": "处理历史",
     "title": "处理历史",
-    "placeholder": "Phase 6 已预留页面入口。",
-    "description": "处理历史数据模型已存在，后续将接入 API 查询与分页展示。"
+    "loading": "加载中\u2026",
+    "loadError": "加载失败，请稍后重试。",
+    "empty": "暂无处理记录。",
+    "prev": "上一页",
+    "next": "下一页",
+    "pageInfo": "第 {{current}} / {{total}} 页"
   },
   "settings": {
     "seoTitle": "账户设置",
@@ -153,6 +156,7 @@
       "emailInvalid": "请输入有效的邮箱地址",
       "emailNotVerified": "邮箱未验证",
       "updateFailed": "更新失败",
+      "updateSuccess": "资料更新成功",
       "saving": "保存中...",
       "save": "保存"
     },

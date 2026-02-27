@@ -6,39 +6,67 @@
     "keywords": "id photo,passport photo,background removal,compliance check"
   },
   "exportAction": "Export Watermark-Free Photo",
-  "workflow": "Upload -> Compliance Check -> Size Selection -> Preview (watermarked) -> Export after login (1 Credit each)",
+  "workflow": "Upload & Process -> Adjust Size/Color -> Export (1 Credit each)",
   "steps": {
     "upload": "Upload",
-    "detection": "Detect",
-    "spec": "Size",
-    "preview": "Preview",
+    "adjust": "Adjust",
     "export": "Export"
   },
   "upload": {
-    "title": "1. Upload Photo & Detect Face",
+    "title": "Upload Photo",
     "hint": "For best results, use a front-facing photo with even lighting and visible shoulders.",
     "failed": "Upload failed. Please try again later.",
-    "detecting": "Uploading & detecting...",
-    "button": "Upload & Detect"
+    "detecting": "Processing...",
+    "processing": "Analyzing photo & removing background...",
+    "button": "Upload & Process"
   },
-  "detection": {
-    "title": "2. Detection Results",
-    "imageSize": "Image size: {{width}} x {{height}}",
-    "engine": "Detection engine: {{engine}}",
-    "faceCount": "Faces detected: {{count}}",
-    "sessionId": "Session ID: {{id}}..."
+  "uploadQuality": {
+    "title": "Upload Quality Gate",
+    "subtitle": "Complete key quality checks before upload to reduce rework later.",
+    "score": "Readiness {{score}}",
+    "scoreBand": {
+      "excellent": "Ready to upload",
+      "good": "Mostly ready",
+      "risky": "Improve before upload"
+    },
+    "analysisPending": "Face and compliance pre-checks will appear after processing.",
+    "signals": {
+      "file": "Photo selected",
+      "format": "File format",
+      "filesize": "File size",
+      "resolution": "Image resolution",
+      "face": "Face count",
+      "warnings": "System warnings"
+    },
+    "hints": {
+      "file": "Use a single-person front-facing photo",
+      "format": "JPG/PNG is recommended, avoid re-compressed screenshots",
+      "filesize": "Recommended range: 100KB - 10MB",
+      "resolution": "Recommended short edge >= 600px",
+      "face": "Keep exactly one clear front face",
+      "warnings": "Higher pass confidence with zero warnings"
+    },
+    "states": {
+      "pass": "pass",
+      "warn": "watch",
+      "fail": "fail",
+      "pending": "pending"
+    },
+    "warningCount": "{{count}} warnings detected",
+    "tipsTitle": "Capture tips",
+    "tips": {
+      "front": "Face the camera with level eyes",
+      "light": "Use even lighting and avoid hard shadows",
+      "shoulder": "Keep shoulders fully visible with headroom"
+    }
   },
   "spec": {
-    "title": "3. Choose Size & Background",
-    "hint": "After generating a watermarked preview, log in to export the clean photo and 6x4 print layout.",
-    "loadingSpecs": "Loading size options...",
-    "processingFailed": "Processing failed. Please try again later.",
-    "processing": "Processing...",
-    "generatePreview": "Generate Preview",
-    "previewLabel": "{{name}} - {{width}}x{{height}}px - Model {{model}}"
+    "title": "Size & Background",
+    "hint": "Changes take effect instantly. Log in to export watermark-free.",
+    "loadingSpecs": "Loading size options..."
   },
   "export": {
-    "title": "4. Export & Print Layout",
+    "title": "Export & Print Layout",
     "hint": "Both watermark-free export and 6x4 print layout require login and cost 1 Credit each.",
     "exportPhoto": "Export Watermark-Free Photo",
     "insufficientCredits": "Insufficient credits for export.",
@@ -54,16 +82,57 @@
   },
   "preview": {
     "watermarkAlt": "Preview (watermarked)",
-    "title": "ID Photo Preview"
+    "title": "ID Photo Preview",
+    "failed": "Preview generation failed. Please try again.",
+    "refreshing": "Updating preview..."
   },
   "compliance": {
     "title": "Compliance Check Results",
+    "subtitle": "Core ID-photo rules are scored automatically. Prioritize unresolved checks first.",
     "pass": "Passed",
     "needReview": "Needs Review",
-    "score": "Score {{score}}"
+    "score": "Score {{score}}",
+    "scoreTitle": "Overall quality score",
+    "scoreBand": {
+      "excellent": "Ready to use",
+      "good": "Solid quality",
+      "fair": "Needs tuning",
+      "risky": "High risk"
+    },
+    "metrics": {
+      "passed": "Passed checks",
+      "attention": "Needs attention",
+      "critical": "Critical risk",
+      "total": "{{count}} checks evaluated"
+    },
+    "severity": {
+      "critical": "critical",
+      "warning": "warning",
+      "info": "info"
+    },
+    "status": {
+      "pass": "PASS",
+      "check": "CHECK"
+    },
+    "advice": {
+      "title": "Optimization tips",
+      "ok": "Current result looks stable. You can continue to export.",
+      "fixIntro": "Address these checks first to improve pass confidence:",
+      "moreIssues": "{{count}} more checks can still be improved."
+    },
+    "noChecks": "No checks were returned yet. Please retry shortly."
   },
   "sizeStandard": {
-    "title": "Photo Size"
+    "title": "Photo Size",
+    "count": "{{count}} standards",
+    "selected": "Current standard details",
+    "dimensions": "Dimensions",
+    "pixels": "Output pixels",
+    "dpi": "Print DPI",
+    "ratio": "Aspect ratio",
+    "topMargin": "Top margin",
+    "face": "Face ratio",
+    "safeZoneHint": "Top margin {{top}}% | Face height {{face}}%"
   },
   "bgColor": {
     "white": "White",
@@ -71,16 +140,15 @@
     "lightBlue": "Light Blue",
     "red": "Red",
     "title": "Background Color",
-    "customLabel": "Custom background color"
-  },
-  "modelTier": {
-    "fast": "Fast",
-    "fastDesc": "Speed-first, suitable for most cases",
-    "balanced": "Balanced",
-    "balancedDesc": "Balance between quality and speed",
-    "quality": "High Quality",
-    "qualityDesc": "Slower, best for complex backgrounds",
-    "title": "Background Removal Model"
+    "customLabel": "Custom background color",
+    "previewTitle": "Background preview",
+    "previewHint": "Color changes apply instantly to the photo preview.",
+    "active": "active",
+    "hex": "HEX value",
+    "apply": "Apply",
+    "tipSolid": "Use solid background colors and avoid gradients.",
+    "tipContrast": "Keep clear contrast around hair edges and shoulders.",
+    "invalidHex": "Enter a valid HEX color (for example #4C8BF5)."
   },
   "paywall": {
     "title": "Log in to Export",

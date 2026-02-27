@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { GoogleLinkPasswordDialog } from '@/components/auth/GoogleLinkPasswordDialog'
 import { loginWithGoogleAccessToken } from '@/services/authApi'
 import { Button } from '@/components/ui/button'
+import { sanitizeRedirect } from '@/lib/authRedirect'
 
 type ApiError = {
   response?: { data?: { code?: string; detail?: string } }
@@ -37,14 +39,17 @@ export function GoogleOAuthButton() {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const redirectTo = params.get('redirect') ?? '/dashboard'
+  const { t } = useTranslation('auth')
+  const redirectTo = sanitizeRedirect(params.get('redirect'))
 
   const [pendingAccessToken, setPendingAccessToken] = useState<string | null>(null)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleGoogleSuccess = async (accessToken: string, linkPassword?: string) => {
     setLoading(true)
+    setError(null)
     try {
       await loginWithGoogleAccessToken(accessToken, linkPassword)
       setShowLinkDialog(false)
@@ -56,7 +61,9 @@ export function GoogleOAuthButton() {
         setPendingAccessToken(accessToken)
         setShowLinkDialog(true)
       } else {
-        throw err
+        const message =
+          (err as ApiError)?.response?.data?.detail ?? t('loginForm.loginFailed')
+        setError(message)
       }
     } finally {
       setLoading(false)
@@ -83,6 +90,7 @@ export function GoogleOAuthButton() {
         <GoogleIcon />
         {loading ? 'Google ...' : 'Google'}
       </Button>
+      {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       <GoogleLinkPasswordDialog
         open={showLinkDialog}
         onConfirm={async (password) => {

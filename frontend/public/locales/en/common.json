@@ -63,9 +63,16 @@
     "orSelectBelow": "or use the button below to select files",
     "progress": "Upload Progress"
   },
+  "preview": {
+    "before": "Before",
+    "after": "After",
+    "input": "Input File",
+    "output": "Output Result"
+  },
   "errors": {
     "fileTooLarge": "File too large (> {{size}}MB)",
     "fileTooLargeShort": "File too large",
-    "processingFailed": "Processing failed. Please try again later."
+    "processingFailed": "Processing failed. Please try again later.",
+    "emailNotVerified": "Please verify your email before using this feature."
   }
 }

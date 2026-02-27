@@ -124,7 +124,6 @@
     "redeemPage": "Redeem",
     "shareCredits": "Share Credits",
     "viewTransactions": "Transactions",
-    "devNote": "Phase 6: ID photo export billing, code redemption, and share/claim flow are now live.",
     "recentTransactions": "Recent Transactions",
     "allTransactions": "View All",
     "noTransactions": "No transactions yet"
@@ -140,8 +139,12 @@
   "processingHistory": {
     "seoTitle": "Processing History",
     "title": "Processing History",
-    "placeholder": "Page entry reserved for Phase 6.",
-    "description": "The processing history data model exists. API queries and pagination will be added later."
+    "loading": "Loading\u2026",
+    "loadError": "Failed to load. Please try again later.",
+    "empty": "No processing history yet.",
+    "prev": "Previous",
+    "next": "Next",
+    "pageInfo": "Page {{current}} / {{total}}"
   },
   "settings": {
     "seoTitle": "Account Settings",
@@ -153,6 +156,7 @@
       "emailInvalid": "Please enter a valid email address",
       "emailNotVerified": "Email not verified",
       "updateFailed": "Update failed",
+      "updateSuccess": "Profile updated",
       "saving": "Saving...",
       "save": "Save"
     },

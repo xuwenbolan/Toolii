@@ -9,15 +9,9 @@ import { loginWithEmail } from '@/services/authApi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { sanitizeRedirect } from '@/lib/authRedirect'
 
 type LoginValues = { email: string; password: string }
-
-function sanitizeRedirect(raw: string | null): string {
-  if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
-    return raw
-  }
-  return '/dashboard'
-}
 
 export function LoginForm() {
   const { t } = useTranslation('auth')

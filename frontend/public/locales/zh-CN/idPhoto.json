@@ -6,39 +6,67 @@
     "keywords": "证件照,证件照制作,去背景,合规检测"
   },
   "exportAction": "导出无水印证件照",
-  "workflow": "上传 → 合规检测 → 规格选择 → 预览（水印）→ 登录后导出（各消耗 1 Credit）",
+  "workflow": "上传处理 -> 调整规格/底色 -> 导出（各消耗 1 Credit）",
   "steps": {
     "upload": "上传",
-    "detection": "检测",
-    "spec": "规格",
-    "preview": "预览",
+    "adjust": "调整",
     "export": "导出"
   },
   "upload": {
-    "title": "1. 上传照片并检测人脸",
+    "title": "上传照片",
     "hint": "建议上传正面、光线均匀、肩部完整的照片。",
     "failed": "上传失败，请稍后再试。",
-    "detecting": "上传检测中…",
-    "button": "上传并检测"
+    "detecting": "处理中…",
+    "processing": "正在分析照片并去除背景…",
+    "button": "上传并处理"
   },
-  "detection": {
-    "title": "2. 检测结果",
-    "imageSize": "图片尺寸：{{width}} × {{height}}",
-    "engine": "检测方式：{{engine}}",
-    "faceCount": "人脸数量：{{count}}",
-    "sessionId": "会话 ID：{{id}}…"
+  "uploadQuality": {
+    "title": "上传质量门槛",
+    "subtitle": "上传前先完成关键质量检查，可减少后续返工。",
+    "score": "准备度 {{score}}",
+    "scoreBand": {
+      "excellent": "可直接上传",
+      "good": "基本可用",
+      "risky": "建议优化后上传"
+    },
+    "analysisPending": "上传并处理后将显示人脸与合规预检。",
+    "signals": {
+      "file": "已选择照片",
+      "format": "文件格式",
+      "filesize": "文件大小",
+      "resolution": "图像分辨率",
+      "face": "人脸数量",
+      "warnings": "系统预警"
+    },
+    "hints": {
+      "file": "请选择单人正面照",
+      "format": "推荐 JPG/PNG，避免截图二次压缩",
+      "filesize": "建议 100KB - 10MB",
+      "resolution": "短边建议 >= 600px",
+      "face": "推荐仅保留 1 张正脸",
+      "warnings": "无预警时通过率更高"
+    },
+    "states": {
+      "pass": "通过",
+      "warn": "关注",
+      "fail": "不建议",
+      "pending": "待检测"
+    },
+    "warningCount": "检测到 {{count}} 条预警",
+    "tipsTitle": "拍摄建议",
+    "tips": {
+      "front": "正对镜头，眼睛平视",
+      "light": "光线均匀，避免强阴影",
+      "shoulder": "肩部完整露出，头顶留白"
+    }
   },
   "spec": {
-    "title": "3. 选择规格与底色",
-    "hint": "生成水印预览后可登录导出无水印图片与 6x4 排版。",
-    "loadingSpecs": "正在加载规格列表…",
-    "processingFailed": "证件照处理失败，请稍后再试。",
-    "processing": "处理中…",
-    "generatePreview": "生成预览",
-    "previewLabel": "{{name}} · {{width}}×{{height}}px · 模型 {{model}}"
+    "title": "规格与底色",
+    "hint": "修改即时生效。登录后可导出无水印图片。",
+    "loadingSpecs": "正在加载规格列表…"
   },
   "export": {
-    "title": "4. 导出与打印排版",
+    "title": "导出与打印排版",
     "hint": "导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。",
     "exportPhoto": "导出无水印证件照",
     "insufficientCredits": "Credits 余额不足，无法导出。",
@@ -54,16 +82,57 @@
   },
   "preview": {
     "watermarkAlt": "预览图（含水印）",
-    "title": "证件照预览"
+    "title": "证件照预览",
+    "failed": "预览生成失败，请稍后再试。",
+    "refreshing": "更新预览中…"
   },
   "compliance": {
     "title": "合规检测结果",
+    "subtitle": "系统自动评估关键证件照规则，未通过项建议优先处理。",
     "pass": "基础通过",
     "needReview": "需人工确认",
-    "score": "评分 {{score}}"
+    "score": "评分 {{score}}",
+    "scoreTitle": "综合质量评分",
+    "scoreBand": {
+      "excellent": "可直接使用",
+      "good": "整体良好",
+      "fair": "建议微调",
+      "risky": "风险较高"
+    },
+    "metrics": {
+      "passed": "通过项",
+      "attention": "待处理项",
+      "critical": "高风险项",
+      "total": "共检测 {{count}} 项"
+    },
+    "severity": {
+      "critical": "高风险",
+      "warning": "注意",
+      "info": "提示"
+    },
+    "status": {
+      "pass": "通过",
+      "check": "复查"
+    },
+    "advice": {
+      "title": "优化建议",
+      "ok": "当前状态稳定，可直接进入导出流程。",
+      "fixIntro": "建议优先处理以下项以提升通过率：",
+      "moreIssues": "另外还有 {{count}} 项可继续优化。"
+    },
+    "noChecks": "暂未返回检测项，请稍后重试。"
   },
   "sizeStandard": {
-    "title": "证件照规格"
+    "title": "证件照规格",
+    "count": "{{count}} 种标准",
+    "selected": "当前规格参数",
+    "dimensions": "尺寸",
+    "pixels": "输出像素",
+    "dpi": "打印 DPI",
+    "ratio": "比例",
+    "topMargin": "头顶留白",
+    "face": "人脸占比",
+    "safeZoneHint": "头顶留白 {{top}}% · 人脸高度 {{face}}%"
   },
   "bgColor": {
     "white": "白底",
@@ -71,16 +140,15 @@
     "lightBlue": "浅蓝",
     "red": "红底",
     "title": "背景颜色",
-    "customLabel": "自定义背景颜色"
-  },
-  "modelTier": {
-    "fast": "快速",
-    "fastDesc": "速度优先，适合大多数情况",
-    "balanced": "平衡",
-    "balancedDesc": "效果与速度平衡",
-    "quality": "高质量",
-    "qualityDesc": "更慢，适合复杂背景",
-    "title": "抠图模型档位"
+    "customLabel": "自定义背景颜色",
+    "previewTitle": "背景预览",
+    "previewHint": "颜色修改会即时应用到证件照预览。",
+    "active": "当前",
+    "hex": "HEX 色值",
+    "apply": "应用",
+    "tipSolid": "建议使用纯色背景，避免渐变纹理。",
+    "tipContrast": "发丝边缘需保持清晰对比，避免贴边发光。",
+    "invalidHex": "请输入有效的 HEX 颜色（如 #4C8BF5）。"
   },
   "paywall": {
     "title": "登录后导出无水印",

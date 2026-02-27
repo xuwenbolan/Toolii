@@ -1,0 +1,151 @@
+{
+  "title": "Admin Panel",
+  "backToSite": "Back to site",
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "cards": "Card Codes",
+    "operations": "Operations"
+  },
+  "dashboard": {
+    "totalUsers": "Total Users",
+    "newUsersToday": "New Today",
+    "activeUsers7d": "Active (7d)",
+    "totalRevenue": "Total Revenue",
+    "revenueToday": "Revenue Today",
+    "totalToolUses": "Total Tool Uses",
+    "toolUsesToday": "Uses Today",
+    "trend30d": "30-Day Trend",
+    "trendUsers": "New Users",
+    "trendToolUses": "Tool Uses",
+    "trendRevenue": "Revenue",
+    "toolRanking": "Tool Usage Ranking"
+  },
+  "users": {
+    "title": "User Management",
+    "searchPlaceholder": "Search email or name...",
+    "filterAll": "All",
+    "filterActive": "Active",
+    "filterDisabled": "Disabled",
+    "id": "ID",
+    "email": "Email",
+    "name": "Name",
+    "balance": "Balance",
+    "status": "Status",
+    "createdAt": "Registered",
+    "actions": "Actions",
+    "active": "Active",
+    "disabled": "Disabled",
+    "viewDetail": "View",
+    "enable": "Enable",
+    "disable": "Disable",
+    "detail": {
+      "title": "User Detail",
+      "back": "Back to Users",
+      "basicInfo": "Basic Info",
+      "emailVerified": "Email Verified",
+      "admin": "Admin",
+      "adjustCredits": "Adjust Credits",
+      "adjustAmount": "Amount",
+      "adjustDesc": "Description",
+      "adjustSubmit": "Confirm",
+      "adjustSuccess": "Credits adjusted successfully",
+      "recentLogins": "Recent Logins",
+      "loginIp": "IP",
+      "loginUserAgent": "User Agent",
+      "loginTime": "Time",
+      "recentTransactions": "Recent Transactions",
+      "txType": "Type",
+      "txAmount": "Amount",
+      "txBalanceBefore": "Before",
+      "txBalanceAfter": "After",
+      "txDescription": "Description",
+      "txTime": "Time",
+      "recentProcessing": "Recent Processing",
+      "procTool": "Tool",
+      "procStatus": "Status",
+      "procTime": "Time"
+    }
+  },
+  "cards": {
+    "title": "Card Code Management",
+    "generate": "Generate Cards",
+    "count": "Count",
+    "credits": "Credits",
+    "cardType": "Type",
+    "prefix": "Prefix",
+    "expiresDays": "Expiry (days)",
+    "generateSubmit": "Generate",
+    "generatedCodes": "Generated Codes",
+    "copyAll": "Copy All",
+    "exportCsv": "Export CSV",
+    "copied": "Copied",
+    "summary": {
+      "unused": "Unused",
+      "redeemed": "Redeemed",
+      "expired": "Expired",
+      "disabled": "Disabled",
+      "totalIssued": "Total Issued",
+      "totalRedeemed": "Total Redeemed"
+    },
+    "id": "ID",
+    "status": "Status",
+    "redeemedBy": "Redeemed By",
+    "expiresAt": "Expires",
+    "redeemedAt": "Redeemed At",
+    "createdAt": "Created",
+    "disableCard": "Disable"
+  },
+  "operations": {
+    "title": "Operations Data",
+    "tabs": {
+      "toolUsage": "Tool Usage",
+      "transactions": "Transactions",
+      "shareLinks": "Share Links",
+      "revenue": "Revenue"
+    },
+    "toolUsage": {
+      "days": "Days",
+      "allTools": "All Tools",
+      "tool": "Tool",
+      "date": "Date",
+      "total": "Total",
+      "success": "Success",
+      "fail": "Failed"
+    },
+    "transactions": {
+      "allTypes": "All Types",
+      "type": "Type",
+      "user": "User",
+      "amount": "Amount",
+      "description": "Description",
+      "time": "Time"
+    },
+    "shareLinks": {
+      "allStatus": "All Status",
+      "from": "From",
+      "to": "To",
+      "amount": "Amount",
+      "status": "Status",
+      "time": "Time"
+    },
+    "revenue": {
+      "granularity": "Granularity",
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "period": "Period",
+      "credits": "Credits",
+      "transactions": "Transactions",
+      "totalCredits": "Total Credits",
+      "totalTransactions": "Total Transactions"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "noData": "No data",
+    "previous": "Previous",
+    "next": "Next",
+    "close": "Close"
+  }
+}

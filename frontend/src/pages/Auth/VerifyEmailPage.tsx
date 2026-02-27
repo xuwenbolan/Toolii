@@ -17,11 +17,7 @@ export function VerifyEmailPage() {
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
-    if (!token) {
-      setState('error')
-      setErrorMsg(t('verifyEmail.missingToken'))
-      return
-    }
+    if (!token) return
 
     let cancelled = false
     ;(async () => {
@@ -45,6 +41,30 @@ export function VerifyEmailPage() {
       cancelled = true
     }
   }, [token, t])
+
+  if (!token) {
+    return (
+      <>
+        <SEOHead title={t('verifyEmail.title')} noindex />
+        <Card className="mx-auto max-w-md">
+          <CardHeader>
+            <CardTitle>{t('verifyEmail.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <p className="text-red-600 dark:text-red-400">{t('verifyEmail.missingToken')}</p>
+              <Link
+                to="/"
+                className="inline-block text-sm text-foreground underline underline-offset-4"
+              >
+                {t('verifyEmail.backHome')}
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </>
+    )
+  }
 
   return (
     <>
