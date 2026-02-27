@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
+import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
 import { SEOHead } from '@/components/common/SEOHead'
@@ -9,6 +11,7 @@ import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
 import { Button } from '@/components/ui/button'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { formatBytes } from '@/lib/fileValidation'
 import { convertImage, type FileResult } from '@/services/imageApi'
 
@@ -17,6 +20,7 @@ export function HeicToJpgPage() {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<FileResult | null>(null)
   const { pending, progress, error, reset, run } = useFileUpload()
+  const inputPreviewUrl = useObjectUrl(file)
 
   const fileInfo = useMemo(() => {
     if (!file) return null
@@ -37,7 +41,15 @@ export function HeicToJpgPage() {
           }}
         />
 
-        {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
+        {file ? (
+          <ArtifactPreviewCard
+            label={t('common:preview.input')}
+            filename={file.name}
+            sizeText={formatBytes(file.size)}
+            mediaKind="image"
+            mediaUrl={inputPreviewUrl}
+          />
+        ) : null}
 
         <ProcessingStatus pending={pending} error={error} />
         <UploadProgress value={pending ? progress : null} />
@@ -64,11 +76,25 @@ export function HeicToJpgPage() {
           </Button>
 
           {result ? (
-            <div className="space-y-2 rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">
-                {t('heicToJpg.output', { filename: result.filename, size: formatBytes(result.size) })}
-              </p>
-              <DownloadButton url={result.download_url} />
+            <div className="space-y-3">
+              {fileInfo ? (
+                <BeforeAfterPreview
+                  beforeFilename={file?.name ?? '-'}
+                  beforeSizeText={file ? formatBytes(file.size) : undefined}
+                  beforeUrl={inputPreviewUrl}
+                  afterFilename={result.filename}
+                  afterSizeText={formatBytes(result.size)}
+                  afterUrl={result.download_url}
+                />
+              ) : null}
+              <ArtifactPreviewCard
+                label={t('common:preview.output')}
+                filename={result.filename}
+                sizeText={formatBytes(result.size)}
+                mediaKind="image"
+                mediaUrl={result.download_url}
+                action={<DownloadButton url={result.download_url} className="w-auto" />}
+              />
             </div>
           ) : null}
         </div>

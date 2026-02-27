@@ -23,16 +23,6 @@ export type PhotoStandard = {
   layout_default_copies: number
 }
 
-export type PhotoUploadResponse = {
-  upload_id: string
-  filename: string
-  width: number
-  height: number
-  faces: PhotoFaceBox[]
-  detection_engine: string
-  warnings: string[]
-}
-
 export type ComplianceCheckItem = {
   id: string
   label: string
@@ -47,11 +37,21 @@ export type ComplianceResult = {
   checks: ComplianceCheckItem[]
 }
 
-export type PhotoProcessResponse = {
+export type PhotoUploadResponse = {
+  upload_id: string
+  filename: string
+  width: number
+  height: number
+  faces: PhotoFaceBox[]
+  detection_engine: string
+  warnings: string[]
+  compliance: ComplianceResult
+}
+
+export type PhotoPreviewResponse = {
   processed_id: string
   standard: PhotoStandard
   background_color: string
-  model_used: string
   preview_data_url: string
   compliance: ComplianceResult
   crop_box: { x: number; y: number; w: number; h: number }
@@ -82,13 +82,12 @@ export async function uploadIdPhoto(file: File, onProgress?: (percent: number) =
   return res.data
 }
 
-export async function processIdPhoto(payload: {
+export async function previewIdPhoto(payload: {
   upload_id: string
   standard: string
   background_color: string
-  model_tier: string
 }) {
-  const res = await api.post<PhotoProcessResponse>('/api/photo/process', payload)
+  const res = await api.post<PhotoPreviewResponse>('/api/photo/preview', payload)
   return res.data
 }
 
@@ -104,4 +103,3 @@ export async function layoutIdPhoto(processedId: string, copies?: number) {
   })
   return res.data
 }
-

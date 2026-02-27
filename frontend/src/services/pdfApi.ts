@@ -77,6 +77,21 @@ export async function editPdfPages(
   return res.data
 }
 
+export async function splitPdf(
+  file: File,
+  opts: { ranges: string },
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('ranges', opts.ranges)
+
+  const res = await api.post<FileResult>('/api/pdf/split', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
 export async function imagesToPdf(
   files: File[],
   opts: { dpi?: number } = {},

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { PdfMergeList } from '@/components/pdf/PdfMergeList'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
@@ -12,15 +13,6 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
 import { mergePdfs, type FileResult } from '@/services/pdfApi'
 import { SEOHead } from '@/components/common/SEOHead'
-
-function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
-  const nextIndex = index + direction
-  if (nextIndex < 0 || nextIndex >= items.length) return items
-  const next = items.slice()
-  const [item] = next.splice(index, 1)
-  next.splice(nextIndex, 0, item)
-  return next
-}
 
 export function PdfMergePage() {
   const { t } = useTranslation('tools')
@@ -55,9 +47,7 @@ export function PdfMergePage() {
 
         <PdfMergeList
           files={files}
-          onMove={(index, direction) => {
-            setFiles((prev) => moveItem(prev, index, direction))
-          }}
+          onReorder={setFiles}
           onRemove={(index) => {
             setFiles((prev) => prev.filter((_, i) => i !== index))
           }}
@@ -86,12 +76,13 @@ export function PdfMergePage() {
           </Button>
 
           {result ? (
-            <div className="space-y-2 rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">
-                {t('pdf.merge.output', { filename: result.filename, size: formatBytes(result.size) })}
-              </p>
-              <DownloadButton url={result.download_url} />
-            </div>
+            <ArtifactPreviewCard
+              label={t('common:preview.output')}
+              filename={result.filename}
+              sizeText={formatBytes(result.size)}
+              mediaKind="pdf"
+              action={<DownloadButton url={result.download_url} className="w-auto" />}
+            />
           ) : null}
         </div>
       </div>

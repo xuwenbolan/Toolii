@@ -10,7 +10,7 @@ const TOOLS = [
   { key: 'convert', to: '/image-tools/convert' },
   { key: 'mosaic', to: '/image-tools/mosaic' },
   { key: 'scanEnhance', to: '/image-tools/scan-enhance' },
-  { key: 'batch', to: '/image-tools/batch' },
+  { key: 'removeBg', to: '/image-tools/remove-bg' },
 ] as const
 
 export function ImageToolsIndexPage() {

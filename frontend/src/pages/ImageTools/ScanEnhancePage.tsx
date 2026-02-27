@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
+import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
 import { SEOHead } from '@/components/common/SEOHead'
@@ -9,6 +11,7 @@ import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
 import { Button } from '@/components/ui/button'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { formatBytes } from '@/lib/fileValidation'
 import { enhanceScan, type FileResult } from '@/services/imageApi'
 
@@ -20,6 +23,7 @@ export function ScanEnhancePage() {
   const [mode, setMode] = useState<Mode>('bw')
   const [result, setResult] = useState<FileResult | null>(null)
   const { pending, progress, error, reset, run } = useFileUpload()
+  const inputPreviewUrl = useObjectUrl(file)
 
   const fileInfo = useMemo(() => {
     if (!file) return null
@@ -40,7 +44,15 @@ export function ScanEnhancePage() {
           }}
         />
 
-        {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
+        {file ? (
+          <ArtifactPreviewCard
+            label={t('common:preview.input')}
+            filename={file.name}
+            sizeText={formatBytes(file.size)}
+            mediaKind="image"
+            mediaUrl={inputPreviewUrl}
+          />
+        ) : null}
 
         <div className="space-y-2">
           <label className="text-sm font-medium">{t('scanEnhance.outputMode')}</label>
@@ -85,11 +97,25 @@ export function ScanEnhancePage() {
           </Button>
 
           {result ? (
-            <div className="space-y-2 rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">
-                {t('scanEnhance.output', { filename: result.filename, size: formatBytes(result.size) })}
-              </p>
-              <DownloadButton url={result.download_url} />
+            <div className="space-y-3">
+              {fileInfo ? (
+                <BeforeAfterPreview
+                  beforeFilename={file?.name ?? '-'}
+                  beforeSizeText={file ? formatBytes(file.size) : undefined}
+                  beforeUrl={inputPreviewUrl}
+                  afterFilename={result.filename}
+                  afterSizeText={formatBytes(result.size)}
+                  afterUrl={result.download_url}
+                />
+              ) : null}
+              <ArtifactPreviewCard
+                label={t('common:preview.output')}
+                filename={result.filename}
+                sizeText={formatBytes(result.size)}
+                mediaKind="image"
+                mediaUrl={result.download_url}
+                action={<DownloadButton url={result.download_url} className="w-auto" />}
+              />
             </div>
           ) : null}
         </div>

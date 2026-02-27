@@ -10,11 +10,6 @@ export type FileResult = {
   expires_in: number
 }
 
-export type BatchResponse = {
-  archive: FileResult
-  items: Array<{ input_filename: string; output: FileResult }>
-}
-
 function getProgressHandler(
   onProgress?: (percent: number) => void,
   fallbackTotal?: number,
@@ -91,26 +86,17 @@ export async function enhanceScan(
   return res.data
 }
 
-export async function batchProcess(
-  files: File[],
-  opts: {
-    action: 'compress' | 'convert'
-    outputFormat?: string
-    quality?: number
-    targetKb?: number
-  },
+export async function removeBackground(
+  file: File,
+  opts: { modelName?: string } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
-  for (const file of files) fd.append('files', file)
-  fd.append('action', opts.action)
-  if (opts.outputFormat) fd.append('output_format', opts.outputFormat)
-  if (opts.quality != null) fd.append('quality', String(opts.quality))
-  if (opts.targetKb != null) fd.append('target_kb', String(opts.targetKb))
+  fd.append('file', file)
+  if (opts.modelName) fd.append('model_name', opts.modelName)
 
-  const fallbackTotal = files.reduce((acc, f) => acc + f.size, 0)
-  const res = await api.post<BatchResponse>('/api/image/batch', fd, {
-    onUploadProgress: getProgressHandler(onProgress, fallbackTotal),
+  const res = await api.post<FileResult>('/api/image/remove-bg', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
   })
   return res.data
 }

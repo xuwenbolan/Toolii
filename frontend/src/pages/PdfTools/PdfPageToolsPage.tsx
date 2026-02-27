@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { PdfPageList } from '@/components/pdf/PdfPageList'
+import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
@@ -12,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
+import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
 import { editPdfPages, type FileResult } from '@/services/pdfApi'
 import { SEOHead } from '@/components/common/SEOHead'
 
@@ -56,14 +58,9 @@ export function PdfPageToolsPage() {
   const [operation, setOperation] = useState<Operation>('extract')
   const [pagesInput, setPagesInput] = useState('')
   const [orderInput, setOrderInput] = useState('')
-  const [rotation, setRotation] = useState(90)
+  const [rotationInput, setRotationInput] = useState('90')
   const [result, setResult] = useState<FileResult | null>(null)
   const { pending, progress, error, reset, run } = useFileUpload()
-
-  const fileInfo = useMemo(() => {
-    if (!file) return null
-    return `${file.name} · ${formatBytes(file.size)}`
-  }, [file])
 
   const parsedPagesPreview = useMemo(() => {
     try {
@@ -90,6 +87,14 @@ export function PdfPageToolsPage() {
 
   const inputError =
     operation === 'reorder' ? parsedOrderPreview.error : parsedPagesPreview.error
+  const rotation = parseFiniteNumber(rotationInput)
+  const rotationValid =
+    operation !== 'rotate' ||
+    (rotation != null && isIntInRange(rotation, -3600, 3600) && rotation % 90 === 0)
+  const requiredInputMissing =
+    operation === 'reorder'
+      ? parsedOrderPreview.pages.length === 0
+      : (operation === 'extract' || operation === 'delete') && parsedPagesPreview.pages.length === 0
 
   return (
     <>
@@ -106,7 +111,14 @@ export function PdfPageToolsPage() {
           }}
         />
 
-        {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
+        {file ? (
+          <ArtifactPreviewCard
+            label={t('common:preview.input')}
+            filename={file.name}
+            sizeText={formatBytes(file.size)}
+            mediaKind="pdf"
+          />
+        ) : null}
 
         <div className="grid gap-4">
           <div className="space-y-2">
@@ -161,8 +173,8 @@ export function PdfPageToolsPage() {
                 id="rotation"
                 type="number"
                 step={90}
-                value={rotation}
-                onChange={(e) => setRotation(Number(e.target.value))}
+                value={rotationInput}
+                onChange={(e) => setRotationInput(e.target.value)}
               />
             </div>
           ) : null}
@@ -182,21 +194,27 @@ export function PdfPageToolsPage() {
           <Button
             type="button"
             className="w-full"
-            disabled={!file || pending || !!inputError}
+            disabled={!file || pending || !!inputError || requiredInputMissing || !rotationValid}
             onClick={async () => {
-              if (!file) return
+              if (!file || requiredInputMissing || !rotationValid) return
               setResult(null)
               try {
                 const pagesList = operation === 'reorder' ? null : parsePageSpec(pagesInput, t)
                 const orderList = operation === 'reorder' ? parsePageSpec(orderInput, t) : null
+                const pagesPayload =
+                  operation === 'rotate'
+                    ? pagesList && pagesList.length > 0
+                      ? pagesList
+                      : undefined
+                    : pagesList ?? undefined
                 const res = await run((onProgress) =>
                   editPdfPages(
                     file,
                     {
                       operation,
-                      pages: pagesList && pagesList.length > 0 ? pagesList : undefined,
+                      pages: pagesPayload,
                       order: orderList && orderList.length > 0 ? orderList : undefined,
-                      rotation,
+                      rotation: rotation ?? 90,
                     },
                     onProgress,
                   ),
@@ -211,12 +229,13 @@ export function PdfPageToolsPage() {
           </Button>
 
           {result ? (
-            <div className="space-y-2 rounded-md border p-3">
-              <p className="text-xs text-muted-foreground">
-                {t('pdf.pages.output', { filename: result.filename, size: formatBytes(result.size) })}
-              </p>
-              <DownloadButton url={result.download_url} />
-            </div>
+            <ArtifactPreviewCard
+              label={t('common:preview.output')}
+              filename={result.filename}
+              sizeText={formatBytes(result.size)}
+              mediaKind="pdf"
+              action={<DownloadButton url={result.download_url} className="w-auto" />}
+            />
           ) : null}
         </div>
       </div>
