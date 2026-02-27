@@ -33,7 +33,7 @@ export function PdfToolsPage() {
         <p className="text-sm text-muted-foreground">匿名可用，适合材料整理与提交。</p>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         {TOOLS.map((item) => (
           <Link key={item.title} to={item.to} className="block">
             <Card className="transition hover:bg-accent/40">
@@ -50,4 +50,3 @@ export function PdfToolsPage() {
     </div>
   )
 }
-

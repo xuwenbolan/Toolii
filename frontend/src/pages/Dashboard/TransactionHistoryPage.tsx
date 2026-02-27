@@ -15,17 +15,23 @@ export function TransactionHistoryPage() {
     <>
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>交易流水</CardTitle>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => void credits.refreshAll()}>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={() => void credits.refreshAll()}
+              >
                 刷新
               </Button>
-              <Button type="button" size="sm" onClick={() => setRedeemDialogOpen(true)}>
+              <Button type="button" size="sm" className="w-full sm:w-auto" onClick={() => setRedeemDialogOpen(true)}>
                 快速兑换
               </Button>
-              <Button asChild type="button" size="sm" variant="outline">
-                <Link to="/credits/redeem">兑换页</Link>
+              <Button asChild type="button" size="sm" variant="outline" className="w-full sm:w-auto">
+                <Link to="/dashboard/redeem">兑换页</Link>
               </Button>
             </div>
           </div>

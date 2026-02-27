@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
+import { Logo } from '@/components/common/Logo'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -11,8 +12,8 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <MobileNav />
-        <Link to="/" className="font-semibold tracking-tight">
-          Toolii
+        <Link to="/">
+          <Logo size={22} />
         </Link>
         <nav className="ml-auto hidden items-center gap-2 md:flex">
           {user ? (

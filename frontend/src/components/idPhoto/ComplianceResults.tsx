@@ -7,7 +7,7 @@ type Props = {
 export function ComplianceResults({ result }: Props) {
   return (
     <div className="space-y-3 rounded-xl border p-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold">合规检测结果</h3>
         <div className="flex items-center gap-2 text-xs">
           <span
@@ -25,7 +25,7 @@ export function ComplianceResults({ result }: Props) {
       <div className="space-y-2">
         {result.checks.map((check) => (
           <div key={check.id} className="rounded-lg border px-3 py-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-medium">{check.label}</p>
               <span
                 className={[
@@ -43,4 +43,3 @@ export function ComplianceResults({ result }: Props) {
     </div>
   )
 }
-

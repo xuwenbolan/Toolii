@@ -5,6 +5,7 @@ from fastapi import Depends
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
+from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
 from app.models.user import User
@@ -37,6 +38,7 @@ async def upload(
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
         return await PhotoService().upload_and_detect(
             image_bytes=data,
             filename=file.filename or "photo",

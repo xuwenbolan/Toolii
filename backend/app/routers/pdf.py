@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi import Depends
 
 from app.core.config import settings
+from app.core.file_validation import validate_image_bytes, validate_pdf_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
 from app.schemas.pdf import FileResult, PdfPagesOperation
@@ -26,6 +27,7 @@ async def validate_pdf_upload(file: UploadFile = File(...)) -> tuple[UploadFile,
     data = await file.read()
     if len(data) > _max_pdf_bytes():
         raise HTTPException(status_code=413, detail="File too large")
+    validate_pdf_bytes(data)
     return file, data
 
 
@@ -80,6 +82,7 @@ async def merge(
             data = await file.read()
             if len(data) > _max_pdf_bytes():
                 raise HTTPException(status_code=413, detail="File too large")
+            validate_pdf_bytes(data)
             total += len(data)
             if total > max_total:
                 raise HTTPException(status_code=413, detail="Batch too large")
@@ -137,6 +140,7 @@ async def from_images(
             data = await file.read()
             if len(data) > _max_image_bytes():
                 raise HTTPException(status_code=413, detail="File too large")
+            validate_image_bytes(data)
             total += len(data)
             if total > max_total:
                 raise HTTPException(status_code=413, detail="Batch too large")

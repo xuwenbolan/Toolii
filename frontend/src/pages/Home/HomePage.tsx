@@ -39,8 +39,8 @@ export function HomePage() {
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {TOOL_CATEGORIES.map((item) => (
-          <Link key={item.title} to={item.to} className="block">
-            <Card className="transition hover:bg-accent/40">
+          <Link key={item.title} to={item.to} className="block h-full">
+            <Card className="h-full transition hover:bg-accent/40">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{item.title}</CardTitle>
               </CardHeader>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Logo } from '@/components/common/Logo'
 import {
   Sheet,
   SheetContent,
@@ -33,7 +34,7 @@ const NAV_ITEMS = [
 
 const AUTH_NAV = [
   { label: '控制台', to: '/dashboard', icon: LayoutDashboard },
-  { label: '兑换卡密', to: '/credits/redeem', icon: Wallet },
+  { label: '兑换卡密', to: '/dashboard/redeem', icon: Wallet },
 ]
 
 export function MobileNav() {
@@ -52,10 +53,10 @@ export function MobileNav() {
           <span className="sr-only">Menu</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-64 p-0">
+      <SheetContent side="left" className="w-[85vw] max-w-xs p-0">
         <SheetHeader className="px-4 pt-4 pb-2">
-          <SheetTitle className="text-left text-base font-semibold tracking-tight">
-            Toolii
+          <SheetTitle className="text-left text-base">
+            <Logo size={20} />
           </SheetTitle>
         </SheetHeader>
         <nav className="flex flex-col gap-1 px-2 py-2">

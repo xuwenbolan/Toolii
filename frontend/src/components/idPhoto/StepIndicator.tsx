@@ -8,7 +8,7 @@ type Props = {
 export function StepIndicator({ steps, currentStep }: Props) {
   return (
     <div className="rounded-xl border border-border/70 bg-card/60 p-3">
-      <ol className="grid grid-cols-5 gap-2">
+      <ol className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {steps.map((step, index) => {
           const active = index <= currentStep
           return (
@@ -35,4 +35,3 @@ export function StepIndicator({ steps, currentStep }: Props) {
     </div>
   )
 }
-

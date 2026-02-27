@@ -1,11 +1,36 @@
 from __future__ import annotations
 
+import contextlib
+import os
+import sys
+
+# Suppress noisy C++ logs from MediaPipe / TensorFlow Lite
+os.environ.setdefault("GLOG_minloglevel", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
+
+@contextlib.contextmanager
+def _suppress_native_stderr():
+    """Redirect OS-level fd 2 to /dev/null to silence C++ library output."""
+    stderr_fd = sys.stderr.fileno()
+    saved_fd = os.dup(stderr_fd)
+    try:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull, stderr_fd)
+        os.close(devnull)
+        yield
+    finally:
+        os.dup2(saved_fd, stderr_fd)
+        os.close(saved_fd)
+
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.error_handlers import register_error_handlers
 from app.core.rate_limiter import limiter, register_rate_limiter
+from app.core.security_headers import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
 from app.core.scheduler import scheduler, setup_scheduler
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
@@ -22,6 +47,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestSizeLimitMiddleware)
 
     app.state.limiter = limiter
     register_rate_limiter(app)
@@ -42,8 +69,9 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
-        prewarm_background_models(["silueta", "u2net_human_seg"])
-        prewarm_face_landmarker()
+        with _suppress_native_stderr():
+            prewarm_background_models(["silueta", "u2net_human_seg"])
+            prewarm_face_landmarker()
         setup_scheduler(scheduler)
         scheduler.start()
 

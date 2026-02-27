@@ -6,6 +6,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from fastapi import HTTPException
 
 from app.core.config import settings
+from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
 from app.schemas.image import BatchResponse, FileResult
@@ -32,6 +33,7 @@ async def compress(
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
         return await ImageService().compress(
             image_bytes=data,
             filename=file.filename or "image",
@@ -56,6 +58,7 @@ async def convert(
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
         return await ImageService().convert(
             image_bytes=data,
             filename=file.filename or "image",
@@ -79,6 +82,7 @@ async def mosaic(
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
         parsed = None
         if regions:
             try:
@@ -107,6 +111,7 @@ async def scan_enhance(
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
+        validate_image_bytes(data)
         return await ImageService().scan_enhance(
             image_bytes=data,
             filename=file.filename or "image",
@@ -141,6 +146,7 @@ async def batch(
                 raise HTTPException(status_code=413, detail="Batch too large")
             if len(data) > _max_image_bytes():
                 raise HTTPException(status_code=413, detail="File too large")
+            validate_image_bytes(data)
             payload.append((f.filename or "image", data))
 
         return await ImageService().batch(

@@ -23,7 +23,7 @@ export function BalanceDisplay({
 
   return (
     <div className={cn('rounded-lg border bg-muted/30 p-3', className)}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">当前 Credits</p>
           <div className="flex items-center gap-2">
@@ -49,6 +49,7 @@ export function BalanceDisplay({
           type="button"
           size="sm"
           variant="outline"
+          className="w-full sm:w-auto"
           disabled={pending}
           onClick={() => onRefresh?.()}
         >

@@ -30,6 +30,7 @@ class PhotoUploadResponse(BaseModel):
     height: int
     faces: list[FaceBox]
     detection_engine: str
+    warnings: list[str] = []
 
 
 class ComplianceCheckItem(BaseModel):

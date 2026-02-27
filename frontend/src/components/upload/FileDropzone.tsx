@@ -57,7 +57,7 @@ export function FileDropzone({
         </div>
       </Card>
 
-      <div className={showCamera ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
+      <div className={showCamera ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'grid grid-cols-1 gap-2'}>
         <Button type="button" variant="outline" onClick={open}>
           选择文件
         </Button>
@@ -91,4 +91,3 @@ export function FileDropzone({
     </div>
   )
 }
-

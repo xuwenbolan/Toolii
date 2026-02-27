@@ -150,6 +150,43 @@ class PhotoService:
         }
         return mapping.get(model_tier, "silueta")
 
+    @staticmethod
+    def _build_upload_warnings(
+        detection: dict[str, object],
+        width: int,
+        height: int,
+    ) -> list[str]:
+        warnings: list[str] = []
+        engine = str(detection.get("engine", ""))
+        faces = list(detection.get("faces", []))  # type: ignore[arg-type]
+        face_count = len(faces)
+
+        if engine == "fallback-center" or face_count == 0:
+            warnings.append("未检测到人脸，请上传正面、光线充足的照片")
+        elif "profile" in engine:
+            warnings.append("检测到侧面人脸，证件照要求正面朝向镜头")
+        elif face_count > 1:
+            warnings.append(f"检测到 {face_count} 张人脸，证件照要求仅含一人")
+
+        if width < 600 or height < 600:
+            warnings.append(f"图片分辨率 {width}x{height} 偏低，建议至少 600x600 像素")
+
+        if face_count == 1 and faces:
+            face = faces[0] if isinstance(faces[0], dict) else {}
+            conf = float(face.get("confidence", 1.0))
+            if conf < 0.5:
+                warnings.append("人脸检测置信度较低，可能影响后续处理效果")
+            fw = int(face.get("w", 0))
+            fh = int(face.get("h", 0))
+            if height > 0 and fh > 0:
+                ratio = fh / height
+                if ratio < 0.15:
+                    warnings.append("人脸在画面中占比过小，建议裁剪或靠近拍摄")
+                elif ratio > 0.85:
+                    warnings.append("人脸在画面中占比过大，建议拉远距离拍摄")
+
+        return warnings
+
     async def upload_and_detect(
         self,
         *,
@@ -161,22 +198,26 @@ class PhotoService:
         try:
             detection = await loop.run_in_executor(None, partial(detect_faces, image_bytes))
         except Exception as exc:  # noqa: BLE001
-            raise AppError(code="PHOTO_DETECT_FAILED", message="人脸检测失败", status_code=400) from exc
+            raise AppError(code="PHOTO_DETECT_FAILED", message="人脸检测失败，请确认上传的是有效图片", status_code=400) from exc
 
         stored = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
         upload_id = uuid.uuid4().hex
+        width = int(detection["width"])
+        height = int(detection["height"])
 
         session = UploadSession(
             upload_id=upload_id,
             file_id=stored.file_id,
             filename=filename,
-            width=int(detection["width"]),
-            height=int(detection["height"]),
+            width=width,
+            height=height,
             faces=[dict(item) for item in detection["faces"]],  # type: ignore[index]
             detection_engine=str(detection["engine"]),
             created_at=time.time(),
         )
         await self._store_upload_session(session)
+
+        warnings = self._build_upload_warnings(detection, width, height)
 
         return PhotoUploadResponse(
             upload_id=upload_id,
@@ -185,6 +226,7 @@ class PhotoService:
             height=session.height,
             faces=session.faces,  # type: ignore[arg-type]
             detection_engine=session.detection_engine,
+            warnings=warnings,
         )
 
     async def process(

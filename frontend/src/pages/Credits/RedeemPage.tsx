@@ -36,7 +36,7 @@ export function RedeemPage() {
             }}
           />
           <div className="flex justify-end">
-            <Button type="button" variant="outline" onClick={() => setShareDialogOpen(true)}>
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShareDialogOpen(true)}>
               分享 Credits
             </Button>
           </div>

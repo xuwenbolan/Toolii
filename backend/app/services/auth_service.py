@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppError, UnauthorizedError
+from app.core.login_guard import login_guard
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -20,14 +21,14 @@ class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def register(self, *, email: str, password: str) -> User:
+    async def register(self, *, email: str, password: str, name: str | None = None) -> User:
         email = email.strip().lower()
 
         result = await self._db.execute(select(User).where(User.email == email))
         if result.scalar_one_or_none() is not None:
             raise AppError(code="EMAIL_EXISTS", message="邮箱已注册", status_code=409)
 
-        user = User(email=email, hashed_password=hash_password(password))
+        user = User(email=email, hashed_password=hash_password(password), name=name)
         self._db.add(user)
         await self._db.flush()
 
@@ -38,14 +39,23 @@ class AuthService:
 
     async def login(self, *, email: str, password: str) -> User:
         email = email.strip().lower()
+
+        # Check lockout before doing any DB work
+        login_guard.check(email)
+
         result = await self._db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
+            login_guard.record_failure(email)
             raise UnauthorizedError("邮箱或密码错误")
         if not user.hashed_password:
+            login_guard.record_failure(email)
             raise UnauthorizedError("该账号仅支持 Google 登录")
         if not verify_password(password, user.hashed_password):
+            login_guard.record_failure(email)
             raise UnauthorizedError("邮箱或密码错误")
+
+        login_guard.record_success(email)
         return user
 
     async def google_auth(self, *, credential: str) -> User:
@@ -80,14 +90,18 @@ class AuthService:
             result = await self._db.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
 
+        name = payload.get("name")
+
         if user is None:
-            user = User(email=email, google_sub=sub, hashed_password=None)
+            user = User(email=email, google_sub=sub, hashed_password=None, name=name)
             self._db.add(user)
             await self._db.flush()
             self._db.add(UserCredit(user_id=user.id, balance=0))
         else:
             if not user.google_sub:
                 user.google_sub = sub
+            if name and not user.name:
+                user.name = name
             user.email = email
             user.is_active = True
 

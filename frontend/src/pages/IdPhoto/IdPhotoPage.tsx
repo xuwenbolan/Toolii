@@ -169,11 +169,12 @@ export function IdPhotoPage() {
               setLayoutResult(null)
               try {
                 const result = await uploadTask.run((onProgress) => uploadIdPhoto(file, onProgress), {
-                  errorMessage: '上传或人脸检测失败，请换一张清晰正面照再试。',
+                  errorMessage: '上传失败，请稍后再试。',
                 })
                 setUploadResult(result)
-              } catch {
-                // Error message is handled by useFileUpload.
+              } catch (err) {
+                const apiMsg = getApiErrorMessage(err, '')
+                if (apiMsg) uploadTask.setError(apiMsg)
               }
             }}
           >
@@ -184,7 +185,7 @@ export function IdPhotoPage() {
         {uploadResult ? (
           <div className="space-y-2 rounded-xl border p-4">
             <h2 className="text-sm font-semibold">2. 检测结果</h2>
-            <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
               <div className="rounded-md bg-muted/60 px-3 py-2">
                 图片尺寸：{uploadResult.width} × {uploadResult.height}
               </div>
@@ -198,6 +199,15 @@ export function IdPhotoPage() {
                 会话 ID：{uploadResult.upload_id.slice(0, 8)}…
               </div>
             </div>
+            {uploadResult.warnings.length > 0 ? (
+              <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
+                {uploadResult.warnings.map((msg, i) => (
+                  <p key={i} className="text-xs text-amber-800 dark:text-amber-200">
+                    {msg}
+                  </p>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -335,7 +345,7 @@ export function IdPhotoPage() {
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <div className="space-y-2">
                       <Label htmlFor="layoutCopies">排版张数（可选）</Label>
                       <Input
@@ -350,7 +360,7 @@ export function IdPhotoPage() {
                     </div>
                     <Button
                       type="button"
-                      className="self-end"
+                      className="w-full sm:w-auto sm:self-end"
                       variant="outline"
                       disabled={layoutPending}
                       onClick={async () => {

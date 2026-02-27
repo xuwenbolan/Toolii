@@ -58,7 +58,10 @@ export function TransactionList({
   return (
     <div className="space-y-2">
       {items.map((item) => (
-        <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+        <div
+          key={item.id}
+          className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{formatTxLabel(item.tx_type)}</p>
             <p className="truncate text-xs text-muted-foreground">
@@ -68,7 +71,7 @@ export function TransactionList({
               {item.reference_id ? `Ref: ${item.reference_id}` : `Tx #${item.id}`}
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <p
               className={
                 item.amount >= 0

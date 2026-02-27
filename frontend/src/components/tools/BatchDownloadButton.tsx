@@ -23,7 +23,7 @@ export function BatchDownloadButton({ batch }: Props) {
           {batch.items.map((item, idx) => (
             <div
               key={`${item.output.file_id}-${idx}`}
-              className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+              className="rounded-md border px-3 py-2"
             >
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{item.output.filename}</p>
@@ -35,6 +35,7 @@ export function BatchDownloadButton({ batch }: Props) {
                 type="button"
                 size="sm"
                 variant="outline"
+                className="mt-2 w-full sm:mt-3 sm:w-auto"
                 onClick={() => download(item.output.download_url)}
               >
                 下载
@@ -46,4 +47,3 @@ export function BatchDownloadButton({ batch }: Props) {
     </div>
   )
 }
-

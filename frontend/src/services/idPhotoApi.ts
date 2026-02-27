@@ -30,6 +30,7 @@ export type PhotoUploadResponse = {
   height: number
   faces: PhotoFaceBox[]
   detection_engine: string
+  warnings: string[]
 }
 
 export type ComplianceCheckItem = {

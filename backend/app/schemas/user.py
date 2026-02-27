@@ -8,5 +8,6 @@ class UserPublic(BaseModel):
 
     id: int
     email: EmailStr
+    name: str | None = None
 
     is_active: bool = True

@@ -23,12 +23,16 @@ export function ModelTierSelector({ value, onChange }: Props) {
             key={tier.value}
             type="button"
             className={[
-              'rounded-md border px-3 py-2 text-left',
-              value === tier.value ? 'border-primary bg-accent/40' : '',
+              'rounded-md border px-3 py-2 text-left transition-colors',
+              value === tier.value
+                ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                : 'hover:bg-muted/50',
             ].join(' ')}
             onClick={() => onChange(tier.value)}
           >
-            <p className="text-sm font-medium">{tier.label}</p>
+            <p className={['text-sm font-medium', value === tier.value ? 'text-primary' : ''].join(' ')}>
+              {tier.label}
+            </p>
             <p className="text-xs text-muted-foreground">{tier.desc}</p>
           </button>
         ))}

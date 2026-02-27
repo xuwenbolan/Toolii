@@ -23,7 +23,7 @@ export function OverviewPage() {
           <CardTitle>控制台</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>你好，{user?.email}</p>
+          <p>你好，{user?.name ?? user?.email}</p>
           <BalanceDisplay
             balance={credits.balance}
             pending={credits.balancePending}
@@ -37,7 +37,7 @@ export function OverviewPage() {
               快速兑换
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to="/credits/redeem">兑换页</Link>
+              <Link to="/dashboard/redeem">兑换页</Link>
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => setShareDialogOpen(true)}>
               分享 Credits
@@ -52,9 +52,9 @@ export function OverviewPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base">最近交易</CardTitle>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
               <Link to="/dashboard/transactions">全部流水</Link>
             </Button>
           </div>

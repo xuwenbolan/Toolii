@@ -15,33 +15,35 @@ export function PdfMergeList({ files, onMove, onRemove }: Props) {
       {files.map((file, index) => (
         <div
           key={`${file.name}-${index}-${file.size}`}
-          className="flex items-center gap-2 rounded-md border p-2"
+          className="rounded-md border p-2"
         >
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <p className="truncate text-sm font-medium">{file.name}</p>
             <p className="text-xs text-muted-foreground">{formatBytes(file.size)}</p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={index === 0}
-            onClick={() => onMove(index, -1)}
-          >
-            上移
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={index === files.length - 1}
-            onClick={() => onMove(index, 1)}
-          >
-            下移
-          </Button>
-          <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(index)}>
-            移除
-          </Button>
+          <div className="mt-2 flex flex-wrap gap-2 sm:mt-3">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={index === 0}
+              onClick={() => onMove(index, -1)}
+            >
+              上移
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={index === files.length - 1}
+              onClick={() => onMove(index, 1)}
+            >
+              下移
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(index)}>
+              移除
+            </Button>
+          </div>
         </div>
       ))}
     </div>

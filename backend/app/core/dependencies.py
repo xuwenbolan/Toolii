@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db as _get_db
 from app.core.exceptions import UnauthorizedError
 from app.core.security import decode_jwt_token
+from app.core.token_blacklist import token_blacklist
 from app.models.user import User
 
 
@@ -30,6 +31,10 @@ async def get_optional_user(
     token = decode_jwt_token(credentials.credentials)
     if token.token_type != "access":
         raise UnauthorizedError("Invalid token type")
+
+    jti = token.raw.get("jti")
+    if jti and token_blacklist.is_revoked(jti):
+        raise UnauthorizedError("Token has been revoked")
 
     try:
         user_id = int(token.sub)

@@ -36,29 +36,31 @@ export function RedeemCreditsDialog({
         className="absolute inset-0 bg-black/45"
         onClick={() => onOpenChange(false)}
       />
-      <div className="absolute inset-x-4 top-1/2 mx-auto w-auto max-w-md -translate-y-1/2">
-        <Card className="shadow-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">兑换 Credits</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              输入卡密后会立即到账。格式：TOOL-XXXX-XXXX-XXXX。
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <RedeemForm
-              onRedeemed={() => {
-                onChanged?.()
-                if (closeOnRedeemed) onOpenChange(false)
-              }}
-            />
+      <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
+        <div className="mx-auto flex min-h-full w-full max-w-md items-start sm:items-center">
+          <Card className="w-full shadow-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">兑换 Credits</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                输入卡密后会立即到账。格式：TOOL-XXXX-XXXX-XXXX。
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <RedeemForm
+                onRedeemed={() => {
+                  onChanged?.()
+                  if (closeOnRedeemed) onOpenChange(false)
+                }}
+              />
 
-            <div className="flex justify-end">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                关闭
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
+                  关闭
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

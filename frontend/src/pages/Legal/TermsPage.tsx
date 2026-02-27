@@ -25,7 +25,7 @@ export function TermsPage() {
       />
 
       <div className="rounded-2xl border bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:from-slate-950 dark:to-slate-900">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-1 text-xs text-muted-foreground">
               <FileText className="size-3.5" />
@@ -35,7 +35,7 @@ export function TermsPage() {
             <p className="text-sm text-muted-foreground">{t('terms.subtitle')}</p>
             <p className="text-xs text-muted-foreground">{t('terms.lastUpdated')}</p>
           </div>
-          <Button variant="ghost" size="sm" asChild>
+          <Button variant="ghost" size="sm" className="w-full sm:w-auto" asChild>
             <Link to="/">
               <ArrowLeft className="size-4" />
               {t('common:actions.backHome')}

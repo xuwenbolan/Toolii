@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+logger = logging.getLogger("app.core.config")
+
+_INSECURE_DEFAULTS = frozenset({"CHANGE_ME", "CHANGE_ME_TOO", ""})
 
 
 def _repo_root() -> Path:
@@ -65,6 +70,20 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _check_secrets(self) -> Settings:
+        problems: list[str] = []
+        if self.jwt_secret_key in _INSECURE_DEFAULTS:
+            problems.append("JWT_SECRET_KEY")
+        if self.download_signing_secret in _INSECURE_DEFAULTS:
+            problems.append("DOWNLOAD_SIGNING_SECRET")
+        if problems:
+            msg = f"Insecure default value for: {', '.join(problems)}. Set proper secrets in .env"
+            if self.env != "dev":
+                raise ValueError(msg)
+            logger.warning("SECURITY WARNING: %s", msg)
+        return self
 
 
 settings = Settings()

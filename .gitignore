@@ -21,3 +21,4 @@ __pycache__/
 data/
 models/
 
+docs/client_secret_*.json

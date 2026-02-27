@@ -127,7 +127,7 @@ export function ShareClaimPage() {
             ) : (
               <div className="rounded-lg border border-dashed p-3">
                 <p className="text-sm text-muted-foreground">登录后即可领取该分享。</p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <Button asChild size="sm">
                     <Link to={`/auth/login?redirect=${redirectTo}`}>去登录</Link>
                   </Button>

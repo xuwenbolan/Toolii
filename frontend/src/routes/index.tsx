@@ -39,14 +39,6 @@ export const router = createBrowserRouter([
       { path: 'id-photo', element: <IdPhotoPage /> },
       { path: 'legal/privacy', element: <PrivacyPolicyPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
-      {
-        path: 'credits/redeem',
-        element: (
-          <ProtectedRoute>
-            <RedeemPage />
-          </ProtectedRoute>
-        ),
-      },
       { path: 'share/:token', element: <ShareClaimPage /> },
       {
         path: 'image-tools',
@@ -89,6 +81,7 @@ export const router = createBrowserRouter([
           { index: true, element: <OverviewPage /> },
           { path: 'transactions', element: <TransactionHistoryPage /> },
           { path: 'history', element: <ProcessingHistoryPage /> },
+          { path: 'redeem', element: <RedeemPage /> },
         ],
       },
     ],

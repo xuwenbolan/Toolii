@@ -11,6 +11,21 @@ body {
 
 body {
   margin: 0;
+  overflow-x: clip;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
 @theme inline {

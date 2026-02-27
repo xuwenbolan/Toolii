@@ -9,6 +9,11 @@ from app.schemas.image import FileResult as ImageFileResult
 from app.services.file_service import FileService
 from app.services.image_service import ImageService
 
+# Minimal valid JPEG bytes (starts with FF D8 FF)
+_JPEG_STUB = b"\xff\xd8\xff\xe0" + b"\x00" * 20
+# Minimal valid PDF bytes
+_PDF_STUB = b"%PDF-1.4 fake content"
+
 
 def _replace_query_value(url: str, key: str, value: str) -> str:
     parsed = urlparse(url)
@@ -66,13 +71,13 @@ async def test_rate_limiting_for_anonymous_requests(async_client, monkeypatch: p
     for _ in range(10):
         ok = await async_client.post(
             "/api/image/compress",
-            files={"file": ("small.jpg", b"small-bytes", "image/jpeg")},
+            files={"file": ("small.jpg", _JPEG_STUB, "image/jpeg")},
         )
         assert ok.status_code == 200
 
     limited = await async_client.post(
         "/api/image/compress",
-        files={"file": ("small.jpg", b"small-bytes", "image/jpeg")},
+        files={"file": ("small.jpg", _JPEG_STUB, "image/jpeg")},
     )
     assert limited.status_code == 429
     assert limited.json()["code"] == "RATE_LIMITED"
