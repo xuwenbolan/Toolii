@@ -71,6 +71,7 @@ async def app_instance(
 
     monkeypatch.setattr(settings, "file_storage_dir", str(tmp_path / "files"))
     monkeypatch.setattr(app_main, "prewarm_background_models", lambda *_a, **_k: {})
+    monkeypatch.setattr(app_main, "prewarm_face_landmarker", lambda *_a, **_k: None)
     monkeypatch.setattr(app_main, "setup_scheduler", lambda *_a, **_k: None)
     monkeypatch.setattr(app_main.scheduler, "start", lambda *_a, **_k: None)
     monkeypatch.setattr(app_main.scheduler, "shutdown", lambda *_a, **_k: None)

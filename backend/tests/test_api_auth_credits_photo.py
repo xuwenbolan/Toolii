@@ -19,7 +19,6 @@ async def test_api_auth_register_login_refresh_me(async_client) -> None:
     assert register_res.status_code == 200
     register_payload = register_res.json()
     access_token = register_payload["tokens"]["access_token"]
-    refresh_token = register_payload["tokens"]["refresh_token"]
 
     me_res = await async_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access_token}"})
     assert me_res.status_code == 200
@@ -28,9 +27,15 @@ async def test_api_auth_register_login_refresh_me(async_client) -> None:
     login_res = await async_client.post("/api/auth/login", json={"email": email, "password": password})
     assert login_res.status_code == 200
 
-    refresh_res = await async_client.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+    # Refresh token is in HttpOnly cookie; extract and send explicitly.
+    refresh_cookie = register_res.cookies.get("toolii_refresh")
+    assert refresh_cookie, "Expected toolii_refresh cookie in register response"
+    refresh_res = await async_client.post(
+        "/api/auth/refresh",
+        cookies={"toolii_refresh": refresh_cookie},
+    )
     assert refresh_res.status_code == 200
-    assert refresh_res.json()["access_token"]
+    assert refresh_res.json()["tokens"]["access_token"]
 
 
 @pytest.mark.asyncio
