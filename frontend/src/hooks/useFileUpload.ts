@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 type Options = {
   errorMessage?: string
@@ -8,6 +9,7 @@ export function useFileUpload() {
   const [pending, setPending] = useState(false)
   const [progress, setProgress] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation('common')
 
   const reset = useCallback(() => {
     setError(null)
@@ -30,13 +32,12 @@ export function useFileUpload() {
       setProgress(100)
       return result
     } catch (err) {
-      setError(options.errorMessage ?? '处理失败，请稍后再试。')
+      setError(options.errorMessage ?? t('errors.processingFailed'))
       throw err
     } finally {
       setPending(false)
     }
-  }, [])
+  }, [t])
 
   return { pending, progress, error, setError, reset, run }
 }
-

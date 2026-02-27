@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { PdfMergeList } from '@/components/pdf/PdfMergeList'
 import { DownloadButton } from '@/components/tools/DownloadButton'
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
 import { mergePdfs, type FileResult } from '@/services/pdfApi'
+import { SEOHead } from '@/components/common/SEOHead'
 
 function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
   const nextIndex = index + direction
@@ -21,6 +23,7 @@ function moveItem<T>(items: T[], index: number, direction: -1 | 1): T[] {
 }
 
 export function PdfMergePage() {
+  const { t } = useTranslation('tools')
   const [files, setFiles] = useState<File[]>([])
   const [result, setResult] = useState<FileResult | null>(null)
   const { pending, progress, error, reset, run } = useFileUpload()
@@ -28,13 +31,15 @@ export function PdfMergePage() {
   const fileInfo = useMemo(() => {
     if (files.length === 0) return null
     const total = files.reduce((acc, file) => acc + file.size, 0)
-    return `${files.length} 个文件 · ${formatBytes(total)}`
-  }, [files])
+    return t('pdf.merge.fileInfo', { count: files.length, size: formatBytes(total) })
+  }, [files, t])
 
   return (
-    <ToolPageShell title="PDF 合并" description="按列表顺序合并 PDF" backTo="/pdf-tools">
-      <div className="space-y-5">
-        <FileDropzone
+    <>
+      <SEOHead title={t('pdf.merge.seoTitle')} description={t('pdf.merge.seoDescription')} keywords={t('pdf.merge.seoKeywords')} canonicalPath="/pdf-tools/merge" />
+      <ToolPageShell title={t('pdf.merge.title')} description={t('pdf.merge.description')} backTo="/pdf-tools">
+        <div className="space-y-5">
+          <FileDropzone
           accept="application/pdf"
           multiple
           maxFiles={20}
@@ -77,13 +82,13 @@ export function PdfMergePage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始合并'}
+            {pending ? t('pdf.merge.processing') : t('pdf.merge.startMerge')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('pdf.merge.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -91,6 +96,6 @@ export function PdfMergePage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }
-

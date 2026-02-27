@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import secrets
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,14 +18,19 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.models.email_verification import EmailVerificationToken
+from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.models.user_credit import UserCredit
+from app.services.email.factory import get_email_service
 
 class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def register(self, *, email: str, password: str, name: str | None = None) -> User:
+    async def register(self, *, email: str, password: str, name: str | None = None) -> tuple[User, str | None]:
+        """Register a new user. Returns (user, dev_token) where dev_token is
+        the raw verification token only in dev mode (for testing convenience)."""
         email = email.strip().lower()
 
         result = await self._db.execute(select(User).where(User.email == email))
@@ -33,9 +42,23 @@ class AuthService:
         await self._db.flush()
 
         self._db.add(UserCredit(user_id=user.id, balance=0))
+
+        # Create email verification token
+        raw_token = await self._create_verification_token(user.id)
+
         await self._db.commit()
         await self._db.refresh(user)
-        return user
+
+        # Send verification email (fire-and-forget, don't block registration)
+        email_svc = get_email_service()
+        await email_svc.send_verification_email(
+            to_email=user.email,
+            token=raw_token,
+            base_url=settings.frontend_base_url,
+        )
+
+        dev_token = raw_token if settings.env == "dev" else None
+        return user, dev_token
 
     async def login(self, *, email: str, password: str) -> User:
         email = email.strip().lower()
@@ -45,7 +68,16 @@ class AuthService:
 
         result = await self._db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
-        if user is None or not user.is_active:
+        if user is None:
+            login_guard.record_failure(email)
+            raise UnauthorizedError("邮箱或密码错误")
+        if not user.is_active and user.deleted_at is not None:
+            raise AppError(
+                code="ACCOUNT_DELETED",
+                message="该账号已删除，7 天内可通过恢复功能找回",
+                status_code=403,
+            )
+        if not user.is_active:
             login_guard.record_failure(email)
             raise UnauthorizedError("邮箱或密码错误")
         if not user.hashed_password:
@@ -58,20 +90,22 @@ class AuthService:
         login_guard.record_success(email)
         return user
 
-    async def google_auth(self, *, credential: str) -> User:
+    async def google_auth(self, *, access_token: str, link_password: str | None = None) -> User:
         if not settings.google_oauth_client_id:
             raise AppError(code="GOOGLE_OAUTH_DISABLED", message="Google 登录未配置", status_code=400)
 
-        from google.auth.transport import requests as google_requests
-        from google.oauth2 import id_token as google_id_token
+        import httpx
 
         try:
-            payload = google_id_token.verify_oauth2_token(
-                credential,
-                google_requests.Request(),
-                settings.google_oauth_client_id,
-            )
-        except Exception as exc:  # noqa: BLE001
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                payload = resp.json()
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
             raise UnauthorizedError("Google 凭证无效") from exc
 
         sub = payload.get("sub")
@@ -84,25 +118,55 @@ class AuthService:
 
         email = email.strip().lower()
 
+        # Look up by Google sub first
         result = await self._db.execute(select(User).where(User.google_sub == sub))
         user = result.scalar_one_or_none()
+
+        # If not found by sub, try email match
+        matched_by_email = False
         if user is None:
             result = await self._db.execute(select(User).where(User.email == email))
             user = result.scalar_one_or_none()
+            if user is not None:
+                matched_by_email = True
 
         name = payload.get("name")
 
         if user is None:
-            user = User(email=email, google_sub=sub, hashed_password=None, name=name)
+            # New user — create account
+            user = User(
+                email=email, google_sub=sub, hashed_password=None,
+                name=name, email_verified=True,
+            )
             self._db.add(user)
             await self._db.flush()
             self._db.add(UserCredit(user_id=user.id, balance=0))
+        elif matched_by_email and not user.google_sub and user.hashed_password:
+            # Existing account with password — require password confirmation to link
+            if not link_password:
+                raise AppError(
+                    code="LINK_REQUIRES_PASSWORD",
+                    message="该邮箱已有账号，请输入密码以关联 Google 登录",
+                    status_code=409,
+                )
+            if not verify_password(link_password, user.hashed_password):
+                raise AppError(
+                    code="WRONG_PASSWORD",
+                    message="密码错误",
+                    status_code=401,
+                )
+            user.google_sub = sub
+            if name and not user.name:
+                user.name = name
+            user.email_verified = True
         else:
+            # Existing Google-linked user or account without password
             if not user.google_sub:
                 user.google_sub = sub
             if name and not user.name:
                 user.name = name
             user.email = email
+            user.email_verified = True
             user.is_active = True
 
         try:
@@ -115,9 +179,17 @@ class AuthService:
         return user
 
     async def refresh(self, *, refresh_token: str) -> User:
+        from app.core.token_blacklist import token_blacklist
+
         token = decode_jwt_token(refresh_token)
         if token.token_type != "refresh":
             raise UnauthorizedError("Invalid token type")
+
+        jti = token.raw.get("jti")
+        if jti and token_blacklist.is_revoked(jti):
+            raise UnauthorizedError("Token has been revoked")
+        if jti and await token_blacklist.is_revoked_async(self._db, jti):
+            raise UnauthorizedError("Token has been revoked")
 
         try:
             user_id = int(token.sub)
@@ -128,10 +200,160 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
             raise UnauthorizedError("User not found")
+
+        if user.tokens_revoked_at is not None:
+            if token.iat < int(user.tokens_revoked_at.timestamp()):
+                raise UnauthorizedError("Token has been revoked")
+
+        return user
+
+    async def verify_email(self, *, token: str) -> User:
+        """Verify email using raw token string. Returns the user on success."""
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        now = datetime.now(timezone.utc)
+
+        result = await self._db.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.token_hash == token_hash,
+                EmailVerificationToken.used_at.is_(None),
+                EmailVerificationToken.expires_at > now,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if record is None:
+            raise AppError(
+                code="INVALID_VERIFICATION_TOKEN",
+                message="验证链接无效或已过期",
+                status_code=400,
+            )
+
+        record.used_at = now
+
+        result = await self._db.execute(select(User).where(User.id == record.user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+
+        user.email_verified = True
+        await self._db.commit()
+        await self._db.refresh(user)
+        return user
+
+    async def resend_verification(self, *, user_id: int) -> str | None:
+        """Resend verification email. Returns raw token in dev mode."""
+        result = await self._db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+        if user.email_verified:
+            raise AppError(code="ALREADY_VERIFIED", message="邮箱已验证", status_code=400)
+
+        raw_token = await self._create_verification_token(user.id)
+        await self._db.commit()
+
+        email_svc = get_email_service()
+        await email_svc.send_verification_email(
+            to_email=user.email,
+            token=raw_token,
+            base_url=settings.frontend_base_url,
+        )
+
+        return raw_token if settings.env == "dev" else None
+
+    async def _create_verification_token(self, user_id: int) -> str:
+        """Create a verification token and store its hash in DB. Returns raw token."""
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            hours=settings.email_verification_expire_hours
+        )
+        record = EmailVerificationToken(
+            user_id=user_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self._db.add(record)
+        return raw_token
+
+    async def forgot_password(self, *, email: str) -> str | None:
+        """Create password reset token and send email.
+        Always returns successfully to avoid email enumeration.
+        Returns raw token in dev mode if user exists."""
+        email = email.strip().lower()
+        result = await self._db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+        if user is None or not user.is_active or not user.hashed_password:
+            # Don't reveal whether email exists
+            return None
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.password_reset_expire_minutes
+        )
+        record = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+        )
+        self._db.add(record)
+        await self._db.commit()
+
+        email_svc = get_email_service()
+        await email_svc.send_password_reset_email(
+            to_email=user.email,
+            token=raw_token,
+            base_url=settings.frontend_base_url,
+        )
+
+        return raw_token if settings.env == "dev" else None
+
+    async def reset_password(self, *, token: str, new_password: str) -> User:
+        """Verify reset token and update password. Revokes all existing sessions."""
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        now = datetime.now(timezone.utc)
+
+        result = await self._db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.token_hash == token_hash,
+                PasswordResetToken.used_at.is_(None),
+                PasswordResetToken.expires_at > now,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if record is None:
+            raise AppError(
+                code="INVALID_RESET_TOKEN",
+                message="重置链接无效或已过期",
+                status_code=400,
+            )
+
+        record.used_at = now
+
+        result = await self._db.execute(select(User).where(User.id == record.user_id))
+        user = result.scalar_one_or_none()
+        if user is None or not user.is_active:
+            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+
+        user.hashed_password = hash_password(new_password)
+        # Revoke all existing sessions for security
+        user.tokens_revoked_at = now
+        await self._db.commit()
+        await self._db.refresh(user)
         return user
 
     @staticmethod
-    def issue_tokens(*, user_id: int) -> tuple[str, str, int]:
+    def issue_tokens(*, user_id: int) -> dict:
+        """Issue access + refresh tokens. Returns dict with token strings and JTIs."""
         access_token, expires_in = create_access_token(user_id=user_id)
         refresh_token, _refresh_expires_in = create_refresh_token(user_id=user_id)
-        return access_token, refresh_token, expires_in
+        access_decoded = decode_jwt_token(access_token)
+        refresh_decoded = decode_jwt_token(refresh_token)
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_in": expires_in,
+            "access_jti": access_decoded.raw.get("jti"),
+            "refresh_jti": refresh_decoded.raw.get("jti"),
+        }

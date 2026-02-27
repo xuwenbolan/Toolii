@@ -54,6 +54,21 @@ _upload_sessions: dict[str, UploadSession] = {}
 _processed_sessions: dict[str, ProcessedSession] = {}
 _session_lock = asyncio.Lock()
 
+# Sessions older than this (seconds) will be purged by the scheduler.
+_SESSION_TTL = 2 * 3600  # 2 hours
+
+
+def cleanup_expired_sessions() -> int:
+    """Remove photo sessions that have exceeded their TTL. Returns count removed."""
+    cutoff = time.time() - _SESSION_TTL
+    removed = 0
+    for store in (_upload_sessions, _processed_sessions):
+        expired = [k for k, v in store.items() if v.created_at < cutoff]
+        for k in expired:
+            del store[k]
+            removed += 1
+    return removed
+
 
 def _standards_path() -> Path:
     return Path(__file__).resolve().parents[1] / "data" / "photo_standards.json"
@@ -197,7 +212,7 @@ class PhotoService:
         loop = asyncio.get_running_loop()
         try:
             detection = await loop.run_in_executor(None, partial(detect_faces, image_bytes))
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PHOTO_DETECT_FAILED", message="人脸检测失败，请确认上传的是有效图片", status_code=400) from exc
 
         stored = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
@@ -274,7 +289,7 @@ class PhotoService:
             preview_png = await loop.run_in_executor(None, partial(_watermark_preview, processed_png))
         except AppError:
             raise
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PHOTO_PROCESS_FAILED", message="证件照处理失败", status_code=400) from exc
 
         out_name = f"{standard_code}-id-photo.png"
@@ -343,7 +358,7 @@ class PhotoService:
                 None,
                 partial(create_print_layout, photo_bytes, copies=count),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PHOTO_LAYOUT_FAILED", message="排版导出失败", status_code=400) from exc
 
         filename = f"{processed.standard_code}-layout-6x4.jpg"

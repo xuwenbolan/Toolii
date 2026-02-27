@@ -83,7 +83,7 @@ class ImageService:
                     max_bytes=max_bytes,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="图片压缩失败", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-compressed{_ext_for_mime(mime)}"
@@ -113,7 +113,7 @@ class ImageService:
                 None,
                 partial(convert_image, image_bytes, output_format=output_format, quality=quality),  # type: ignore[arg-type]
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="图片转换失败", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}{_ext_for_mime(mime)}"
@@ -134,7 +134,7 @@ class ImageService:
                 None,
                 partial(mosaic_image, image_bytes, regions=regions, pixel_size=pixel_size),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="图片马赛克失败", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-mosaic{_ext_for_mime(mime)}"
@@ -154,7 +154,7 @@ class ImageService:
         loop = asyncio.get_running_loop()
         try:
             out, mime = await loop.run_in_executor(None, partial(enhance_scan, image_bytes, mode=mode))  # type: ignore[arg-type]
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="扫描增强失败", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-scan{_ext_for_mime(mime)}"

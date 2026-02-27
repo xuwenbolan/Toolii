@@ -1,0 +1,71 @@
+{
+  "appName": "Toolii",
+  "nav": {
+    "home": "Home",
+    "idPhoto": "ID Photo",
+    "imageTools": "Image Tools",
+    "pdfTools": "PDF Tools",
+    "dashboard": "Dashboard",
+    "redeemCredits": "Redeem Credits",
+    "login": "Log in",
+    "register": "Sign up",
+    "logout": "Log out",
+    "logoutFull": "Log out"
+  },
+  "footer": {
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "contact": "Contact Us"
+  },
+  "dashboard": {
+    "overview": "Overview",
+    "transactions": "Transactions",
+    "processingHistory": "Processing History",
+    "redeemShare": "Redeem / Share",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Toolii Online Toolkit",
+    "subtitle": "ID photos, image processing, and PDF tools -- all in one place.",
+    "seoTitle": "Toolii Online Toolkit",
+    "seoDescription": "Toolii offers online tools for ID photo processing, image compression, format conversion, PDF merging, and more.",
+    "seoKeywords": "online tools,ID photo,image compression,HEIC to JPG,PDF merge",
+    "idPhoto": "ID Photo",
+    "idPhotoDesc": "Background removal, compliance check, and print layout (watermark-free export after login).",
+    "imageTools": "Image Tools",
+    "imageToolsDesc": "Compression, HEIC conversion, format conversion, mosaic, and scan enhancement.",
+    "pdfTools": "PDF Tools",
+    "pdfToolsDesc": "Compress, merge, split/reorder, and images to PDF."
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "description": "The page you requested does not exist or has been moved.",
+    "seoTitle": "Page Not Found",
+    "backHome": "Back to Home"
+  },
+  "seo": {
+    "defaultDescription": "Toolii online toolkit: ID photo processing, image tools, and PDF tools."
+  },
+  "actions": {
+    "backHome": "Back to Home",
+    "back": "Back",
+    "download": "Download",
+    "downloadResult": "Download Result",
+    "downloadZip": "Download ZIP",
+    "viewResults": "View individual results ({{count}})",
+    "selectFile": "Select File",
+    "takePhoto": "Take Photo",
+    "processing": "Processing...",
+    "processingWait": "Processing, please wait..."
+  },
+  "upload": {
+    "dropHere": "Drop files here",
+    "orSelectBelow": "or use the button below to select files",
+    "progress": "Upload Progress"
+  },
+  "errors": {
+    "fileTooLarge": "File too large (> {{size}}MB)",
+    "fileTooLargeShort": "File too large",
+    "processingFailed": "Processing failed. Please try again later."
+  }
+}

@@ -1,62 +1,45 @@
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { SEOHead } from '@/components/common/SEOHead'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const TOOLS = [
-  {
-    title: '图片压缩',
-    description: '自定义质量或压到指定大小。',
-    to: '/image-tools/compress',
-  },
-  {
-    title: 'HEIC 转 JPG',
-    description: '苹果用户常见格式，一键转换。',
-    to: '/image-tools/heic-to-jpg',
-  },
-  {
-    title: '格式转换',
-    description: 'JPG/PNG/WEBP 互转。',
-    to: '/image-tools/convert',
-  },
-  {
-    title: '图片马赛克',
-    description: '打码保护隐私（先支持整图马赛克）。',
-    to: '/image-tools/mosaic',
-  },
-  {
-    title: '扫描件增强',
-    description: '自动增强对比度与黑白化。',
-    to: '/image-tools/scan-enhance',
-  },
-  {
-    title: '批量处理',
-    description: '多图压缩/转换，打包 ZIP 下载。',
-    to: '/image-tools/batch',
-  },
-]
+  { key: 'compress', to: '/image-tools/compress' },
+  { key: 'heicToJpg', to: '/image-tools/heic-to-jpg' },
+  { key: 'convert', to: '/image-tools/convert' },
+  { key: 'mosaic', to: '/image-tools/mosaic' },
+  { key: 'scanEnhance', to: '/image-tools/scan-enhance' },
+  { key: 'batch', to: '/image-tools/batch' },
+] as const
 
 export function ImageToolsIndexPage() {
+  const { t } = useTranslation('tools')
+
   return (
-    <div className="space-y-5">
+    <>
+      <SEOHead title={t('seoTitle')} description={t('seoDescription')} keywords={t('seoKeywords')} canonicalPath="/image-tools" />
+      <div className="space-y-5">
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight">图片工具</h1>
-        <p className="text-sm text-muted-foreground">匿名可用，受限流保护。</p>
+        <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {TOOLS.map((item) => (
-          <Link key={item.title} to={item.to} className="block">
+          <Link key={item.key} to={item.to} className="block">
             <Card className="transition hover:bg-accent/40">
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">{item.title}</CardTitle>
+                <CardTitle className="text-base">{t(`${item.key}.title`)}</CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
-                {item.description}
+                {t(`${item.key}.indexDescription`)}
               </CardContent>
             </Card>
           </Link>
         ))}
       </div>
     </div>
+    </>
   )
 }

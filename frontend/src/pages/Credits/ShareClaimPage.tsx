@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
 
+import { SEOHead } from '@/components/common/SEOHead'
 import { BalanceDisplay } from '@/components/credits/BalanceDisplay'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,21 +16,14 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 function formatTime(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '--'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function statusLabel(status: string) {
-  if (status === 'pending') return '待领取'
-  if (status === 'claimed') return '已领取'
-  if (status === 'expired') return '已过期'
-  if (status === 'canceled') return '已取消'
-  return status
-}
-
 export function ShareClaimPage() {
+  const { t } = useTranslation('credits')
   const { token = '' } = useParams()
   const { isAuthenticated } = useAuth()
   const credits = useCredits({ enabled: isAuthenticated, includeTransactions: false })
@@ -39,6 +34,14 @@ export function ShareClaimPage() {
   const [claimPending, setClaimPending] = useState(false)
   const [claimError, setClaimError] = useState<string | null>(null)
   const [claimResult, setClaimResult] = useState<ShareClaimResponse | null>(null)
+
+  function statusLabel(status: string) {
+    if (status === 'pending') return t('claimPage.statusPending')
+    if (status === 'claimed') return t('claimPage.statusClaimed')
+    if (status === 'expired') return t('claimPage.statusExpired')
+    if (status === 'canceled') return t('claimPage.statusCanceled')
+    return status
+  }
 
   useEffect(() => {
     let active = true
@@ -52,7 +55,7 @@ export function ShareClaimPage() {
       })
       .catch((err) => {
         if (!active) return
-        setError(getApiErrorMessage(err, '分享链接不存在或已失效'))
+        setError(getApiErrorMessage(err, t('claimPage.linkInvalid')))
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -60,31 +63,33 @@ export function ShareClaimPage() {
     return () => {
       active = false
     }
-  }, [token])
+  }, [token, t])
 
   const redirectTo = useMemo(() => encodeURIComponent(`/share/${token}`), [token])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>领取分享 Credits</CardTitle>
+    <>
+      <SEOHead title={t('claimPage.seoTitle')} noindex />
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('claimPage.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {loading ? <p className="text-sm text-muted-foreground">正在加载分享信息…</p> : null}
+        {loading ? <p className="text-sm text-muted-foreground">{t('claimPage.loading')}</p> : null}
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {info ? (
           <div className="space-y-3">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              <p>分享数量：{info.amount} Credits</p>
-              <p>状态：{statusLabel(info.status)}</p>
-              <p>创建时间：{formatTime(info.created_at)}</p>
-              <p>过期时间：{formatTime(info.expires_at)}</p>
+              <p>{t('claimPage.amount', { amount: info.amount })}</p>
+              <p>{t('claimPage.status', { status: statusLabel(info.status) })}</p>
+              <p>{t('claimPage.createdAt', { date: formatTime(info.created_at) })}</p>
+              <p>{t('claimPage.expiresAt', { date: formatTime(info.expires_at) })}</p>
             </div>
 
             {claimResult ? (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                {claimResult.message}，到账 {claimResult.amount} Credits（当前余额 {claimResult.balance}）。
+                {claimResult.message}{', '}{t('claimPage.claimSuccess', { amount: claimResult.amount, balance: claimResult.balance })}
               </div>
             ) : null}
 
@@ -112,7 +117,7 @@ export function ShareClaimPage() {
                       setInfo((prev) => (prev ? { ...prev, status: 'claimed', can_claim: false } : prev))
                       void credits.refreshBalance()
                     } catch (err) {
-                      setClaimError(getApiErrorMessage(err, '领取失败，请稍后重试'))
+                      setClaimError(getApiErrorMessage(err, t('claimPage.claimFailed')))
                       void getShareInfo(token)
                         .then((data) => setInfo(data))
                         .catch(() => undefined)
@@ -121,18 +126,18 @@ export function ShareClaimPage() {
                     }
                   }}
                 >
-                  {claimPending ? '领取中…' : info.can_claim ? '领取 Credits' : '当前不可领取'}
+                  {claimPending ? t('claimPage.claiming') : info.can_claim ? t('claimPage.claimButton') : t('claimPage.cannotClaim')}
                 </Button>
               </>
             ) : (
               <div className="rounded-lg border border-dashed p-3">
-                <p className="text-sm text-muted-foreground">登录后即可领取该分享。</p>
+                <p className="text-sm text-muted-foreground">{t('claimPage.loginHint')}</p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <Button asChild size="sm">
-                    <Link to={`/auth/login?redirect=${redirectTo}`}>去登录</Link>
+                    <Link to={`/auth/login?redirect=${redirectTo}`}>{t('claimPage.login')}</Link>
                   </Button>
                   <Button asChild size="sm" variant="outline">
-                    <Link to={`/auth/register?redirect=${redirectTo}`}>注册</Link>
+                    <Link to={`/auth/register?redirect=${redirectTo}`}>{t('claimPage.register')}</Link>
                   </Button>
                 </div>
               </div>
@@ -141,5 +146,6 @@ export function ShareClaimPage() {
         ) : null}
       </CardContent>
     </Card>
+    </>
   )
 }

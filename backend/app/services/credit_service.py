@@ -3,8 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import logging
+
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from app.core.exceptions import AppError
 from app.models.card_code import CardCode
@@ -144,8 +149,9 @@ class CreditService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Credit change failed for user %s", user_id)
             raise AppError(code="CREDIT_CHANGE_FAILED", message="Credits 余额变更失败", status_code=500) from exc
 
     async def get_balance(self, *, user_id: int) -> int:
@@ -216,8 +222,9 @@ class CreditService:
             if autocommit:
                 raise
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             if autocommit:
+                logger.exception("Credit add failed for user %s", user_id)
                 raise AppError(code="CREDIT_ADD_FAILED", message="余额增加失败", status_code=500) from exc
             raise
 
@@ -253,8 +260,9 @@ class CreditService:
             if autocommit:
                 raise
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             if autocommit:
+                logger.exception("Credit consume failed for user %s", user_id)
                 raise AppError(code="CREDIT_CONSUME_FAILED", message="余额扣费失败", status_code=500) from exc
             raise
 
@@ -308,6 +316,7 @@ class CreditService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Card redeem failed for user %s", user_id)
             raise AppError(code="CARD_REDEEM_FAILED", message="卡密兑换失败", status_code=500) from exc

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Camera,
   FileText,
@@ -15,6 +16,7 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/common/Logo'
+import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher'
 import {
   Sheet,
   SheetContent,
@@ -25,22 +27,24 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/hooks/useAuth'
 
+// Translation keys for nav items
 const NAV_ITEMS = [
-  { label: '首页', to: '/', icon: Home },
-  { label: '证件照', to: '/id-photo', icon: Camera },
-  { label: '图片工具', to: '/image-tools', icon: ImageIcon },
-  { label: 'PDF 工具', to: '/pdf-tools', icon: FileText },
+  { labelKey: 'nav.home', to: '/', icon: Home },
+  { labelKey: 'nav.idPhoto', to: '/id-photo', icon: Camera },
+  { labelKey: 'nav.imageTools', to: '/image-tools', icon: ImageIcon },
+  { labelKey: 'nav.pdfTools', to: '/pdf-tools', icon: FileText },
 ]
 
 const AUTH_NAV = [
-  { label: '控制台', to: '/dashboard', icon: LayoutDashboard },
-  { label: '兑换卡密', to: '/dashboard/redeem', icon: Wallet },
+  { labelKey: 'nav.dashboard', to: '/dashboard', icon: LayoutDashboard },
+  { labelKey: 'nav.redeemCredits', to: '/dashboard/redeem', icon: Wallet },
 ]
 
 export function MobileNav() {
   const [open, setOpen] = useState(false)
   const { user, logout } = useAuth()
   const location = useLocation()
+  const { t } = useTranslation('common')
 
   const isActive = (to: string) =>
     to === '/' ? location.pathname === '/' : location.pathname.startsWith(to)
@@ -54,10 +58,11 @@ export function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[85vw] max-w-xs p-0">
-        <SheetHeader className="px-4 pt-4 pb-2">
+        <SheetHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
           <SheetTitle className="text-left text-base">
             <Logo size={20} />
           </SheetTitle>
+          <LanguageSwitcher />
         </SheetHeader>
         <nav className="flex flex-col gap-1 px-2 py-2">
           {NAV_ITEMS.map((item) => (
@@ -72,7 +77,7 @@ export function MobileNav() {
               }`}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              {t(item.labelKey)}
             </Link>
           ))}
 
@@ -92,7 +97,7 @@ export function MobileNav() {
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               ))}
               <button
@@ -104,7 +109,7 @@ export function MobileNav() {
                 className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
               >
                 <LogOut className="h-4 w-4" />
-                退出登录
+                {t('nav.logoutFull')}
               </button>
             </>
           ) : (
@@ -115,7 +120,7 @@ export function MobileNav() {
                 className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
               >
                 <LogIn className="h-4 w-4" />
-                登录
+                {t('nav.login')}
               </Link>
               <Link
                 to="/auth/register"
@@ -123,7 +128,7 @@ export function MobileNav() {
                 className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition hover:bg-accent/50 hover:text-foreground"
               >
                 <UserPlus className="h-4 w-4" />
-                注册
+                {t('nav.register')}
               </Link>
             </>
           )}

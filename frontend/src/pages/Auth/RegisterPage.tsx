@@ -1,22 +1,30 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { RegisterForm } from '@/components/auth/RegisterForm'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SEOHead } from '@/components/common/SEOHead'
+import { RegisterForm } from '@/components/auth/RegisterForm'
+
 export function RegisterPage() {
+  const { t } = useTranslation('auth')
+
   return (
-    <Card>
+    <>
+      <SEOHead title={t('register')} noindex />
+      <Card>
       <CardHeader>
-        <CardTitle>注册</CardTitle>
+        <CardTitle>{t('register')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <RegisterForm />
         <p className="text-center text-sm text-muted-foreground">
-          已有账号？{' '}
+          {t('registerPage.hasAccount')}{' '}
           <Link className="text-foreground underline underline-offset-4" to="/auth/login">
-            去登录
+            {t('registerPage.goLogin')}
           </Link>
         </p>
       </CardContent>
     </Card>
+    </>
   )
 }

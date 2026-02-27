@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
@@ -15,6 +17,7 @@ import { convertImage, type FileResult } from '@/services/imageApi'
 type Format = 'jpeg' | 'png' | 'webp'
 
 export function ConvertPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [format, setFormat] = useState<Format>('jpeg')
   const [quality, setQuality] = useState(92)
@@ -27,7 +30,9 @@ export function ConvertPage() {
   }, [file])
 
   return (
-    <ToolPageShell title="格式转换" description="支持 JPG / PNG / WEBP。">
+    <>
+      <SEOHead title={t('convert.seoTitle')} description={t('convert.seoDescription')} keywords={t('convert.seoKeywords')} canonicalPath="/image-tools/convert" />
+      <ToolPageShell title={t('convert.title')} description={t('convert.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -42,7 +47,7 @@ export function ConvertPage() {
 
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="format">输出格式</Label>
+            <Label htmlFor="format">{t('convert.outputFormat')}</Label>
             <select
               id="format"
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -56,7 +61,7 @@ export function ConvertPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quality">质量（仅 JPG/WEBP）</Label>
+            <Label htmlFor="quality">{t('convert.qualityLabel')}</Label>
             <Input
               id="quality"
               type="number"
@@ -96,13 +101,13 @@ export function ConvertPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始转换'}
+            {pending ? t('convert.processing') : t('convert.startConvert')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('convert.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -110,5 +115,6 @@ export function ConvertPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

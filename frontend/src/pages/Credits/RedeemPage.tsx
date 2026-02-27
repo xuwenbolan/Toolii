@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
+import { SEOHead } from '@/components/common/SEOHead'
 import { BalanceDisplay } from '@/components/credits/BalanceDisplay'
 import { RedeemForm } from '@/components/credits/RedeemForm'
 import { ShareCreditsDialog } from '@/components/credits/ShareCreditsDialog'
@@ -9,16 +11,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCredits } from '@/hooks/useCredits'
 
 export function RedeemPage() {
+  const { t } = useTranslation('credits')
   const credits = useCredits({ enabled: true, includeTransactions: true, transactionsLimit: 20 })
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <>
+      <SEOHead title={t('redeemPage.seoTitle')} noindex />
+      <div className="space-y-4">
+        <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">兑换 Credits</CardTitle>
+          <CardTitle className="text-base">{t('redeemPage.title')}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            输入卡密为账户充值，到账后可用于证件照导出与打印排版。
+            {t('redeemPage.description')}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -37,7 +42,7 @@ export function RedeemPage() {
           />
           <div className="flex justify-end">
             <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setShareDialogOpen(true)}>
-              分享 Credits
+              {t('redeemPage.shareButton')}
             </Button>
           </div>
         </CardContent>
@@ -45,7 +50,7 @@ export function RedeemPage() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">最近交易流水</CardTitle>
+          <CardTitle className="text-base">{t('redeemPage.recentTransactions')}</CardTitle>
         </CardHeader>
         <CardContent>
           <TransactionList
@@ -64,5 +69,6 @@ export function RedeemPage() {
         }}
       />
     </div>
+    </>
   )
 }

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { BatchDownloadButton } from '@/components/tools/BatchDownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
@@ -15,6 +17,7 @@ import { batchProcess, type BatchResponse } from '@/services/imageApi'
 type Action = 'compress' | 'convert'
 
 export function BatchProcessPage() {
+  const { t } = useTranslation('tools')
   const [files, setFiles] = useState<File[]>([])
   const [action, setAction] = useState<Action>('compress')
   const [format, setFormat] = useState<'jpeg' | 'png' | 'webp'>('jpeg')
@@ -26,11 +29,13 @@ export function BatchProcessPage() {
   const fileInfo = useMemo(() => {
     if (files.length === 0) return null
     const total = files.reduce((acc, f) => acc + f.size, 0)
-    return `${files.length} 个文件 · ${formatBytes(total)}`
-  }, [files])
+    return t('batch.fileInfo', { count: files.length, size: formatBytes(total) })
+  }, [files, t])
 
   return (
-    <ToolPageShell title="批量处理" description="多图处理后打包 ZIP 下载。">
+    <>
+      <SEOHead title={t('batch.seoTitle')} description={t('batch.seoDescription')} keywords={t('batch.seoKeywords')} canonicalPath="/image-tools/batch" />
+      <ToolPageShell title={t('batch.title')} description={t('batch.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -47,21 +52,21 @@ export function BatchProcessPage() {
 
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="action">操作</Label>
+            <Label htmlFor="action">{t('batch.actionLabel')}</Label>
             <select
               id="action"
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
               value={action}
               onChange={(e) => setAction(e.target.value as Action)}
             >
-              <option value="compress">压缩</option>
-              <option value="convert">转换</option>
+              <option value="compress">{t('batch.actionCompress')}</option>
+              <option value="convert">{t('batch.actionConvert')}</option>
             </select>
           </div>
 
           {action === 'convert' ? (
             <div className="space-y-2">
-              <Label htmlFor="format">输出格式</Label>
+              <Label htmlFor="format">{t('batch.outputFormat')}</Label>
               <select
                 id="format"
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -76,7 +81,7 @@ export function BatchProcessPage() {
           ) : null}
 
           <div className="space-y-2">
-            <Label htmlFor="quality">质量（仅 JPG/WEBP）</Label>
+            <Label htmlFor="quality">{t('batch.qualityLabel')}</Label>
             <Input
               id="quality"
               type="number"
@@ -89,12 +94,12 @@ export function BatchProcessPage() {
 
           {action === 'compress' ? (
             <div className="space-y-2">
-              <Label htmlFor="targetKb">目标大小（KB，可选）</Label>
+              <Label htmlFor="targetKb">{t('batch.targetSizeLabel')}</Label>
               <Input
                 id="targetKb"
                 type="number"
                 min={1}
-                placeholder="例如 500"
+                placeholder={t('batch.targetSizePlaceholder')}
                 value={targetKb}
                 onChange={(e) => setTargetKb(e.target.value === '' ? '' : Number(e.target.value))}
               />
@@ -133,13 +138,13 @@ export function BatchProcessPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始处理'}
+            {pending ? t('batch.processing') : t('batch.startProcess')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                ZIP：{result.archive.filename} · {formatBytes(result.archive.size)}
+                {t('batch.zipOutput', { filename: result.archive.filename, size: formatBytes(result.archive.size) })}
               </p>
               <BatchDownloadButton batch={result} />
             </div>
@@ -147,5 +152,6 @@ export function BatchProcessPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

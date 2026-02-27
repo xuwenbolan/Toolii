@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Label } from '@/components/ui/label'
 
 type Props = {
@@ -5,17 +7,20 @@ type Props = {
   onChange: (value: string) => void
 }
 
+// Preset key mapped to i18n key and hex value
 const PRESETS = [
-  { label: '白底', value: '#FFFFFF' },
-  { label: '蓝底', value: '#4C8BF5' },
-  { label: '浅蓝', value: '#DDEBFF' },
-  { label: '红底', value: '#D93E3E' },
-]
+  { i18nKey: 'bgColor.white', value: '#FFFFFF' },
+  { i18nKey: 'bgColor.blue', value: '#4C8BF5' },
+  { i18nKey: 'bgColor.lightBlue', value: '#DDEBFF' },
+  { i18nKey: 'bgColor.red', value: '#D93E3E' },
+] as const
 
 export function BackgroundColorPicker({ value, onChange }: Props) {
+  const { t } = useTranslation('idPhoto')
+
   return (
     <div className="space-y-2">
-      <Label>背景颜色</Label>
+      <Label>{t('bgColor.title')}</Label>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {PRESETS.map((preset) => (
           <button
@@ -34,14 +39,14 @@ export function BackgroundColorPicker({ value, onChange }: Props) {
               style={{ backgroundColor: preset.value }}
               aria-hidden="true"
             />
-            {preset.label}
+            {t(preset.i18nKey)}
           </button>
         ))}
       </div>
 
       <div className="flex items-center gap-2">
         <input
-          aria-label="自定义背景颜色"
+          aria-label={t('bgColor.customLabel')}
           type="color"
           value={value}
           onChange={(e) => onChange(e.target.value)}

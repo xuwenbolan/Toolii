@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,21 +24,14 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 function formatTime(value: string | null) {
-  if (!value) return '—'
+  if (!value) return '--'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function statusLabel(status: string) {
-  if (status === 'pending') return '待领取'
-  if (status === 'claimed') return '已领取'
-  if (status === 'canceled') return '已取消'
-  if (status === 'expired') return '已过期'
-  return status
-}
-
 export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
+  const { t } = useTranslation('credits')
   const [amount, setAmount] = useState<number | ''>(1)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +42,14 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
 
   const pendingLinks = useMemo(() => links.filter((item) => item.status === 'pending').slice(0, 6), [links])
 
+  function statusLabel(status: string) {
+    if (status === 'pending') return t('share.statusPending')
+    if (status === 'claimed') return t('share.statusClaimed')
+    if (status === 'canceled') return t('share.statusCanceled')
+    if (status === 'expired') return t('share.statusExpired')
+    return status
+  }
+
   const loadLinks = useCallback(async () => {
     setLoadingLinks(true)
     setLinksError(null)
@@ -55,11 +57,11 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
       const res = await fetchShareLinks({ limit: 20, offset: 0 })
       setLinks(res.items)
     } catch (err) {
-      setLinksError(getApiErrorMessage(err, '分享记录加载失败'))
+      setLinksError(getApiErrorMessage(err, t('share.linksLoadFailed')))
     } finally {
       setLoadingLinks(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     if (!open) return
@@ -82,16 +84,16 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
       <button
         type="button"
         className="absolute inset-0 bg-black/45"
-        aria-label="关闭弹窗"
+        aria-label={t('share.closeDialog')}
         onClick={() => onOpenChange(false)}
       />
       <div className="absolute inset-0 overflow-y-auto p-4 sm:p-6">
         <div className="mx-auto flex min-h-full w-full max-w-xl items-start sm:items-center">
           <Card className="w-full shadow-2xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">分享 Credits</CardTitle>
+              <CardTitle className="text-base">{t('share.title')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                创建分享链接后会先冻结 Credits，领取成功后转给对方；取消/过期会自动退回。
+                {t('share.dialogDescription')}
               </p>
             </CardHeader>
             <CardContent className="max-h-[min(85dvh,44rem)] space-y-4 overflow-y-auto pr-1">
@@ -103,7 +105,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                   setShareUrl(null)
                   const value = amount === '' ? 0 : amount
                   if (!Number.isInteger(value) || value < 1 || value > 1000) {
-                    setError('分享数量必须是 1-1000 的整数')
+                    setError(t('share.amountInvalid'))
                     return
                   }
 
@@ -115,14 +117,14 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                     await loadLinks()
                     onChanged?.()
                   } catch (err) {
-                    setError(getApiErrorMessage(err, '创建分享链接失败'))
+                    setError(getApiErrorMessage(err, t('share.createFailed')))
                   } finally {
                     setPending(false)
                   }
                 }}
               >
                 <div className="space-y-2">
-                  <Label htmlFor="shareAmount">分享数量</Label>
+                  <Label htmlFor="shareAmount">{t('share.amountLabel')}</Label>
                   <Input
                     id="shareAmount"
                     type="number"
@@ -134,13 +136,13 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                 </div>
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
                 <Button className="w-full" type="submit" disabled={pending}>
-                  {pending ? '创建中…' : '创建分享链接'}
+                  {pending ? t('share.creating') : t('share.createButton')}
                 </Button>
               </form>
 
               {shareUrl ? (
                 <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-                  <p className="text-xs font-medium">分享链接已生成</p>
+                  <p className="text-xs font-medium">{t('share.linkGenerated')}</p>
                   <Input readOnly value={shareUrl} />
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
@@ -156,7 +158,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                         }
                       }}
                     >
-                      复制链接
+                      {t('share.copyLink')}
                     </Button>
                     <Button
                       type="button"
@@ -164,7 +166,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                       className="w-full sm:flex-1"
                       onClick={() => window.open(shareUrl, '_blank', 'noopener,noreferrer')}
                     >
-                      打开落地页
+                      {t('share.openPage')}
                     </Button>
                   </div>
                 </div>
@@ -172,16 +174,16 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
 
               <div className="rounded-lg border p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium">最近分享记录</p>
+                  <p className="text-xs font-medium">{t('share.recentLinks')}</p>
                   <Button type="button" size="sm" variant="outline" onClick={() => void loadLinks()} disabled={loadingLinks}>
-                    {loadingLinks ? '刷新中…' : '刷新'}
+                    {loadingLinks ? t('share.refreshing') : t('share.refresh')}
                   </Button>
                 </div>
 
                 {linksError ? (
                   <p className="text-xs text-destructive">{linksError}</p>
                 ) : pendingLinks.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">暂无待领取分享</p>
+                  <p className="text-xs text-muted-foreground">{t('share.noPendingShares')}</p>
                 ) : (
                   <div className="space-y-2">
                     {pendingLinks.map((item) => (
@@ -201,16 +203,16 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                                   await loadLinks()
                                   onChanged?.()
                                 } catch (err) {
-                                  setLinksError(getApiErrorMessage(err, '取消分享失败'))
+                                  setLinksError(getApiErrorMessage(err, t('share.cancelFailed')))
                                 }
                               }}
                             >
-                              取消
+                              {t('share.cancel')}
                             </Button>
                           ) : null}
                         </div>
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          创建 {formatTime(item.created_at)} · 过期 {formatTime(item.expires_at)}
+                          {t('share.createdAt', { date: formatTime(item.created_at) })} · {t('share.expiresAt', { date: formatTime(item.expires_at) })}
                         </p>
                       </div>
                     ))}
@@ -220,7 +222,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
 
               <div className="flex justify-end">
                 <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                  关闭
+                  {t('share.close')}
                 </Button>
               </div>
             </CardContent>

@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     file_retention_hours: int = Field(default=24, alias="FILE_RETENTION_HOURS")
     download_url_ttl_seconds: int = Field(default=3600, alias="DOWNLOAD_URL_TTL_SECONDS")
 
+    # Email settings
+    email_provider: str = Field(default="dev", alias="EMAIL_PROVIDER")
+    resend_api_key: str = Field(default="", alias="RESEND_API_KEY")
+    email_from: str = Field(default="noreply@toolii.app", alias="EMAIL_FROM")
+    email_verification_expire_hours: int = Field(default=24, alias="EMAIL_VERIFICATION_EXPIRE_HOURS")
+    password_reset_expire_minutes: int = Field(default=30, alias="PASSWORD_RESET_EXPIRE_MINUTES")
+    frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
+
     model_config = SettingsConfigDict(
         env_file=(_repo_root() / ".env"),
         env_file_encoding="utf-8",

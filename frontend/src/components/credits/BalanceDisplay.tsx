@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +20,7 @@ export function BalanceDisplay({
   onRefresh,
   className,
 }: Props) {
+  const { t } = useTranslation('credits')
   const hasBalance = typeof balance === 'number'
   const enough = hasBalance && balance >= requiredCredits
 
@@ -25,9 +28,9 @@ export function BalanceDisplay({
     <div className={cn('rounded-lg border bg-muted/30 p-3', className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">当前 Credits</p>
+          <p className="text-xs text-muted-foreground">{t('balance.label')}</p>
           <div className="flex items-center gap-2">
-            <p className="text-lg font-semibold tabular-nums">{hasBalance ? balance : '—'}</p>
+            <p className="text-lg font-semibold tabular-nums">{hasBalance ? balance : '--'}</p>
             <span
               className={cn(
                 'inline-flex rounded-full border px-2 py-0.5 text-[11px]',
@@ -36,13 +39,13 @@ export function BalanceDisplay({
                   : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
               )}
             >
-              {hasBalance ? (enough ? `可用（≥${requiredCredits}）` : `不足（需 ${requiredCredits}）`) : '未加载'}
+              {hasBalance ? (enough ? t('balance.enough', { credit: requiredCredits }) : t('balance.insufficient', { credit: requiredCredits })) : t('balance.notLoaded')}
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            导出无水印与 6x4 排版各消耗 {requiredCredits} Credit。
+            {t('balance.costHint', { credit: requiredCredits })}
           </p>
-          {error ? <p className="text-xs text-destructive">余额获取失败：{error}</p> : null}
+          {error ? <p className="text-xs text-destructive">{t('balance.fetchFailed', { error })}</p> : null}
         </div>
 
         <Button
@@ -53,7 +56,7 @@ export function BalanceDisplay({
           disabled={pending}
           onClick={() => onRefresh?.()}
         >
-          {pending ? '刷新中…' : '刷新'}
+          {pending ? t('balance.refreshing') : t('balance.refresh')}
         </Button>
       </div>
     </div>

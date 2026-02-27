@@ -17,7 +17,7 @@ _MODEL_PRIORITY = ["silueta", "u2net_human_seg", "birefnet-portrait"]
 def warmup_background_model(model_name: str) -> bool:
     try:
         from rembg import new_session  # type: ignore
-    except Exception:  # noqa: BLE001
+    except ImportError:
         return False
 
     if model_name in _sessions:
@@ -26,7 +26,7 @@ def warmup_background_model(model_name: str) -> bool:
     try:
         _sessions[model_name] = new_session(model_name=model_name)
         return True
-    except Exception:  # noqa: BLE001
+    except (OSError, RuntimeError, ValueError):
         return False
 
 
@@ -166,7 +166,7 @@ def remove_background(
 
     try:
         from rembg import remove  # type: ignore
-    except Exception:  # noqa: BLE001
+    except ImportError:
         return _ensure_rgba_png_bytes(base_img), {"engine": "none", "model": None}
 
     attempts: list[dict[str, object]] = []
@@ -205,7 +205,7 @@ def remove_background(
                 }
             if alpha_meta.get("usable") and score >= 0.68:
                 break
-        except Exception:  # noqa: BLE001
+        except (OSError, RuntimeError, ValueError):
             attempts.append({"model": candidate, "ok": False})
 
     if best_bytes is not None and best_meta is not None:

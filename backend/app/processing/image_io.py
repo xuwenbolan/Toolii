@@ -8,7 +8,7 @@ try:
     import pillow_heif
 
     pillow_heif.register_heif_opener()
-except Exception:  # noqa: BLE001
+except ImportError:
     # pillow-heif is optional; other formats will still work.
     pillow_heif = None  # type: ignore[assignment]
 

@@ -1,0 +1,113 @@
+{
+  "privacy": {
+    "metaTitle": "Privacy Policy",
+    "metaDescription": "Learn how Toolii collects, uses, and protects your data.",
+    "badge": "Privacy & Data Protection",
+    "title": "Privacy Policy",
+    "subtitle": "We only process your information to the extent necessary to provide our services.",
+    "lastUpdated": "Last updated: 2026-02-27",
+    "summary": "Toolii provides online image and PDF processing services. Files you upload are used solely to fulfill your processing requests and are automatically cleaned up according to system retention policies. We do not use your files for advertising or unrelated purposes.",
+    "sections": [
+      {
+        "title": "1. Information We Collect",
+        "paragraphs": [
+          "Account information: When you sign up and log in, we store your email address, encrypted password, and basic account status.",
+          "Usage information: This includes tool type, processing time, file size, error logs, etc., used for troubleshooting and service optimization.",
+          "Payment and credits information: Redemption codes, balance changes, and sharing records are kept for auditing and risk control."
+        ]
+      },
+      {
+        "title": "2. File Processing & Storage",
+        "paragraphs": [
+          "Uploaded files are stored in a temporary directory and automatically cleaned up by scheduled background tasks.",
+          "Download links use signed URLs with expiration times and become inaccessible after they expire."
+        ],
+        "bullets": [
+          "Default file retention period: 24 hours",
+          "Default download link validity: 1 hour",
+          "Expired files are cleaned up in batch by background tasks"
+        ]
+      },
+      {
+        "title": "3. How We Use Your Information",
+        "bullets": [
+          "Provide core features including ID photos, image tools, and PDF tools",
+          "Ensure account security, balance consistency, and transaction traceability",
+          "Perform performance optimization, error monitoring, and abuse prevention"
+        ]
+      },
+      {
+        "title": "4. Cookies & Local Storage",
+        "paragraphs": [
+          "We use local storage to maintain login tokens, cookie consent status, and other essential information to ensure a stable experience across browsers.",
+          "You can choose to accept or reject non-essential analytics in the initial consent prompt."
+        ]
+      },
+      {
+        "title": "5. Third-Party Services",
+        "paragraphs": [
+          "If you use Google Sign-In, authentication follows Google's authorization flow.",
+          "If Google Analytics is enabled, analytics scripts are only loaded after you explicitly consent."
+        ]
+      },
+      {
+        "title": "6. Your Rights",
+        "bullets": [
+          "View and correct your account information",
+          "Request deletion of your account and related personal data",
+          "Withdraw consent for non-essential analytics"
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "Terms of Service",
+    "metaDescription": "Read Toolii's terms of service and liability boundaries.",
+    "badge": "Terms of Service",
+    "title": "Terms of Service",
+    "subtitle": "By using Toolii, you agree to the following terms.",
+    "lastUpdated": "Last updated: 2026-02-27",
+    "summary": "Toolii provides online file processing services for individual users. Please ensure the content you upload is lawful and that you have the right to process it. We strive to maintain service stability but cannot guarantee uninterrupted or error-free operation in all circumstances.",
+    "sections": [
+      {
+        "title": "1. Scope of Services",
+        "paragraphs": [
+          "Current services include ID photo processing, image tools, PDF tools, and the Credits system.",
+          "We may adjust features, parameter limits, and pricing based on product development."
+        ]
+      },
+      {
+        "title": "2. User Responsibilities",
+        "bullets": [
+          "Only upload files you have the right to process",
+          "Do not upload illegal, infringing, or malicious content",
+          "Do not abuse APIs through scripts, bypass rate limits, or attack the system"
+        ]
+      },
+      {
+        "title": "3. Credits & Redemption Code Rules",
+        "paragraphs": [
+          "Once redeemed, a code is bound to the account and cannot be reused.",
+          "Exporting watermark-free ID photos and print layouts will deduct credits according to the rules."
+        ],
+        "bullets": [
+          "If your balance is insufficient, exports will be blocked with a top-up prompt",
+          "Unclaimed shared Credits will be automatically refunded after expiration"
+        ]
+      },
+      {
+        "title": "4. Availability & Disclaimer",
+        "paragraphs": [
+          "We do not guarantee that processing results will meet all official acceptance standards. Please verify before submission.",
+          "To the extent permitted by law, Toolii shall not be liable for indirect losses or lost profits."
+        ]
+      },
+      {
+        "title": "5. Changes to Terms",
+        "paragraphs": [
+          "We may update these terms and mark the latest date on the page. Continued use of the service constitutes acceptance of the updated terms."
+        ]
+      }
+    ]
+  }
+}

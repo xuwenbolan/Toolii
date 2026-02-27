@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { RedeemCreditsDialog } from '@/components/credits/RedeemCreditsDialog'
@@ -19,15 +20,6 @@ type Props = {
   onRedeemed?: () => void
 }
 
-function formatTxLabel(txType: string) {
-  if (txType === 'photo_export') return '证件照导出'
-  if (txType === 'photo_layout') return '6x4 排版导出'
-  if (txType === 'redeem') return '卡密兑换'
-  if (txType === 'share_claim') return '领取分享'
-  if (txType === 'share_create') return '创建分享'
-  return txType
-}
-
 function formatTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
@@ -44,14 +36,30 @@ export function InsufficientCreditsDialog({
   onOpenChange,
   requiredCredits = 1,
   balance,
-  actionLabel = '当前操作',
+  actionLabel,
   transactions = [],
   transactionsPending,
   transactionsError,
   onRefreshBalance,
   onRedeemed,
 }: Props) {
+  const { t } = useTranslation('credits')
   const [redeemDialogOpen, setRedeemDialogOpen] = useState(false)
+
+  const resolvedActionLabel = actionLabel ?? t('insufficient.defaultAction')
+
+  const txLabelMap: Record<string, string> = {
+    photo_export: t('insufficient.photoExport'),
+    photo_layout: t('insufficient.photoLayout'),
+    redeem: t('insufficient.redeem'),
+    share_claim: t('insufficient.shareClaim'),
+    share_create: t('insufficient.shareCreate'),
+  }
+
+  function formatTxLabel(txType: string) {
+    return txLabelMap[txType] ?? txType
+  }
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -70,7 +78,7 @@ export function InsufficientCreditsDialog({
     <div className="fixed inset-0 z-50">
       <button
         type="button"
-        aria-label="关闭弹窗"
+        aria-label={t('insufficient.closeDialog')}
         className="absolute inset-0 bg-black/45"
         onClick={() => onOpenChange(false)}
       />
@@ -79,20 +87,20 @@ export function InsufficientCreditsDialog({
           <Card className="w-full shadow-2xl">
             <CardHeader className="space-y-2 pb-3">
               <div className="inline-flex w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
-                Credits 余额不足
+                {t('insufficient.badge')}
               </div>
-              <CardTitle className="text-base">{actionLabel}需要 Credits</CardTitle>
+              <CardTitle className="text-base">{t('insufficient.needCredits', { actionLabel: resolvedActionLabel })}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                当前余额 <span className="font-medium text-foreground">{currentBalance}</span>，本次需要{' '}
-                <span className="font-medium text-foreground">{requiredCredits}</span>，还差{' '}
-                <span className="font-medium text-foreground">{gap}</span>。
+                {t('insufficient.currentBalance')} <span className="font-medium text-foreground">{currentBalance}</span>
+                {', '}{t('insufficient.thisTimeNeed')} <span className="font-medium text-foreground">{requiredCredits}</span>
+                {', '}{t('insufficient.shortBy')} <span className="font-medium text-foreground">{gap}</span>{'.'}
               </p>
             </CardHeader>
 
             <CardContent className="max-h-[min(85dvh,44rem)] space-y-4 overflow-y-auto pr-1">
               <div className="rounded-lg border bg-muted/30 p-3">
                 <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs font-medium">最近流水</p>
+                  <p className="text-xs font-medium">{t('insufficient.recentTransactions')}</p>
                   <Button
                     type="button"
                     size="sm"
@@ -100,16 +108,16 @@ export function InsufficientCreditsDialog({
                     className="w-full sm:w-auto"
                     onClick={() => onRefreshBalance?.()}
                   >
-                    刷新余额
+                    {t('insufficient.refreshBalance')}
                   </Button>
                 </div>
 
                 {transactionsPending ? (
-                  <p className="text-xs text-muted-foreground">正在加载流水…</p>
+                  <p className="text-xs text-muted-foreground">{t('insufficient.transactionsLoading')}</p>
                 ) : transactionsError ? (
-                  <p className="text-xs text-destructive">流水加载失败：{transactionsError}</p>
+                  <p className="text-xs text-destructive">{t('insufficient.transactionsLoadFailed', { error: transactionsError })}</p>
                 ) : transactions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">暂无流水记录</p>
+                  <p className="text-xs text-muted-foreground">{t('insufficient.noTransactions')}</p>
                 ) : (
                   <div className="space-y-2">
                     {transactions.slice(0, 5).map((item) => (
@@ -125,7 +133,7 @@ export function InsufficientCreditsDialog({
                           <p className={item.amount < 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>
                             {item.amount > 0 ? `+${item.amount}` : item.amount}
                           </p>
-                          <p className="text-muted-foreground">余额 {item.balance_after}</p>
+                          <p className="text-muted-foreground">{t('insufficient.transactionBalance', { balance: item.balance_after })}</p>
                         </div>
                       </div>
                     ))}
@@ -134,18 +142,18 @@ export function InsufficientCreditsDialog({
               </div>
 
               <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-                你可以前往兑换页进行卡密兑换，或通过分享链接领取 Credits。
+                {t('insufficient.hint')}
               </div>
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                  我知道了
+                  {t('insufficient.dismiss')}
                 </Button>
                 <Button type="button" className="w-full sm:w-auto" onClick={() => setRedeemDialogOpen(true)}>
-                  快速兑换
+                  {t('insufficient.quickRedeem')}
                 </Button>
                 <Button asChild type="button" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                  <Link to="/dashboard/redeem">去兑换 / 分享</Link>
+                  <Link to="/dashboard/redeem">{t('insufficient.goRedeem')}</Link>
                 </Button>
               </div>
             </CardContent>

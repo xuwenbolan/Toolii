@@ -1,17 +1,23 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 export function Footer() {
+  const { t } = useTranslation('common')
+
   return (
     <footer className="border-t">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3 px-4 py-6 text-center text-xs text-muted-foreground sm:justify-between sm:px-6 sm:text-left lg:px-8">
-        <p>© {new Date().getFullYear()} Toolii</p>
+        <p>&copy; {new Date().getFullYear()} Toolii</p>
         <div className="flex items-center gap-3">
           <Link className="transition hover:text-foreground" to="/legal/privacy">
-            隐私政策
+            {t('footer.privacy')}
           </Link>
           <Link className="transition hover:text-foreground" to="/legal/terms">
-            使用条款
+            {t('footer.terms')}
           </Link>
+          <a className="transition hover:text-foreground" href="mailto:contact@toolii.cc">
+            {t('footer.contact')}
+          </a>
         </div>
       </div>
     </footer>

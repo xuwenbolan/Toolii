@@ -1,15 +1,23 @@
+import { useTranslation } from 'react-i18next'
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { SEOHead } from '@/components/common/SEOHead'
 
 export function ProcessingHistoryPage() {
+  const { t } = useTranslation('credits')
+
   return (
-    <Card>
+    <>
+      <SEOHead title={t('processingHistory.seoTitle')} noindex />
+      <Card>
       <CardHeader>
-        <CardTitle>处理历史</CardTitle>
+        <CardTitle>{t('processingHistory.title')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 text-sm text-muted-foreground">
-        <p>Phase 6 已预留页面入口。</p>
-        <p>处理历史数据模型已存在，后续将接入 API 查询与分页展示。</p>
+        <p>{t('processingHistory.placeholder')}</p>
+        <p>{t('processingHistory.description')}</p>
       </CardContent>
     </Card>
+    </>
   )
 }

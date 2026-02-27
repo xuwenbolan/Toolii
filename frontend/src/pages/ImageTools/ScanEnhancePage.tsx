@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
@@ -13,6 +15,7 @@ import { enhanceScan, type FileResult } from '@/services/imageApi'
 type Mode = 'bw' | 'color'
 
 export function ScanEnhancePage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<Mode>('bw')
   const [result, setResult] = useState<FileResult | null>(null)
@@ -24,7 +27,9 @@ export function ScanEnhancePage() {
   }, [file])
 
   return (
-    <ToolPageShell title="扫描件增强" description="自动增强、黑白化（适合材料提交）。">
+    <>
+      <SEOHead title={t('scanEnhance.seoTitle')} description={t('scanEnhance.seoDescription')} keywords={t('scanEnhance.seoKeywords')} canonicalPath="/image-tools/scan-enhance" />
+      <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -38,21 +43,21 @@ export function ScanEnhancePage() {
         {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">输出模式</label>
+          <label className="text-sm font-medium">{t('scanEnhance.outputMode')}</label>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button
               type="button"
               variant={mode === 'bw' ? 'secondary' : 'outline'}
               onClick={() => setMode('bw')}
             >
-              黑白
+              {t('scanEnhance.bw')}
             </Button>
             <Button
               type="button"
               variant={mode === 'color' ? 'secondary' : 'outline'}
               onClick={() => setMode('color')}
             >
-              彩色
+              {t('scanEnhance.color')}
             </Button>
           </div>
         </div>
@@ -76,13 +81,13 @@ export function ScanEnhancePage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始处理'}
+            {pending ? t('scanEnhance.processing') : t('scanEnhance.startProcess')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('scanEnhance.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -90,5 +95,6 @@ export function ScanEnhancePage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

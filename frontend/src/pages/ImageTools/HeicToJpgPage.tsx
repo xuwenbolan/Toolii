@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
@@ -11,6 +13,7 @@ import { formatBytes } from '@/lib/fileValidation'
 import { convertImage, type FileResult } from '@/services/imageApi'
 
 export function HeicToJpgPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<FileResult | null>(null)
   const { pending, progress, error, reset, run } = useFileUpload()
@@ -21,7 +24,9 @@ export function HeicToJpgPage() {
   }, [file])
 
   return (
-    <ToolPageShell title="HEIC 转 JPG" description="将 HEIC/HEIF 图片转换为 JPG。">
+    <>
+      <SEOHead title={t('heicToJpg.seoTitle')} description={t('heicToJpg.seoDescription')} keywords={t('heicToJpg.seoKeywords')} canonicalPath="/image-tools/heic-to-jpg" />
+      <ToolPageShell title={t('heicToJpg.title')} description={t('heicToJpg.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -55,13 +60,13 @@ export function HeicToJpgPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始转换'}
+            {pending ? t('heicToJpg.processing') : t('heicToJpg.startConvert')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('heicToJpg.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -69,5 +74,6 @@ export function HeicToJpgPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

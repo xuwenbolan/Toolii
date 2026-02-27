@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import secrets
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
+
+logger = logging.getLogger(__name__)
 from app.models.share_link import ShareLink
 from app.services.credit_service import CreditAddResult, CreditService
 
@@ -147,8 +151,9 @@ class ShareService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Share link creation failed for user %s", user_id)
             raise AppError(code="SHARE_CREATE_FAILED", message="创建分享链接失败", status_code=500) from exc
 
     async def get_info(self, *, token: str) -> ShareLink:
@@ -208,8 +213,9 @@ class ShareService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Share claim failed for token %s", token)
             raise AppError(code="SHARE_CLAIM_FAILED", message="领取分享失败", status_code=500) from exc
 
     async def cancel(self, *, link_id: int, user_id: int) -> ShareCancelResult:
@@ -243,8 +249,9 @@ class ShareService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Share cancel failed for link %s", link_id)
             raise AppError(code="SHARE_CANCEL_FAILED", message="取消分享失败", status_code=500) from exc
 
     async def expire_pending_links(self, *, limit: int = 500) -> int:
@@ -275,6 +282,7 @@ class ShareService:
         except AppError:
             await self._db.rollback()
             raise
-        except Exception as exc:  # noqa: BLE001
+        except SQLAlchemyError as exc:
             await self._db.rollback()
+            logger.exception("Share expire job failed")
             raise AppError(code="SHARE_EXPIRE_JOB_FAILED", message="过期分享处理失败", status_code=500) from exc

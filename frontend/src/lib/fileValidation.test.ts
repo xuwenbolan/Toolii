@@ -13,7 +13,7 @@ describe('fileValidation', () => {
 
   it('throws when file exceeds max size', () => {
     const file = new File([new Uint8Array(2 * 1024 * 1024)], 'big.bin')
-    expect(() => assertMaxFileSize(file, 1)).toThrow('文件过大')
+    expect(() => assertMaxFileSize(file, 1)).toThrow()
   })
 
   it('passes when file is within max size', () => {

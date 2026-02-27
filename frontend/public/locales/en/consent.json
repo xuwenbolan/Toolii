@@ -1,0 +1,9 @@
+{
+  "cookieBanner": {
+    "message": "We use essential storage to maintain your login session and enable analytics with your consent. Please make a choice before continuing.",
+    "privacyLink": "Privacy Policy",
+    "termsLink": "Terms of Service",
+    "reject": "Essential Only",
+    "accept": "Accept & Continue"
+  }
+}

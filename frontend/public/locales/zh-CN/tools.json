@@ -1,28 +1,168 @@
 {
   "title": "图片工具",
+  "subtitle": "匿名可用，受限流保护。",
+  "seoTitle": "图片工具",
+  "seoDescription": "在线图片处理工具集：压缩、格式转换、HEIC 转 JPG、马赛克、扫描增强。",
+  "seoKeywords": "图片工具,图片处理,在线图片工具",
   "compress": {
     "title": "图片压缩",
-    "description": "支持质量压缩与目标大小压缩。"
+    "indexDescription": "自定义质量或压到指定大小。",
+    "seoTitle": "图片压缩",
+    "seoDescription": "在线图片压缩工具，支持质量压缩与目标大小压缩。",
+    "seoKeywords": "图片压缩,图片压缩工具,压缩图片",
+    "description": "支持质量压缩与目标大小压缩。",
+    "qualityLabel": "质量（1-100）",
+    "targetSizeLabel": "目标大小（KB，可选）",
+    "targetSizePlaceholder": "例如 500",
+    "targetSizeHint": "留空则按质量压缩。",
+    "processing": "处理中\u2026",
+    "startCompress": "开始压缩",
+    "output": "输出：{{filename}} \u00b7 {{size}}"
   },
   "heicToJpg": {
     "title": "HEIC 转 JPG",
-    "description": "将 HEIC/HEIF 图片转换为 JPG。"
+    "indexDescription": "苹果用户常见格式，一键转换。",
+    "seoTitle": "HEIC 转 JPG",
+    "seoDescription": "将 iPhone HEIC 照片转换为通用 JPG 格式。",
+    "seoKeywords": "HEIC转JPG,HEIC转换,iPhone照片转换",
+    "description": "将 HEIC/HEIF 图片转换为 JPG。",
+    "processing": "处理中\u2026",
+    "startConvert": "开始转换",
+    "output": "输出：{{filename}} \u00b7 {{size}}"
   },
   "convert": {
     "title": "格式转换",
-    "description": "支持 JPG / PNG / WEBP。"
+    "indexDescription": "JPG/PNG/WEBP 互转。",
+    "seoTitle": "图片格式转换",
+    "seoDescription": "在线图片格式转换，支持 JPG、PNG、WebP 等常见格式互转。",
+    "seoKeywords": "图片格式转换,图片转换,JPG转PNG,WebP转换",
+    "description": "支持 JPG / PNG / WEBP。",
+    "outputFormat": "输出格式",
+    "qualityLabel": "质量（仅 JPG/WEBP）",
+    "processing": "处理中\u2026",
+    "startConvert": "开始转换",
+    "output": "输出：{{filename}} \u00b7 {{size}}"
   },
   "mosaic": {
     "title": "图片马赛克",
-    "description": "当前版本：整图马赛克（后续支持框选区域）。"
+    "indexDescription": "打码保护隐私（先支持整图马赛克）。",
+    "seoTitle": "图片马赛克",
+    "seoDescription": "在线图片马赛克工具，保护隐私信息。",
+    "seoKeywords": "图片马赛克,马赛克工具,图片打码",
+    "description": "当前版本：整图马赛克（后续支持框选区域）。",
+    "pixelSizeLabel": "像素块大小",
+    "processing": "处理中\u2026",
+    "startProcess": "开始处理",
+    "output": "输出：{{filename}} \u00b7 {{size}}"
   },
   "scanEnhance": {
     "title": "扫描件增强",
-    "description": "自动增强、黑白化（适合材料提交）。"
+    "indexDescription": "自动增强对比度与黑白化。",
+    "seoTitle": "扫描增强",
+    "seoDescription": "增强扫描件清晰度，提升文档可读性。",
+    "seoKeywords": "扫描增强,文档增强,扫描件优化",
+    "description": "自动增强、黑白化（适合材料提交）。",
+    "outputMode": "输出模式",
+    "bw": "黑白",
+    "color": "彩色",
+    "processing": "处理中\u2026",
+    "startProcess": "开始处理",
+    "output": "输出：{{filename}} \u00b7 {{size}}"
   },
   "batch": {
     "title": "批量处理",
-    "description": "多图处理后打包 ZIP 下载。"
+    "indexDescription": "多图压缩/转换，打包 ZIP 下载。",
+    "seoTitle": "批量处理",
+    "seoDescription": "批量压缩、转换图片，一次处理多个文件。",
+    "seoKeywords": "批量处理,批量压缩,批量转换",
+    "description": "多图处理后打包 ZIP 下载。",
+    "actionLabel": "操作",
+    "actionCompress": "压缩",
+    "actionConvert": "转换",
+    "outputFormat": "输出格式",
+    "qualityLabel": "质量（仅 JPG/WEBP）",
+    "targetSizeLabel": "目标大小（KB，可选）",
+    "targetSizePlaceholder": "例如 500",
+    "processing": "处理中\u2026",
+    "startProcess": "开始处理",
+    "fileInfo": "{{count}} 个文件 \u00b7 {{size}}",
+    "zipOutput": "ZIP：{{filename}} \u00b7 {{size}}"
+  },
+  "pdf": {
+    "title": "PDF 工具",
+    "subtitle": "匿名可用，适合材料整理与提交。",
+    "seoTitle": "PDF 工具",
+    "seoDescription": "在线 PDF 工具集：压缩、合并、拆分重排、图片转 PDF。",
+    "seoKeywords": "PDF工具,PDF压缩,PDF合并,图片转PDF",
+    "compress": {
+      "title": "PDF 压缩",
+      "indexDescription": "压缩 PDF 大小（最佳努力）。",
+      "seoTitle": "PDF 压缩",
+      "seoDescription": "在线压缩 PDF 文件，减小文件体积。",
+      "seoKeywords": "PDF压缩,压缩PDF,PDF减小",
+      "description": "压缩 PDF 体积（最佳努力）",
+      "targetSizeLabel": "目标大小（KB，可选）",
+      "targetSizePlaceholder": "例如 1000",
+      "targetSizeHint": "不保证严格达到目标，采用最佳努力压缩。",
+      "processing": "处理中\u2026",
+      "startCompress": "开始压缩",
+      "output": "输出：{{filename}} \u00b7 {{size}}"
+    },
+    "merge": {
+      "title": "PDF 合并",
+      "indexDescription": "多个 PDF 合并为一个文件。",
+      "seoTitle": "PDF 合并",
+      "seoDescription": "在线合并多个 PDF 文件为一个。",
+      "seoKeywords": "PDF合并,合并PDF,PDF拼接",
+      "description": "按列表顺序合并 PDF",
+      "processing": "处理中\u2026",
+      "startMerge": "开始合并",
+      "output": "输出：{{filename}} \u00b7 {{size}}",
+      "fileInfo": "{{count}} 个文件 \u00b7 {{size}}"
+    },
+    "pages": {
+      "title": "页面操作",
+      "indexDescription": "旋转、删除、抽取、重排页面。",
+      "seoTitle": "PDF 页面管理",
+      "seoDescription": "在线 PDF 页面拆分、重排、删除。",
+      "seoKeywords": "PDF拆分,PDF重排,PDF页面管理",
+      "description": "抽取、删除、旋转、重排页面",
+      "operationLabel": "操作",
+      "extract": "抽取",
+      "delete": "删除",
+      "rotate": "旋转",
+      "reorder": "重排",
+      "newOrderLabel": "新顺序（如 3,1,2）",
+      "newOrderPlaceholder": "例如 3,1,2",
+      "pagesLabel": "页码（如 1,3,5-8）",
+      "pagesLabelAllSuffix": "；留空=全部页面",
+      "pagesPlaceholderAll": "留空表示全部页面",
+      "pagesPlaceholder": "例如 1,3,5-8",
+      "rotationLabel": "旋转角度（90 的倍数）",
+      "invalidPageRange": "页码范围格式无效",
+      "invalidPage": "页码格式无效",
+      "processing": "处理中\u2026",
+      "startProcess": "开始处理",
+      "output": "输出：{{filename}} \u00b7 {{size}}"
+    },
+    "imagesToPdf": {
+      "title": "图转 PDF",
+      "indexDescription": "多张图片合并为 PDF。",
+      "seoTitle": "图片转 PDF",
+      "seoDescription": "将多张图片合成为一个 PDF 文件。",
+      "seoKeywords": "图片转PDF,图转PDF,图片合成PDF",
+      "description": "多张图片生成一个 PDF",
+      "orderHint": "当前顺序将作为 PDF 页顺序",
+      "processing": "处理中\u2026",
+      "startConvert": "开始转换",
+      "output": "输出：{{filename}} \u00b7 {{size}}",
+      "fileInfo": "{{count}} 张图片 \u00b7 {{size}}"
+    }
+  },
+  "shared": {
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "remove": "移除",
+    "parsedPages": "解析到页面序号（预览）"
   }
 }
-

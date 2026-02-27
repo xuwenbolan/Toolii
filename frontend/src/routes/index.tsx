@@ -10,6 +10,7 @@ import { HomePage } from '@/pages/Home/HomePage'
 import { ProcessingHistoryPage } from '@/pages/Dashboard/ProcessingHistoryPage'
 import { TransactionHistoryPage } from '@/pages/Dashboard/TransactionHistoryPage'
 import { OverviewPage } from '@/pages/Dashboard/OverviewPage'
+import { SettingsPage } from '@/pages/Dashboard/SettingsPage'
 import { IdPhotoPage } from '@/pages/IdPhoto/IdPhotoPage'
 import { BatchProcessPage } from '@/pages/ImageTools/BatchProcessPage'
 import { CompressPage } from '@/pages/ImageTools/CompressPage'
@@ -18,8 +19,11 @@ import { HeicToJpgPage } from '@/pages/ImageTools/HeicToJpgPage'
 import { ImageToolsIndexPage } from '@/pages/ImageTools/ImageToolsIndexPage'
 import { MosaicPage } from '@/pages/ImageTools/MosaicPage'
 import { ScanEnhancePage } from '@/pages/ImageTools/ScanEnhancePage'
+import { ForgotPasswordPage } from '@/pages/Auth/ForgotPasswordPage'
 import { LoginPage } from '@/pages/Auth/LoginPage'
 import { RegisterPage } from '@/pages/Auth/RegisterPage'
+import { ResetPasswordPage } from '@/pages/Auth/ResetPasswordPage'
+import { VerifyEmailPage } from '@/pages/Auth/VerifyEmailPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 import { ImagesToPdfPage } from '@/pages/PdfTools/ImagesToPdfPage'
 import { PdfCompressPage } from '@/pages/PdfTools/PdfCompressPage'
@@ -68,6 +72,9 @@ export const router = createBrowserRouter([
         children: [
           { path: 'login', element: <LoginPage /> },
           { path: 'register', element: <RegisterPage /> },
+          { path: 'verify-email', element: <VerifyEmailPage /> },
+          { path: 'forgot-password', element: <ForgotPasswordPage /> },
+          { path: 'reset-password', element: <ResetPasswordPage /> },
         ],
       },
       {
@@ -82,6 +89,7 @@ export const router = createBrowserRouter([
           { path: 'transactions', element: <TransactionHistoryPage /> },
           { path: 'history', element: <ProcessingHistoryPage /> },
           { path: 'redeem', element: <RedeemPage /> },
+          { path: 'settings', element: <SettingsPage /> },
         ],
       },
     ],

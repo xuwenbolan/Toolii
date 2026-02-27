@@ -20,6 +20,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0.0",
   "uvicorn[standard]>=0.30.0",
   "aiosqlite>=0.20.0",
+  "resend>=2.0.0",
 ]
 
 [project.optional-dependencies]

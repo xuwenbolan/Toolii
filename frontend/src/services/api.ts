@@ -9,6 +9,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 const refreshClient = axios.create({
@@ -16,6 +17,7 @@ const refreshClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 })
 
 api.interceptors.request.use((config) => {
@@ -34,17 +36,13 @@ api.interceptors.request.use((config) => {
 let refreshPromise: Promise<string | null> | null = null
 
 async function refreshAccessToken(): Promise<string | null> {
-  const { refreshToken } = useAuthStore.getState()
-  if (!refreshToken) return null
-
   if (!refreshPromise) {
     refreshPromise = refreshClient
-      .post('/api/auth/refresh', { refresh_token: refreshToken })
+      .post('/api/auth/refresh')
       .then((res) => {
-        const access = res.data?.access_token as string | undefined
-        const refresh = res.data?.refresh_token as string | undefined
-        if (!access || !refresh) return null
-        useAuthStore.getState().setTokens({ accessToken: access, refreshToken: refresh })
+        const access = res.data?.tokens?.access_token as string | undefined
+        if (!access) return null
+        useAuthStore.getState().setAccessToken(access)
         return access
       })
       .catch(() => null)

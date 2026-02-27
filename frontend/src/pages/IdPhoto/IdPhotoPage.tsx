@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { BalanceDisplay } from '@/components/credits/BalanceDisplay'
 import { InsufficientCreditsDialog } from '@/components/credits/InsufficientCreditsDialog'
@@ -12,6 +13,7 @@ import { SizeStandardPicker } from '@/components/idPhoto/SizeStandardPicker'
 import { StepIndicator } from '@/components/idPhoto/StepIndicator'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { UploadProgress } from '@/components/upload/UploadProgress'
 import { FileDropzone } from '@/components/upload/FileDropzone'
@@ -35,7 +37,13 @@ import {
 } from '@/services/idPhotoApi'
 import type { FileResult } from '@/services/imageApi'
 
-const STEPS = ['上传', '检测', '规格', '预览', '导出']
+// Map standard code to translation key for display name
+const STANDARD_I18N_MAP: Record<string, string> = {
+  'uk-passport': 'standards.ukPassport',
+  'schengen-visa': 'standards.schengenVisa',
+  'cn-passport': 'standards.cnPassport',
+  'us-2x2': 'standards.us2x2',
+}
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   const maybe = error as { response?: { data?: { message?: string } } }
@@ -48,6 +56,7 @@ function getApiErrorCode(error: unknown): string | undefined {
 }
 
 export function IdPhotoPage() {
+  const { t } = useTranslation('idPhoto')
   const { isAuthenticated } = useAuth()
   const credits = useCredits({
     enabled: isAuthenticated,
@@ -72,8 +81,16 @@ export function IdPhotoPage() {
   const [layoutPending, setLayoutPending] = useState(false)
   const [layoutError, setLayoutError] = useState<string | null>(null)
   const [insufficientDialogOpen, setInsufficientDialogOpen] = useState(false)
-  const [insufficientActionLabel, setInsufficientActionLabel] = useState('导出无水印证件照')
+  const [insufficientActionLabel, setInsufficientActionLabel] = useState(t('exportAction'))
   const uploadTask = useFileUpload()
+
+  const STEPS = [
+    t('steps.upload'),
+    t('steps.detection'),
+    t('steps.spec'),
+    t('steps.preview'),
+    t('steps.export'),
+  ]
 
   useEffect(() => {
     let active = true
@@ -122,19 +139,21 @@ export function IdPhotoPage() {
   }
 
   return (
-    <ToolPageShell
-      title="证件照"
-      description="上传 → 合规检测 → 规格选择 → 预览（水印）→ 登录后导出（各消耗 1 Credit）"
-      backTo="/"
-    >
+    <>
+      <SEOHead title={t('seo.title')} description={t('seo.description')} keywords={t('seo.keywords')} canonicalPath="/id-photo" />
+      <ToolPageShell
+        title={t('title')}
+        description={t('workflow')}
+        backTo="/"
+      >
       <div className="space-y-5">
         <StepIndicator steps={STEPS} currentStep={currentStep} />
 
         <div className="space-y-3 rounded-xl border p-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold">1. 上传照片并检测人脸</h2>
+            <h2 className="text-sm font-semibold">{t('upload.title')}</h2>
             <p className="text-xs text-muted-foreground">
-              建议上传正面、光线均匀、肩部完整的照片。
+              {t('upload.hint')}
             </p>
           </div>
 
@@ -169,7 +188,7 @@ export function IdPhotoPage() {
               setLayoutResult(null)
               try {
                 const result = await uploadTask.run((onProgress) => uploadIdPhoto(file, onProgress), {
-                  errorMessage: '上传失败，请稍后再试。',
+                  errorMessage: t('upload.failed'),
                 })
                 setUploadResult(result)
               } catch (err) {
@@ -178,25 +197,25 @@ export function IdPhotoPage() {
               }
             }}
           >
-            {uploadTask.pending ? '上传检测中…' : '上传并检测'}
+            {uploadTask.pending ? t('upload.detecting') : t('upload.button')}
           </Button>
         </div>
 
         {uploadResult ? (
           <div className="space-y-2 rounded-xl border p-4">
-            <h2 className="text-sm font-semibold">2. 检测结果</h2>
+            <h2 className="text-sm font-semibold">{t('detection.title')}</h2>
             <div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
               <div className="rounded-md bg-muted/60 px-3 py-2">
-                图片尺寸：{uploadResult.width} × {uploadResult.height}
+                {t('detection.imageSize', { width: uploadResult.width, height: uploadResult.height })}
               </div>
               <div className="rounded-md bg-muted/60 px-3 py-2">
-                检测方式：{uploadResult.detection_engine}
+                {t('detection.engine', { engine: uploadResult.detection_engine })}
               </div>
               <div className="rounded-md bg-muted/60 px-3 py-2">
-                人脸数量：{uploadResult.faces.length}
+                {t('detection.faceCount', { count: uploadResult.faces.length })}
               </div>
               <div className="rounded-md bg-muted/60 px-3 py-2">
-                会话 ID：{uploadResult.upload_id.slice(0, 8)}…
+                {t('detection.sessionId', { id: uploadResult.upload_id.slice(0, 8) })}
               </div>
             </div>
             {uploadResult.warnings.length > 0 ? (
@@ -213,9 +232,9 @@ export function IdPhotoPage() {
 
         <div className="space-y-4 rounded-xl border p-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold">3. 选择规格与底色</h2>
+            <h2 className="text-sm font-semibold">{t('spec.title')}</h2>
             <p className="text-xs text-muted-foreground">
-              生成水印预览后可登录导出无水印图片与 6x4 排版。
+              {t('spec.hint')}
             </p>
           </div>
 
@@ -246,7 +265,7 @@ export function IdPhotoPage() {
             />
           </div>
 
-          {loadingStandards ? <p className="text-xs text-muted-foreground">正在加载规格列表…</p> : null}
+          {loadingStandards ? <p className="text-xs text-muted-foreground">{t('spec.loadingSpecs')}</p> : null}
           <ProcessingStatus pending={processPending} error={processError} />
 
           <Button
@@ -270,13 +289,13 @@ export function IdPhotoPage() {
                 })
                 setProcessResult(result)
               } catch (error) {
-                setProcessError(getApiErrorMessage(error, '证件照处理失败，请稍后再试。'))
+                setProcessError(getApiErrorMessage(error, t('spec.processingFailed')))
               } finally {
                 setProcessPending(false)
               }
             }}
           >
-            {processPending ? '处理中…' : '生成预览'}
+            {processPending ? t('spec.processing') : t('spec.generatePreview')}
           </Button>
         </div>
 
@@ -284,16 +303,23 @@ export function IdPhotoPage() {
           <>
             <PhotoPreview
               src={processResult.preview_data_url}
-              subtitle={`${processResult.standard.name} · ${processResult.output_width}×${processResult.output_height}px · 模型 ${processResult.model_used}`}
+              subtitle={t('spec.previewLabel', {
+                name: STANDARD_I18N_MAP[processResult.standard.code]
+                  ? t(STANDARD_I18N_MAP[processResult.standard.code])
+                  : processResult.standard.name,
+                width: processResult.output_width,
+                height: processResult.output_height,
+                model: processResult.model_used,
+              })}
             />
 
             <ComplianceResults result={processResult.compliance} />
 
             <div className="space-y-4 rounded-xl border p-4">
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold">4. 导出与打印排版</h2>
+                <h2 className="text-sm font-semibold">{t('export.title')}</h2>
                 <p className="text-xs text-muted-foreground">
-                  导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。
+                  {t('export.hint')}
                 </p>
               </div>
 
@@ -323,31 +349,31 @@ export function IdPhotoPage() {
                         setExportResult(result)
                         void credits.refreshAll()
                       } catch (error) {
-                        if (handleInsufficientCredits(error, '导出无水印证件照')) {
-                          setExportError(getApiErrorMessage(error, 'Credits 余额不足，无法导出。'))
+                        if (handleInsufficientCredits(error, t('export.exportPhoto'))) {
+                          setExportError(getApiErrorMessage(error, t('export.insufficientCredits')))
                         } else {
-                          setExportError(getApiErrorMessage(error, '导出失败，请先登录后重试。'))
+                          setExportError(getApiErrorMessage(error, t('export.loginRequired')))
                         }
                       } finally {
                         setExportPending(false)
                       }
                     }}
                   >
-                    {exportPending ? '导出中…' : '导出无水印证件照'}
+                    {exportPending ? t('export.exporting') : t('export.exportPhoto')}
                   </Button>
 
                   {exportResult ? (
                     <div className="rounded-lg border p-3">
                       <p className="mb-2 text-xs text-muted-foreground">
-                        导出文件：{exportResult.filename} · {formatBytes(exportResult.size)}
+                        {t('export.fileInfo', { filename: exportResult.filename, size: formatBytes(exportResult.size) })}
                       </p>
-                      <DownloadButton url={exportResult.download_url} label="下载证件照" />
+                      <DownloadButton url={exportResult.download_url} label={t('export.downloadPhoto')} />
                     </div>
                   ) : null}
 
                   <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                     <div className="space-y-2">
-                      <Label htmlFor="layoutCopies">排版张数（可选）</Label>
+                      <Label htmlFor="layoutCopies">{t('export.layoutCount')}</Label>
                       <Input
                         id="layoutCopies"
                         type="number"
@@ -374,17 +400,17 @@ export function IdPhotoPage() {
                           setLayoutResult(result)
                           void credits.refreshAll()
                         } catch (error) {
-                          if (handleInsufficientCredits(error, '生成 6x4 排版')) {
-                            setLayoutError(getApiErrorMessage(error, 'Credits 余额不足，无法生成排版。'))
+                          if (handleInsufficientCredits(error, t('export.generateLayout'))) {
+                            setLayoutError(getApiErrorMessage(error, t('export.layoutInsufficientCredits')))
                           } else {
-                            setLayoutError(getApiErrorMessage(error, '排版导出失败，请先登录后重试。'))
+                            setLayoutError(getApiErrorMessage(error, t('export.layoutLoginRequired')))
                           }
                         } finally {
                           setLayoutPending(false)
                         }
                       }}
                     >
-                      {layoutPending ? '生成中…' : '生成 6x4 排版'}
+                      {layoutPending ? t('export.generatingLayout') : t('export.generateLayout')}
                     </Button>
                   </div>
 
@@ -414,5 +440,6 @@ export function IdPhotoPage() {
         />
       </div>
     </ToolPageShell>
+    </>
   )
 }

@@ -17,7 +17,7 @@ def _mm_to_px(mm: float, dpi: int) -> int:
 def _parse_color(color: str) -> tuple[int, int, int]:
     try:
         value = ImageColor.getrgb(color)
-    except Exception:  # noqa: BLE001
+    except ValueError:
         return (255, 255, 255)
     if len(value) == 4:
         return (value[0], value[1], value[2])
@@ -36,7 +36,7 @@ def _point(mapping: dict[str, Any], key: str) -> tuple[float, float] | None:
         return None
     try:
         return float(value[0]), float(value[1])
-    except Exception:  # noqa: BLE001
+    except (ValueError, TypeError, IndexError):
         return None
 
 

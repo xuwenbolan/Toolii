@@ -6,7 +6,7 @@ import io
 def _compress_with_pikepdf(pdf_bytes: bytes) -> bytes:
     try:
         import pikepdf
-    except Exception as exc:  # noqa: BLE001
+    except ImportError as exc:
         raise RuntimeError("pikepdf is not available") from exc
 
     with pikepdf.Pdf.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -33,7 +33,7 @@ def _compress_with_pypdf2(pdf_bytes: bytes) -> bytes:
     for page in reader.pages:
         try:
             page.compress_content_streams()
-        except Exception:  # noqa: BLE001
+        except (ValueError, KeyError, RuntimeError, TypeError):
             pass
         writer.add_page(page)
 
@@ -48,7 +48,7 @@ def compress_pdf(pdf_bytes: bytes, *, target_kb: int | None = None) -> bytes:  #
     for compressor in (_compress_with_pikepdf, _compress_with_pypdf2):
         try:
             compressed = compressor(pdf_bytes)
-        except Exception:  # noqa: BLE001
+        except (ImportError, RuntimeError, ValueError, OSError):
             continue
         if compressed:
             candidates.append(compressed)

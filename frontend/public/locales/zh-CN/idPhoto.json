@@ -1,10 +1,101 @@
 {
   "title": "证件照",
-  "wizard": {
-    "upload": "上传照片",
-    "compliance": "合规检测",
-    "spec": "规格选择",
+  "seo": {
+    "title": "证件照制作",
+    "description": "在线证件照处理：智能去背景、合规检测、规格选择、打印排版。",
+    "keywords": "证件照,证件照制作,去背景,合规检测"
+  },
+  "exportAction": "导出无水印证件照",
+  "workflow": "上传 → 合规检测 → 规格选择 → 预览（水印）→ 登录后导出（各消耗 1 Credit）",
+  "steps": {
+    "upload": "上传",
+    "detection": "检测",
+    "spec": "规格",
     "preview": "预览",
     "export": "导出"
+  },
+  "upload": {
+    "title": "1. 上传照片并检测人脸",
+    "hint": "建议上传正面、光线均匀、肩部完整的照片。",
+    "failed": "上传失败，请稍后再试。",
+    "detecting": "上传检测中…",
+    "button": "上传并检测"
+  },
+  "detection": {
+    "title": "2. 检测结果",
+    "imageSize": "图片尺寸：{{width}} × {{height}}",
+    "engine": "检测方式：{{engine}}",
+    "faceCount": "人脸数量：{{count}}",
+    "sessionId": "会话 ID：{{id}}…"
+  },
+  "spec": {
+    "title": "3. 选择规格与底色",
+    "hint": "生成水印预览后可登录导出无水印图片与 6x4 排版。",
+    "loadingSpecs": "正在加载规格列表…",
+    "processingFailed": "证件照处理失败，请稍后再试。",
+    "processing": "处理中…",
+    "generatePreview": "生成预览",
+    "previewLabel": "{{name}} · {{width}}×{{height}}px · 模型 {{model}}"
+  },
+  "export": {
+    "title": "4. 导出与打印排版",
+    "hint": "导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。",
+    "exportPhoto": "导出无水印证件照",
+    "insufficientCredits": "Credits 余额不足，无法导出。",
+    "loginRequired": "导出失败，请先登录后重试。",
+    "exporting": "导出中…",
+    "fileInfo": "导出文件：{{filename}} · {{size}}",
+    "downloadPhoto": "下载证件照",
+    "layoutCount": "排版张数（可选）",
+    "generateLayout": "生成 6x4 排版",
+    "layoutInsufficientCredits": "Credits 余额不足，无法生成排版。",
+    "layoutLoginRequired": "排版导出失败，请先登录后重试。",
+    "generatingLayout": "生成中…"
+  },
+  "preview": {
+    "watermarkAlt": "预览图（含水印）",
+    "title": "证件照预览"
+  },
+  "compliance": {
+    "title": "合规检测结果",
+    "pass": "基础通过",
+    "needReview": "需人工确认",
+    "score": "评分 {{score}}"
+  },
+  "sizeStandard": {
+    "title": "证件照规格"
+  },
+  "bgColor": {
+    "white": "白底",
+    "blue": "蓝底",
+    "lightBlue": "浅蓝",
+    "red": "红底",
+    "title": "背景颜色",
+    "customLabel": "自定义背景颜色"
+  },
+  "modelTier": {
+    "fast": "快速",
+    "fastDesc": "速度优先，适合大多数情况",
+    "balanced": "平衡",
+    "balancedDesc": "效果与速度平衡",
+    "quality": "高质量",
+    "qualityDesc": "更慢，适合复杂背景",
+    "title": "抠图模型档位"
+  },
+  "paywall": {
+    "title": "登录后导出无水印",
+    "description": "导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。",
+    "login": "去登录",
+    "register": "注册"
+  },
+  "printLayout": {
+    "generated": "6x4 排版已生成",
+    "download": "下载排版图"
+  },
+  "standards": {
+    "ukPassport": "英国护照",
+    "schengenVisa": "申根签证",
+    "cnPassport": "中国护照/签证",
+    "us2x2": "美国 2x2 英寸"
   }
 }

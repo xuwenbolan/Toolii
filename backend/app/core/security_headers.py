@@ -13,11 +13,11 @@ _SECURITY_HEADERS: dict[str, str] = {
     "X-XSS-Protection": "0",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self'; "
+        "script-src 'self' https://www.googletagmanager.com; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob:; "
+        "img-src 'self' data: blob: https://www.google-analytics.com; "
         "font-src 'self'; "
-        "connect-src 'self'; "
+        "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://*.analytics.google.com; "
         "frame-ancestors 'none'"
     ),
 }

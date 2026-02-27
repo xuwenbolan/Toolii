@@ -1,15 +1,20 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
 
+// Translation keys for dashboard nav items
 const ITEMS = [
-  { to: '/dashboard', label: '概览', end: true },
-  { to: '/dashboard/transactions', label: '交易流水' },
-  { to: '/dashboard/history', label: '处理历史' },
-  { to: '/dashboard/redeem', label: '兑换/分享' },
+  { to: '/dashboard', labelKey: 'dashboard.overview', end: true },
+  { to: '/dashboard/transactions', labelKey: 'dashboard.transactions' },
+  { to: '/dashboard/history', labelKey: 'dashboard.processingHistory' },
+  { to: '/dashboard/redeem', labelKey: 'dashboard.redeemShare' },
+  { to: '/dashboard/settings', labelKey: 'dashboard.settings' },
 ]
 
 export function DashboardLayout() {
+  const { t } = useTranslation('common')
+
   return (
     <div className="space-y-5">
       <nav className="flex flex-wrap gap-2 rounded-xl border p-2">
@@ -25,7 +30,7 @@ export function DashboardLayout() {
               )
             }
           >
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
       </nav>

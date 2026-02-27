@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import { formatBytes } from '@/lib/fileValidation'
 
@@ -8,6 +10,8 @@ type Props = {
 }
 
 export function PdfMergeList({ files, onMove, onRemove }: Props) {
+  const { t } = useTranslation('tools')
+
   if (files.length === 0) return null
 
   return (
@@ -29,7 +33,7 @@ export function PdfMergeList({ files, onMove, onRemove }: Props) {
               disabled={index === 0}
               onClick={() => onMove(index, -1)}
             >
-              上移
+              {t('shared.moveUp')}
             </Button>
             <Button
               type="button"
@@ -38,10 +42,10 @@ export function PdfMergeList({ files, onMove, onRemove }: Props) {
               disabled={index === files.length - 1}
               onClick={() => onMove(index, 1)}
             >
-              下移
+              {t('shared.moveDown')}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(index)}>
-              移除
+              {t('shared.remove')}
             </Button>
           </div>
         </div>

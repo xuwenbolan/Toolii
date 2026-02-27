@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { ComplianceResult } from '@/services/idPhotoApi'
 
 type Props = {
@@ -5,10 +7,12 @@ type Props = {
 }
 
 export function ComplianceResults({ result }: Props) {
+  const { t } = useTranslation('idPhoto')
+
   return (
     <div className="space-y-3 rounded-xl border p-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="text-sm font-semibold">合规检测结果</h3>
+        <h3 className="text-sm font-semibold">{t('compliance.title')}</h3>
         <div className="flex items-center gap-2 text-xs">
           <span
             className={[
@@ -16,9 +20,9 @@ export function ComplianceResults({ result }: Props) {
               result.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
             ].join(' ')}
           >
-            {result.passed ? '基础通过' : '需人工确认'}
+            {result.passed ? t('compliance.pass') : t('compliance.needReview')}
           </span>
-          <span className="text-muted-foreground">评分 {result.score}</span>
+          <span className="text-muted-foreground">{t('compliance.score', { score: result.score })}</span>
         </div>
       </div>
 

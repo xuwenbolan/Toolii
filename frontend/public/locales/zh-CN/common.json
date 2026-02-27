@@ -1,10 +1,71 @@
 {
   "appName": "Toolii",
-  "actions": {
-    "backHome": "返回首页"
+  "nav": {
+    "home": "首页",
+    "idPhoto": "证件照",
+    "imageTools": "图片工具",
+    "pdfTools": "PDF 工具",
+    "dashboard": "控制台",
+    "redeemCredits": "兑换卡密",
+    "login": "登录",
+    "register": "注册",
+    "logout": "退出",
+    "logoutFull": "退出登录"
+  },
+  "footer": {
+    "privacy": "隐私政策",
+    "terms": "使用条款",
+    "contact": "联系我们"
+  },
+  "dashboard": {
+    "overview": "概览",
+    "transactions": "交易流水",
+    "processingHistory": "处理历史",
+    "redeemShare": "兑换/分享",
+    "settings": "设置"
   },
   "home": {
     "title": "Toolii 在线工具平台",
-    "subtitle": "证件照处理、图片处理、PDF 工具，一站式在线完成。"
+    "subtitle": "证件照处理、图片处理、PDF 工具，一站式在线完成。",
+    "seoTitle": "Toolii 在线工具平台",
+    "seoDescription": "Toolii 提供证件照处理、图片压缩、格式转换、PDF 合并压缩等在线工具。",
+    "seoKeywords": "在线工具,证件照,图片压缩,HEIC 转 JPG,PDF 合并",
+    "idPhoto": "证件照",
+    "idPhotoDesc": "去背景、合规检测、打印排版（登录后导出无水印）。",
+    "imageTools": "图片工具",
+    "imageToolsDesc": "压缩、HEIC 转换、格式转换、马赛克、扫描增强。",
+    "pdfTools": "PDF 工具",
+    "pdfToolsDesc": "压缩、合并、拆分/重排、图转 PDF。"
+  },
+  "notFound": {
+    "title": "页面不存在",
+    "description": "请求的页面不存在或已被移动。",
+    "seoTitle": "页面不存在",
+    "backHome": "返回首页"
+  },
+  "seo": {
+    "defaultDescription": "Toolii 在线工具平台：证件照处理、图片工具、PDF 工具。"
+  },
+  "actions": {
+    "backHome": "返回首页",
+    "back": "返回",
+    "download": "下载",
+    "downloadResult": "下载结果",
+    "downloadZip": "下载 ZIP",
+    "viewResults": "查看单个结果（{{count}}）",
+    "selectFile": "选择文件",
+    "takePhoto": "拍照",
+    "processing": "处理中…",
+    "processingWait": "处理中，请稍候…"
+  },
+  "upload": {
+    "dropHere": "拖拽文件到这里",
+    "orSelectBelow": "或使用下方按钮选择文件",
+    "progress": "上传进度"
+  },
+  "errors": {
+    "fileTooLarge": "文件过大（> {{size}}MB）",
+    "fileTooLargeShort": "文件过大",
+    "processingFailed": "处理失败，请稍后再试。"
   }
 }

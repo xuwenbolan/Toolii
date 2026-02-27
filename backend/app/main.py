@@ -31,7 +31,9 @@ from app.core.config import settings
 from app.core.error_handlers import register_error_handlers
 from app.core.rate_limiter import limiter, register_rate_limiter
 from app.core.security_headers import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
+from app.core.database import SessionLocal
 from app.core.scheduler import scheduler, setup_scheduler
+from app.core.token_blacklist import token_blacklist
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
 from app.routers import auth, credits, download, image, pdf, photo, share, users
@@ -72,6 +74,8 @@ def create_app() -> FastAPI:
         with _suppress_native_stderr():
             prewarm_background_models(["silueta", "u2net_human_seg"])
             prewarm_face_landmarker()
+        async with SessionLocal() as db:
+            await token_blacklist.load_cache(db)
         setup_scheduler(scheduler)
         scheduler.start()
 

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import { cn } from '@/lib/utils'
@@ -10,8 +12,11 @@ type Props = {
   className?: string
 }
 
-export function DownloadButton({ url, label = '下载结果', variant, size, className }: Props) {
+export function DownloadButton({ url, label, variant, size, className }: Props) {
   const download = useFileDownload()
+  const { t } = useTranslation('common')
+  const resolvedLabel = label ?? t('actions.downloadResult')
+
   return (
     <Button
       type="button"
@@ -22,7 +27,7 @@ export function DownloadButton({ url, label = '下载结果', variant, size, cla
         download(url)
       }}
     >
-      {label}
+      {resolvedLabel}
     </Button>
   )
 }

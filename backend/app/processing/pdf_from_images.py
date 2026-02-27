@@ -43,6 +43,6 @@ def images_to_pdf(image_files: list[bytes], *, dpi: int = 150) -> bytes:
         for page in pages:
             try:
                 page.close()
-            except Exception:  # noqa: BLE001
+            except OSError:
                 pass
 

@@ -10,6 +10,7 @@ from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
+from app.core.exceptions import UnauthorizedError
 from app.core.security import decode_jwt_token
 
 # ---------------------------------------------------------------------------
@@ -57,7 +58,7 @@ def rate_limit_key(request: Request) -> str:
             decoded = decode_jwt_token(token)
             if decoded.token_type == "access":
                 return f"user:{decoded.sub}"
-        except Exception:  # noqa: BLE001
+        except UnauthorizedError:
             pass
     return get_remote_address(request)
 

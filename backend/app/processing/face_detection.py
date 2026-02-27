@@ -33,7 +33,11 @@ def _ensure_model_file() -> Path | None:
         return _MODEL_PATH
     try:
         import httpx
+    except ImportError:
+        logger.warning("httpx not available for model download, will use Haar fallback")
+        return None
 
+    try:
         _MODELS_DIR.mkdir(parents=True, exist_ok=True)
         tmp = _MODEL_PATH.with_suffix(".tmp")
         logger.info("Downloading face_landmarker.task ...")
@@ -43,8 +47,8 @@ def _ensure_model_file() -> Path | None:
         tmp.rename(_MODEL_PATH)
         logger.info("Downloaded face_landmarker.task (%d bytes)", len(resp.content))
         return _MODEL_PATH
-    except Exception:  # noqa: BLE001
-        logger.warning("Failed to download face_landmarker.task, will use Haar fallback")
+    except (httpx.HTTPError, OSError):
+        logger.warning("Failed to download face_landmarker.task, will use Haar fallback", exc_info=True)
         return None
 
 
@@ -74,7 +78,11 @@ def _get_landmarker() -> Any:
                 FaceLandmarker,
                 FaceLandmarkerOptions,
             )
+        except ImportError:
+            logger.warning("mediapipe.tasks not available, will use Haar fallback")
+            return None
 
+        try:
             options = FaceLandmarkerOptions(
                 base_options=BaseOptions(model_asset_path=str(model_path)),
                 num_faces=5,
@@ -86,7 +94,7 @@ def _get_landmarker() -> Any:
             _landmarker_instance = FaceLandmarker.create_from_options(options)
             logger.info("MediaPipe FaceLandmarker initialized successfully")
             return _landmarker_instance
-        except Exception:  # noqa: BLE001
+        except (RuntimeError, OSError, ValueError):
             logger.warning(
                 "Failed to initialize FaceLandmarker, will use Haar fallback",
                 exc_info=True,
@@ -265,11 +273,15 @@ def _detect_with_mediapipe(img: np.ndarray) -> dict[str, object] | None:
 
     try:
         from mediapipe import Image as MpImage, ImageFormat
+    except ImportError:
+        logger.warning("mediapipe not importable, falling back to Haar")
+        return None
 
+    try:
         mp_image = MpImage(image_format=ImageFormat.SRGB, data=rgb)
         with _landmarker_lock:
             result = landmarker.detect(mp_image)
-    except Exception:  # noqa: BLE001
+    except (RuntimeError, OSError, ValueError):
         logger.warning("MediaPipe detection failed, falling back to Haar", exc_info=True)
         return None
 

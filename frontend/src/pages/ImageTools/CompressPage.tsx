@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { UploadProgress } from '@/components/upload/UploadProgress'
 import { Button } from '@/components/ui/button'
@@ -14,6 +16,7 @@ import { precompressImage } from '@/lib/imageCompressor'
 import { compressImage, type FileResult } from '@/services/imageApi'
 
 export function CompressPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [quality, setQuality] = useState(80)
   const [targetKb, setTargetKb] = useState<number | ''>('')
@@ -26,7 +29,9 @@ export function CompressPage() {
   }, [file])
 
   return (
-    <ToolPageShell title="图片压缩" description="支持质量压缩与目标大小压缩。">
+    <>
+      <SEOHead title={t('compress.seoTitle')} description={t('compress.seoDescription')} keywords={t('compress.seoKeywords')} canonicalPath="/image-tools/compress" />
+      <ToolPageShell title={t('compress.title')} description={t('compress.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -47,7 +52,7 @@ export function CompressPage() {
 
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="quality">质量（1-100）</Label>
+            <Label htmlFor="quality">{t('compress.qualityLabel')}</Label>
             <Input
               id="quality"
               type="number"
@@ -59,16 +64,16 @@ export function CompressPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="targetKb">目标大小（KB，可选）</Label>
+            <Label htmlFor="targetKb">{t('compress.targetSizeLabel')}</Label>
             <Input
               id="targetKb"
               type="number"
               min={1}
-              placeholder="例如 500"
+              placeholder={t('compress.targetSizePlaceholder')}
               value={targetKb}
               onChange={(e) => setTargetKb(e.target.value === '' ? '' : Number(e.target.value))}
             />
-            <p className="text-xs text-muted-foreground">留空则按质量压缩。</p>
+            <p className="text-xs text-muted-foreground">{t('compress.targetSizeHint')}</p>
           </div>
         </div>
 
@@ -100,13 +105,13 @@ export function CompressPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始压缩'}
+            {pending ? t('compress.processing') : t('compress.startCompress')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('compress.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -114,5 +119,6 @@ export function CompressPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

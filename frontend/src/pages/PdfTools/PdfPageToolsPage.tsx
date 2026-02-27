@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { PdfPageList } from '@/components/pdf/PdfPageList'
 import { DownloadButton } from '@/components/tools/DownloadButton'
@@ -12,10 +13,11 @@ import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
 import { editPdfPages, type FileResult } from '@/services/pdfApi'
+import { SEOHead } from '@/components/common/SEOHead'
 
 type Operation = 'rotate' | 'delete' | 'extract' | 'reorder'
 
-function parsePageSpec(input: string): number[] {
+function parsePageSpec(input: string, t: (key: string) => string): number[] {
   const raw = input.trim()
   if (!raw) return []
 
@@ -29,7 +31,7 @@ function parsePageSpec(input: string): number[] {
       const start = Number(startRaw)
       const end = Number(endRaw)
       if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end <= 0) {
-        throw new Error('页码范围格式无效')
+        throw new Error(t('pdf.pages.invalidPageRange'))
       }
       const step = start <= end ? 1 : -1
       for (let n = start; step > 0 ? n <= end : n >= end; n += step) {
@@ -40,7 +42,7 @@ function parsePageSpec(input: string): number[] {
 
     const page = Number(token)
     if (!Number.isInteger(page) || page <= 0) {
-      throw new Error('页码格式无效')
+      throw new Error(t('pdf.pages.invalidPage'))
     }
     values.push(page)
   }
@@ -49,6 +51,7 @@ function parsePageSpec(input: string): number[] {
 }
 
 export function PdfPageToolsPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [operation, setOperation] = useState<Operation>('extract')
   const [pagesInput, setPagesInput] = useState('')
@@ -64,34 +67,36 @@ export function PdfPageToolsPage() {
 
   const parsedPagesPreview = useMemo(() => {
     try {
-      return { pages: parsePageSpec(pagesInput), error: null as string | null }
+      return { pages: parsePageSpec(pagesInput, t), error: null as string | null }
     } catch (err) {
       return {
         pages: [] as number[],
-        error: err instanceof Error ? err.message : '页码格式无效',
+        error: err instanceof Error ? err.message : t('pdf.pages.invalidPage'),
       }
     }
-  }, [pagesInput])
+  }, [pagesInput, t])
 
   const parsedOrderPreview = useMemo(() => {
     try {
       if (!orderInput.trim()) return { pages: [] as number[], error: null as string | null }
-      return { pages: parsePageSpec(orderInput), error: null as string | null }
+      return { pages: parsePageSpec(orderInput, t), error: null as string | null }
     } catch (err) {
       return {
         pages: [] as number[],
-        error: err instanceof Error ? err.message : '页码格式无效',
+        error: err instanceof Error ? err.message : t('pdf.pages.invalidPage'),
       }
     }
-  }, [orderInput])
+  }, [orderInput, t])
 
   const inputError =
     operation === 'reorder' ? parsedOrderPreview.error : parsedPagesPreview.error
 
   return (
-    <ToolPageShell title="页面操作" description="抽取、删除、旋转、重排页面" backTo="/pdf-tools">
-      <div className="space-y-5">
-        <FileDropzone
+    <>
+      <SEOHead title={t('pdf.pages.seoTitle')} description={t('pdf.pages.seoDescription')} keywords={t('pdf.pages.seoKeywords')} canonicalPath="/pdf-tools/pages" />
+      <ToolPageShell title={t('pdf.pages.title')} description={t('pdf.pages.description')} backTo="/pdf-tools">
+        <div className="space-y-5">
+          <FileDropzone
           accept="application/pdf"
           showCamera={false}
           onFiles={(files) => {
@@ -105,7 +110,7 @@ export function PdfPageToolsPage() {
 
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="operation">操作</Label>
+            <Label htmlFor="operation">{t('pdf.pages.operationLabel')}</Label>
             <select
               id="operation"
               className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -115,19 +120,19 @@ export function PdfPageToolsPage() {
                 setOperation(e.target.value as Operation)
               }}
             >
-              <option value="extract">抽取</option>
-              <option value="delete">删除</option>
-              <option value="rotate">旋转</option>
-              <option value="reorder">重排</option>
+              <option value="extract">{t('pdf.pages.extract')}</option>
+              <option value="delete">{t('pdf.pages.delete')}</option>
+              <option value="rotate">{t('pdf.pages.rotate')}</option>
+              <option value="reorder">{t('pdf.pages.reorder')}</option>
             </select>
           </div>
 
           {operation === 'reorder' ? (
             <div className="space-y-2">
-              <Label htmlFor="orderInput">新顺序（如 3,1,2）</Label>
+              <Label htmlFor="orderInput">{t('pdf.pages.newOrderLabel')}</Label>
               <Input
                 id="orderInput"
-                placeholder="例如 3,1,2"
+                placeholder={t('pdf.pages.newOrderPlaceholder')}
                 value={orderInput}
                 onChange={(e) => setOrderInput(e.target.value)}
               />
@@ -137,12 +142,12 @@ export function PdfPageToolsPage() {
           {operation !== 'reorder' ? (
             <div className="space-y-2">
               <Label htmlFor="pagesInput">
-                页码（如 1,3,5-8）
-                {operation === 'rotate' ? '；留空=全部页面' : ''}
+                {t('pdf.pages.pagesLabel')}
+                {operation === 'rotate' ? t('pdf.pages.pagesLabelAllSuffix') : ''}
               </Label>
               <Input
                 id="pagesInput"
-                placeholder={operation === 'rotate' ? '留空表示全部页面' : '例如 1,3,5-8'}
+                placeholder={operation === 'rotate' ? t('pdf.pages.pagesPlaceholderAll') : t('pdf.pages.pagesPlaceholder')}
                 value={pagesInput}
                 onChange={(e) => setPagesInput(e.target.value)}
               />
@@ -151,7 +156,7 @@ export function PdfPageToolsPage() {
 
           {operation === 'rotate' ? (
             <div className="space-y-2">
-              <Label htmlFor="rotation">旋转角度（90 的倍数）</Label>
+              <Label htmlFor="rotation">{t('pdf.pages.rotationLabel')}</Label>
               <Input
                 id="rotation"
                 type="number"
@@ -182,8 +187,8 @@ export function PdfPageToolsPage() {
               if (!file) return
               setResult(null)
               try {
-                const pagesList = operation === 'reorder' ? null : parsePageSpec(pagesInput)
-                const orderList = operation === 'reorder' ? parsePageSpec(orderInput) : null
+                const pagesList = operation === 'reorder' ? null : parsePageSpec(pagesInput, t)
+                const orderList = operation === 'reorder' ? parsePageSpec(orderInput, t) : null
                 const res = await run((onProgress) =>
                   editPdfPages(
                     file,
@@ -202,13 +207,13 @@ export function PdfPageToolsPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始处理'}
+            {pending ? t('pdf.pages.processing') : t('pdf.pages.startProcess')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('pdf.pages.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -216,5 +221,6 @@ export function PdfPageToolsPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

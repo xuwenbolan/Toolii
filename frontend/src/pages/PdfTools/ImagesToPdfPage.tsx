@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
@@ -11,8 +12,10 @@ import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
 import { imagesToPdf, type FileResult } from '@/services/pdfApi'
+import { SEOHead } from '@/components/common/SEOHead'
 
 export function ImagesToPdfPage() {
+  const { t } = useTranslation('tools')
   const [files, setFiles] = useState<File[]>([])
   const [dpi, setDpi] = useState(150)
   const [result, setResult] = useState<FileResult | null>(null)
@@ -21,13 +24,15 @@ export function ImagesToPdfPage() {
   const fileInfo = useMemo(() => {
     if (files.length === 0) return null
     const total = files.reduce((acc, file) => acc + file.size, 0)
-    return `${files.length} 张图片 · ${formatBytes(total)}`
-  }, [files])
+    return t('pdf.imagesToPdf.fileInfo', { count: files.length, size: formatBytes(total) })
+  }, [files, t])
 
   return (
-    <ToolPageShell title="图转 PDF" description="多张图片生成一个 PDF" backTo="/pdf-tools">
-      <div className="space-y-5">
-        <FileDropzone
+    <>
+      <SEOHead title={t('pdf.imagesToPdf.seoTitle')} description={t('pdf.imagesToPdf.seoDescription')} keywords={t('pdf.imagesToPdf.seoKeywords')} canonicalPath="/pdf-tools/from-images" />
+      <ToolPageShell title={t('pdf.imagesToPdf.title')} description={t('pdf.imagesToPdf.description')} backTo="/pdf-tools">
+        <div className="space-y-5">
+          <FileDropzone
           accept="image/*"
           multiple
           maxFiles={20}
@@ -42,7 +47,7 @@ export function ImagesToPdfPage() {
 
         {files.length > 0 ? (
           <div className="space-y-2 rounded-md border p-3">
-            <p className="text-xs text-muted-foreground">当前顺序将作为 PDF 页顺序</p>
+            <p className="text-xs text-muted-foreground">{t('pdf.imagesToPdf.orderHint')}</p>
             <div className="space-y-1">
               {files.map((file, index) => (
                 <p key={`${file.name}-${index}`} className="truncate text-sm">
@@ -84,13 +89,13 @@ export function ImagesToPdfPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始转换'}
+            {pending ? t('pdf.imagesToPdf.processing') : t('pdf.imagesToPdf.startConvert')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('pdf.imagesToPdf.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -98,6 +103,6 @@ export function ImagesToPdfPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }
-

@@ -19,20 +19,29 @@ class LoginRequest(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    credential: str
+    access_token: str
+    link_password: str | None = None
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class TokenPair(BaseModel):
+class AccessTokenResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     access_token: str
-    refresh_token: str
     expires_in: int
 
 
 class AuthResponse(BaseModel):
     user: UserPublic
-    tokens: TokenPair
+    tokens: AccessTokenResponse
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    password: str = Field(min_length=8, max_length=128)

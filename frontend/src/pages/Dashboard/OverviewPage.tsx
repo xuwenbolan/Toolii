@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
+import { SEOHead } from '@/components/common/SEOHead'
 import { BalanceDisplay } from '@/components/credits/BalanceDisplay'
 import { RedeemCreditsDialog } from '@/components/credits/RedeemCreditsDialog'
 import { ShareCreditsDialog } from '@/components/credits/ShareCreditsDialog'
@@ -11,19 +13,22 @@ import { useCredits } from '@/hooks/useCredits'
 import { useAuthStore } from '@/stores/authStore'
 
 export function OverviewPage() {
+  const { t } = useTranslation('credits')
   const user = useAuthStore((s) => s.user)
   const credits = useCredits({ enabled: true, includeTransactions: true, transactionsLimit: 5 })
   const [redeemDialogOpen, setRedeemDialogOpen] = useState(false)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
 
   return (
-    <div className="space-y-4">
-      <Card>
+    <>
+      <SEOHead title={t('overview.seoTitle')} noindex />
+      <div className="space-y-4">
+        <Card>
         <CardHeader>
-          <CardTitle>控制台</CardTitle>
+          <CardTitle>{t('overview.title')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-sm text-muted-foreground">
-          <p>你好，{user?.name ?? user?.email}</p>
+          <p>{t('overview.greeting', { name: user?.name ?? user?.email })}</p>
           <BalanceDisplay
             balance={credits.balance}
             pending={credits.balancePending}
@@ -34,28 +39,28 @@ export function OverviewPage() {
           />
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => setRedeemDialogOpen(true)}>
-              快速兑换
+              {t('overview.quickRedeem')}
             </Button>
             <Button asChild size="sm" variant="outline">
-              <Link to="/dashboard/redeem">兑换页</Link>
+              <Link to="/dashboard/redeem">{t('overview.redeemPage')}</Link>
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => setShareDialogOpen(true)}>
-              分享 Credits
+              {t('overview.shareCredits')}
             </Button>
             <Button asChild size="sm" variant="ghost">
-              <Link to="/dashboard/transactions">查看流水</Link>
+              <Link to="/dashboard/transactions">{t('overview.viewTransactions')}</Link>
             </Button>
           </div>
-          <p>Phase 6 已接入证件照导出扣费、卡密兑换基础能力与分享领取流程。</p>
+          <p>{t('overview.devNote')}</p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-base">最近交易</CardTitle>
+            <CardTitle className="text-base">{t('overview.recentTransactions')}</CardTitle>
             <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
-              <Link to="/dashboard/transactions">全部流水</Link>
+              <Link to="/dashboard/transactions">{t('overview.allTransactions')}</Link>
             </Button>
           </div>
         </CardHeader>
@@ -64,7 +69,7 @@ export function OverviewPage() {
             items={credits.transactions}
             pending={credits.transactionsPending}
             error={credits.transactionsError}
-            emptyText="暂无交易流水"
+            emptyText={t('overview.noTransactions')}
           />
         </CardContent>
       </Card>
@@ -85,5 +90,6 @@ export function OverviewPage() {
         }}
       />
     </div>
+    </>
   )
 }

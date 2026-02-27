@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
@@ -11,8 +12,10 @@ import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { formatBytes } from '@/lib/fileValidation'
 import { compressPdf, type FileResult } from '@/services/pdfApi'
+import { SEOHead } from '@/components/common/SEOHead'
 
 export function PdfCompressPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [targetKb, setTargetKb] = useState<number | ''>('')
   const [result, setResult] = useState<FileResult | null>(null)
@@ -24,9 +27,11 @@ export function PdfCompressPage() {
   }, [file])
 
   return (
-    <ToolPageShell title="PDF 压缩" description="压缩 PDF 体积（最佳努力）" backTo="/pdf-tools">
-      <div className="space-y-5">
-        <FileDropzone
+    <>
+      <SEOHead title={t('pdf.compress.seoTitle')} description={t('pdf.compress.seoDescription')} keywords={t('pdf.compress.seoKeywords')} canonicalPath="/pdf-tools/compress" />
+      <ToolPageShell title={t('pdf.compress.title')} description={t('pdf.compress.description')} backTo="/pdf-tools">
+        <div className="space-y-5">
+          <FileDropzone
           accept="application/pdf"
           showCamera={false}
           onFiles={(files) => {
@@ -39,16 +44,16 @@ export function PdfCompressPage() {
         {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
 
         <div className="space-y-2">
-          <Label htmlFor="targetKb">目标大小（KB，可选）</Label>
+          <Label htmlFor="targetKb">{t('pdf.compress.targetSizeLabel')}</Label>
           <Input
             id="targetKb"
             type="number"
             min={1}
-            placeholder="例如 1000"
+            placeholder={t('pdf.compress.targetSizePlaceholder')}
             value={targetKb}
             onChange={(e) => setTargetKb(e.target.value === '' ? '' : Number(e.target.value))}
           />
-          <p className="text-xs text-muted-foreground">不保证严格达到目标，采用最佳努力压缩。</p>
+          <p className="text-xs text-muted-foreground">{t('pdf.compress.targetSizeHint')}</p>
         </div>
 
         <ProcessingStatus pending={pending} error={error} />
@@ -72,13 +77,13 @@ export function PdfCompressPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始压缩'}
+            {pending ? t('pdf.compress.processing') : t('pdf.compress.startCompress')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('pdf.compress.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -86,6 +91,6 @@ export function PdfCompressPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }
-

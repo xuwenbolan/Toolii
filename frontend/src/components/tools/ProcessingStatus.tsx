@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -7,12 +9,13 @@ type Props = {
 }
 
 export function ProcessingStatus({ pending, error, className }: Props) {
+  const { t } = useTranslation('common')
+
   if (!pending && !error) return null
 
   if (error) {
     return <p className={cn('text-sm text-destructive', className)}>{error}</p>
   }
 
-  return <p className={cn('text-sm text-muted-foreground', className)}>处理中，请稍候…</p>
+  return <p className={cn('text-sm text-muted-foreground', className)}>{t('actions.processingWait')}</p>
 }
-

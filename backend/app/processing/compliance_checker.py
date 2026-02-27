@@ -44,7 +44,7 @@ def _point_from_mapping(mapping: dict[str, object], key: str) -> tuple[float, fl
         return None
     try:
         return float(value[0]), float(value[1])
-    except Exception:  # noqa: BLE001
+    except (ValueError, TypeError, IndexError):
         return None
 
 
@@ -81,7 +81,7 @@ def _alpha_background_quality(cutout_png_bytes: bytes | None) -> dict[str, objec
 
     try:
         rgba = open_image(cutout_png_bytes).convert("RGBA")
-    except Exception:  # noqa: BLE001
+    except (OSError, ValueError):
         return None
 
     alpha = np.array(rgba.getchannel("A"), dtype=np.uint8)

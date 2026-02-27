@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Label } from '@/components/ui/label'
 
 type Tier = 'fast' | 'balanced' | 'hq'
@@ -7,16 +9,19 @@ type Props = {
   onChange: (value: Tier) => void
 }
 
-const TIERS: Array<{ value: Tier; label: string; desc: string }> = [
-  { value: 'fast', label: '快速', desc: '速度优先，适合大多数情况' },
-  { value: 'balanced', label: '平衡', desc: '效果与速度平衡' },
-  { value: 'hq', label: '高质量', desc: '更慢，适合复杂背景' },
+// Tier config with i18n keys
+const TIERS: Array<{ value: Tier; labelKey: string; descKey: string }> = [
+  { value: 'fast', labelKey: 'modelTier.fast', descKey: 'modelTier.fastDesc' },
+  { value: 'balanced', labelKey: 'modelTier.balanced', descKey: 'modelTier.balancedDesc' },
+  { value: 'hq', labelKey: 'modelTier.quality', descKey: 'modelTier.qualityDesc' },
 ]
 
 export function ModelTierSelector({ value, onChange }: Props) {
+  const { t } = useTranslation('idPhoto')
+
   return (
     <div className="space-y-2">
-      <Label>抠图模型档位</Label>
+      <Label>{t('modelTier.title')}</Label>
       <div className="grid gap-2">
         {TIERS.map((tier) => (
           <button
@@ -31,13 +36,12 @@ export function ModelTierSelector({ value, onChange }: Props) {
             onClick={() => onChange(tier.value)}
           >
             <p className={['text-sm font-medium', value === tier.value ? 'text-primary' : ''].join(' ')}>
-              {tier.label}
+              {t(tier.labelKey)}
             </p>
-            <p className="text-xs text-muted-foreground">{tier.desc}</p>
+            <p className="text-xs text-muted-foreground">{t(tier.descKey)}</p>
           </button>
         ))}
       </div>
     </div>
   )
 }
-

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,7 @@ type Props = {
 }
 
 export function PaywallGate({ children }: Props) {
+  const { t } = useTranslation('idPhoto')
   const { isAuthenticated } = useAuth()
 
   if (isAuthenticated) {
@@ -18,17 +20,17 @@ export function PaywallGate({ children }: Props) {
   return (
     <div className="space-y-3 rounded-xl border border-dashed p-4">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold">登录后导出无水印</h3>
+        <h3 className="text-sm font-semibold">{t('paywall.title')}</h3>
         <p className="text-xs text-muted-foreground">
-          导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。
+          {t('paywall.description')}
         </p>
       </div>
       <div className="flex gap-2">
         <Button asChild size="sm">
-          <Link to="/auth/login">去登录</Link>
+          <Link to="/auth/login">{t('paywall.login')}</Link>
         </Button>
         <Button asChild variant="outline" size="sm">
-          <Link to="/auth/register">注册</Link>
+          <Link to="/auth/register">{t('paywall.register')}</Link>
         </Button>
       </div>
     </div>

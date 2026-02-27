@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import type { CreditTransactionItem } from '@/services/creditsApi'
 
 type Props = {
@@ -5,27 +7,6 @@ type Props = {
   pending?: boolean
   error?: string | null
   emptyText?: string
-}
-
-function formatTxLabel(txType: string) {
-  switch (txType) {
-    case 'redeem':
-      return '卡密兑换'
-    case 'photo_export':
-      return '证件照导出'
-    case 'photo_layout':
-      return '6x4 排版导出'
-    case 'share_create':
-      return '创建分享（冻结）'
-    case 'share_claim':
-      return '领取分享'
-    case 'share_cancel_refund':
-      return '取消分享退回'
-    case 'share_expire_refund':
-      return '过期分享退回'
-    default:
-      return txType
-  }
 }
 
 function formatTime(value: string) {
@@ -43,16 +24,32 @@ export function TransactionList({
   items,
   pending,
   error,
-  emptyText = '暂无交易流水',
+  emptyText,
 }: Props) {
+  const { t } = useTranslation('credits')
+
+  const txLabelMap: Record<string, string> = {
+    redeem: t('transaction.redeem'),
+    photo_export: t('transaction.photoExport'),
+    photo_layout: t('transaction.photoLayout'),
+    share_create: t('transaction.shareCreate'),
+    share_claim: t('transaction.shareClaim'),
+    share_cancel_refund: t('transaction.shareCancelRefund'),
+    share_expire_refund: t('transaction.shareExpireRefund'),
+  }
+
+  function formatTxLabel(txType: string) {
+    return txLabelMap[txType] ?? txType
+  }
+
   if (pending) {
-    return <p className="text-sm text-muted-foreground">正在加载交易流水…</p>
+    return <p className="text-sm text-muted-foreground">{t('transaction.loading')}</p>
   }
   if (error) {
-    return <p className="text-sm text-destructive">交易流水加载失败：{error}</p>
+    return <p className="text-sm text-destructive">{t('transaction.loadFailed', { error })}</p>
   }
   if (items.length === 0) {
-    return <p className="text-sm text-muted-foreground">{emptyText}</p>
+    return <p className="text-sm text-muted-foreground">{emptyText ?? t('transaction.empty')}</p>
   }
 
   return (
@@ -65,7 +62,7 @@ export function TransactionList({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{formatTxLabel(item.tx_type)}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {item.description || '—'} · {formatTime(item.created_at)}
+              {item.description || '--'} · {formatTime(item.created_at)}
             </p>
             <p className="truncate text-[11px] text-muted-foreground">
               {item.reference_id ? `Ref: ${item.reference_id}` : `Tx #${item.id}`}
@@ -81,7 +78,7 @@ export function TransactionList({
             >
               {item.amount > 0 ? `+${item.amount}` : item.amount}
             </p>
-            <p className="text-xs text-muted-foreground">余额 {item.balance_after}</p>
+            <p className="text-xs text-muted-foreground">{t('transaction.balance', { balance: item.balance_after })}</p>
           </div>
         </div>
       ))}

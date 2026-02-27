@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { SEOHead } from '@/components/common/SEOHead'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { UploadProgress } from '@/components/upload/UploadProgress'
@@ -13,6 +15,7 @@ import { formatBytes } from '@/lib/fileValidation'
 import { mosaicImage, type FileResult } from '@/services/imageApi'
 
 export function MosaicPage() {
+  const { t } = useTranslation('tools')
   const [file, setFile] = useState<File | null>(null)
   const [pixelSize, setPixelSize] = useState(16)
   const [result, setResult] = useState<FileResult | null>(null)
@@ -24,7 +27,9 @@ export function MosaicPage() {
   }, [file])
 
   return (
-    <ToolPageShell title="图片马赛克" description="当前版本：整图马赛克（后续支持框选区域）。">
+    <>
+      <SEOHead title={t('mosaic.seoTitle')} description={t('mosaic.seoDescription')} keywords={t('mosaic.seoKeywords')} canonicalPath="/image-tools/mosaic" />
+      <ToolPageShell title={t('mosaic.title')} description={t('mosaic.description')}>
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -38,7 +43,7 @@ export function MosaicPage() {
         {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
 
         <div className="space-y-2">
-          <Label htmlFor="pixelSize">像素块大小</Label>
+          <Label htmlFor="pixelSize">{t('mosaic.pixelSizeLabel')}</Label>
           <Input
             id="pixelSize"
             type="number"
@@ -68,13 +73,13 @@ export function MosaicPage() {
               }
             }}
           >
-            {pending ? '处理中…' : '开始处理'}
+            {pending ? t('mosaic.processing') : t('mosaic.startProcess')}
           </Button>
 
           {result ? (
             <div className="space-y-2 rounded-md border p-3">
               <p className="text-xs text-muted-foreground">
-                输出：{result.filename} · {formatBytes(result.size)}
+                {t('mosaic.output', { filename: result.filename, size: formatBytes(result.size) })}
               </p>
               <DownloadButton url={result.download_url} />
             </div>
@@ -82,5 +87,6 @@ export function MosaicPage() {
         </div>
       </div>
     </ToolPageShell>
+    </>
   )
 }

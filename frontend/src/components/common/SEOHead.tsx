@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async'
+import { useTranslation } from 'react-i18next'
 
 type SEOHeadProps = {
   title: string
@@ -9,7 +10,6 @@ type SEOHeadProps = {
 }
 
 const SITE_NAME = 'Toolii'
-const DEFAULT_DESCRIPTION = 'Toolii 在线工具平台：证件照处理、图片工具、PDF 工具。'
 
 function buildCanonicalUrl(canonicalPath?: string): string | undefined {
   if (!canonicalPath) return undefined
@@ -22,28 +22,30 @@ function buildCanonicalUrl(canonicalPath?: string): string | undefined {
 
 export function SEOHead({
   title,
-  description = DEFAULT_DESCRIPTION,
+  description,
   keywords,
   canonicalPath,
   noindex = false,
 }: SEOHeadProps) {
+  const { t } = useTranslation('common')
+  const resolvedDescription = description ?? t('seo.defaultDescription')
   const fullTitle = `${title} | ${SITE_NAME}`
   const canonicalUrl = buildCanonicalUrl(canonicalPath)
 
   return (
     <Helmet prioritizeSeoTags>
       <title>{fullTitle}</title>
-      <meta name="description" content={description} />
+      <meta name="description" content={resolvedDescription} />
       {keywords ? <meta name="keywords" content={keywords} /> : null}
       {noindex ? <meta name="robots" content="noindex,nofollow" /> : <meta name="robots" content="index,follow" />}
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:title" content={fullTitle} />
-      <meta property="og:description" content={description} />
+      <meta property="og:description" content={resolvedDescription} />
       {canonicalUrl ? <meta property="og:url" content={canonicalUrl} /> : null}
       <meta name="twitter:card" content="summary" />
       <meta name="twitter:title" content={fullTitle} />
-      <meta name="twitter:description" content={description} />
+      <meta name="twitter:description" content={resolvedDescription} />
       {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
     </Helmet>
   )

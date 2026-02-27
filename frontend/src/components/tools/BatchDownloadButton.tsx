@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+
 import { Button } from '@/components/ui/button'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { useFileDownload } from '@/hooks/useFileDownload'
@@ -10,14 +12,15 @@ type Props = {
 
 export function BatchDownloadButton({ batch }: Props) {
   const download = useFileDownload()
+  const { t } = useTranslation('common')
 
   return (
     <div className="space-y-3">
-      <DownloadButton url={batch.archive.download_url} label="下载 ZIP" />
+      <DownloadButton url={batch.archive.download_url} label={t('actions.downloadZip')} />
 
       <details className="rounded-md border p-3">
         <summary className="cursor-pointer text-sm font-medium">
-          查看单个结果（{batch.items.length}）
+          {t('actions.viewResults', { count: batch.items.length })}
         </summary>
         <div className="mt-3 space-y-2">
           {batch.items.map((item, idx) => (
@@ -38,7 +41,7 @@ export function BatchDownloadButton({ batch }: Props) {
                 className="mt-2 w-full sm:mt-3 sm:w-auto"
                 onClick={() => download(item.output.download_url)}
               >
-                下载
+                {t('actions.download')}
               </Button>
             </div>
           ))}

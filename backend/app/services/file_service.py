@@ -81,7 +81,7 @@ class FileService:
         if meta_path.exists():
             try:
                 meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            except Exception:  # noqa: BLE001
+            except (json.JSONDecodeError, OSError, ValueError):
                 meta = {}
 
         content_type = str(meta.get("content_type") or "application/octet-stream")
@@ -129,7 +129,7 @@ class FileService:
                 path.unlink(missing_ok=True)
                 self._meta_path(file_id).unlink(missing_ok=True)
                 removed += 1
-            except Exception:  # noqa: BLE001
+            except OSError:
                 continue
 
         return removed

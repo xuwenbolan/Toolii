@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
@@ -9,12 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-const loginSchema = z.object({
-  email: z.string().min(1, '请输入邮箱').email('请输入有效的邮箱地址'),
-  password: z.string().min(1, '请输入密码'),
-})
-
-type LoginValues = z.infer<typeof loginSchema>
+type LoginValues = { email: string; password: string }
 
 function sanitizeRedirect(raw: string | null): string {
   if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
@@ -24,11 +20,21 @@ function sanitizeRedirect(raw: string | null): string {
 }
 
 export function LoginForm() {
+  const { t } = useTranslation('auth')
   const [params] = useSearchParams()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
 
   const redirectTo = useMemo(() => sanitizeRedirect(params.get('redirect')), [params])
+
+  const loginSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().min(1, t('loginForm.emailRequired')).email(t('loginForm.emailInvalid')),
+        password: z.string().min(1, t('loginForm.passwordRequired')),
+      }),
+    [t],
+  )
 
   const {
     register,
@@ -42,14 +48,14 @@ export function LoginForm() {
       await loginWithEmail(values.email, values.password)
       navigate(redirectTo, { replace: true })
     } catch {
-      setError('登录失败，请检查邮箱或密码。')
+      setError(t('loginForm.loginFailed'))
     }
   }
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-2">
-        <Label htmlFor="email">邮箱</Label>
+        <Label htmlFor="email">{t('email')}</Label>
         <Input
           id="email"
           inputMode="email"
@@ -62,7 +68,15 @@ export function LoginForm() {
         ) : null}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">密码</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">{t('password')}</Label>
+          <Link
+            to="/auth/forgot-password"
+            className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          >
+            {t('loginForm.forgotPassword')}
+          </Link>
+        </div>
         <Input
           id="password"
           type="password"
@@ -75,7 +89,7 @@ export function LoginForm() {
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button className="w-full" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? '登录中…' : '登录'}
+        {isSubmitting ? t('loginForm.loggingIn') : t('login')}
       </Button>
     </form>
   )

@@ -44,7 +44,7 @@ class PdfService:
                 None,
                 partial(compress_pdf, pdf_bytes, target_kb=target_kb),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF 压缩失败", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-compressed.pdf"
@@ -58,7 +58,7 @@ class PdfService:
         loop = asyncio.get_running_loop()
         try:
             out = await loop.run_in_executor(None, partial(merge_pdfs, [data for _, data in pdf_files]))
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF 合并失败", status_code=400) from exc
 
         out_name = "toolii-merged.pdf"
@@ -90,7 +90,7 @@ class PdfService:
                     rotation=rotation,
                 ),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF 页面处理失败", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-{op_value}.pdf"
@@ -114,7 +114,7 @@ class PdfService:
                 None,
                 partial(images_to_pdf, [data for _, data in image_files], dpi=dpi),
             )
-        except Exception as exc:  # noqa: BLE001
+        except (OSError, ValueError, RuntimeError) as exc:
             raise AppError(code="PDF_PROCESS_FAILED", message="图转 PDF 失败", status_code=400) from exc
 
         if len(image_files) == 1:

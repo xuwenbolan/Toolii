@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -12,11 +13,13 @@ type Props = {
 }
 
 export function ToolPageShell({ title, description, backTo = '/image-tools', children }: Props) {
+  const { t } = useTranslation('common')
+
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4">
       <div className="flex items-center gap-2">
         <Button asChild variant="ghost" size="sm">
-          <Link to={backTo}>返回</Link>
+          <Link to={backTo}>{t('actions.back')}</Link>
         </Button>
       </div>
       <Card>

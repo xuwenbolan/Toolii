@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
@@ -9,19 +10,27 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-const registerSchema = z.object({
-  email: z.string().min(1, '请输入邮箱').email('请输入有效的邮箱地址'),
-  password: z
-    .string()
-    .min(8, '密码至少 8 位')
-    .max(128, '密码不能超过 128 位'),
-})
-
-type RegisterValues = z.infer<typeof registerSchema>
+type RegisterValues = { email: string; password: string }
 
 export function RegisterForm() {
+  const { t } = useTranslation('auth')
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+
+  const registerSchema = useMemo(
+    () =>
+      z.object({
+        email: z
+          .string()
+          .min(1, t('registerForm.emailRequired'))
+          .email(t('registerForm.emailInvalid')),
+        password: z
+          .string()
+          .min(8, t('registerForm.passwordMin'))
+          .max(128, t('registerForm.passwordMax')),
+      }),
+    [t],
+  )
 
   const {
     register,
@@ -35,14 +44,14 @@ export function RegisterForm() {
       await registerWithEmail(values.email, values.password)
       navigate('/dashboard', { replace: true })
     } catch {
-      setError('注册失败，请稍后再试。')
+      setError(t('registerForm.registerFailed'))
     }
   }
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-2">
-        <Label htmlFor="email">邮箱</Label>
+        <Label htmlFor="email">{t('email')}</Label>
         <Input
           id="email"
           inputMode="email"
@@ -55,7 +64,7 @@ export function RegisterForm() {
         ) : null}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">密码</Label>
+        <Label htmlFor="password">{t('password')}</Label>
         <Input
           id="password"
           type="password"
@@ -65,12 +74,12 @@ export function RegisterForm() {
         {errors.password ? (
           <p className="text-sm text-destructive">{errors.password.message}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">至少 8 位。</p>
+          <p className="text-xs text-muted-foreground">{t('registerForm.passwordHint')}</p>
         )}
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button className="w-full" type="submit" disabled={isSubmitting}>
-        {isSubmitting ? '注册中…' : '注册'}
+        {isSubmitting ? t('registerForm.registering') : t('register')}
       </Button>
     </form>
   )

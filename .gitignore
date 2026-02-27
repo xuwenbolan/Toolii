@@ -20,5 +20,6 @@ __pycache__/
 # toolii runtime
 data/
 models/
+ssl/
 
-docs/client_secret_*.json
+client_secret_*.json

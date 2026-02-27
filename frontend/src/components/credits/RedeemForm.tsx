@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 export function RedeemForm({ onRedeemed }: Props) {
+  const { t } = useTranslation('credits')
   const [code, setCode] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,25 +35,25 @@ export function RedeemForm({ onRedeemed }: Props) {
         setSuccess(null)
 
         if (!CARD_CODE_RE.test(normalized)) {
-          setError('卡密格式错误，应为 TOOL-XXXX-XXXX-XXXX')
+          setError(t('redeem.invalidFormat'))
           return
         }
 
         setPending(true)
         try {
           const result = await redeemCredits(normalized)
-          setSuccess(`兑换成功，到账 ${result.added_credits} Credits（余额 ${result.balance}）`)
+          setSuccess(t('redeem.success', { amount: result.added_credits, balance: result.balance }))
           setCode('')
           onRedeemed?.(result)
         } catch (err) {
-          setError(getApiErrorMessage(err, '兑换失败，请检查卡密后重试。'))
+          setError(getApiErrorMessage(err, t('redeem.failed')))
         } finally {
           setPending(false)
         }
       }}
     >
       <div className="space-y-2">
-        <Label htmlFor="redeemCode">输入卡密</Label>
+        <Label htmlFor="redeemCode">{t('redeem.placeholder')}</Label>
         <Input
           id="redeemCode"
           value={code}
@@ -65,14 +67,14 @@ export function RedeemForm({ onRedeemed }: Props) {
             setSuccess(null)
           }}
         />
-        <p className="text-xs text-muted-foreground">格式：TOOL-XXXX-XXXX-XXXX</p>
+        <p className="text-xs text-muted-foreground">{t('redeem.formatHint')}</p>
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {success ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p> : null}
 
       <Button className="w-full" type="submit" disabled={pending}>
-        {pending ? '兑换中…' : '兑换 Credits'}
+        {pending ? t('redeem.redeeming') : t('redeem.button')}
       </Button>
     </form>
   )

@@ -1,3 +1,5 @@
+import i18n from '@/config/i18n'
+
 export function bytesToMb(bytes: number): number {
   return bytes / 1024 / 1024
 }
@@ -13,7 +15,6 @@ export function formatBytes(bytes: number): string {
 export function assertMaxFileSize(file: File, maxMb: number) {
   const maxBytes = maxMb * 1024 * 1024
   if (file.size > maxBytes) {
-    throw new Error(`文件过大（> ${maxMb}MB）`)
+    throw new Error(i18n.t('errors.fileTooLarge', { size: maxMb }))
   }
 }
-

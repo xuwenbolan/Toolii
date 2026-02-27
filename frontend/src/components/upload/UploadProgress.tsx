@@ -1,9 +1,14 @@
+import { useTranslation } from 'react-i18next'
+
 type Props = {
   value: number | null
   label?: string
 }
 
-export function UploadProgress({ value, label = '上传进度' }: Props) {
+export function UploadProgress({ value, label }: Props) {
+  const { t } = useTranslation('common')
+  const resolvedLabel = label ?? t('upload.progress')
+
   if (value == null) return null
 
   const pct = Math.max(0, Math.min(100, Math.round(value)))
@@ -11,7 +16,7 @@ export function UploadProgress({ value, label = '上传进度' }: Props) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{label}</span>
+        <span>{resolvedLabel}</span>
         <span>{pct}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-muted">
@@ -20,4 +25,3 @@ export function UploadProgress({ value, label = '上传进度' }: Props) {
     </div>
   )
 }
-

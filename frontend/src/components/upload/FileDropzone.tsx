@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -22,6 +23,7 @@ export function FileDropzone({
   onFiles,
 }: Props) {
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const { t } = useTranslation('common')
 
   const handleDrop = useCallback(
     (accepted: File[]) => {
@@ -52,14 +54,14 @@ export function FileDropzone({
       >
         <input {...getInputProps()} />
         <div className="space-y-1 text-center">
-          <p className="text-sm font-medium">拖拽文件到这里</p>
-          <p className="text-xs text-muted-foreground">或使用下方按钮选择文件</p>
+          <p className="text-sm font-medium">{t('upload.dropHere')}</p>
+          <p className="text-xs text-muted-foreground">{t('upload.orSelectBelow')}</p>
         </div>
       </Card>
 
       <div className={showCamera ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'grid grid-cols-1 gap-2'}>
         <Button type="button" variant="outline" onClick={open}>
-          选择文件
+          {t('actions.selectFile')}
         </Button>
         {showCamera ? (
           <Button
@@ -68,7 +70,7 @@ export function FileDropzone({
               cameraInputRef.current?.click()
             }}
           >
-            拍照
+            {t('actions.takePhoto')}
           </Button>
         ) : null}
       </div>

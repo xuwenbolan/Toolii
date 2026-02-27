@@ -1,0 +1,101 @@
+{
+  "title": "ID Photo",
+  "seo": {
+    "title": "ID Photo Maker",
+    "description": "Online ID photo processing: smart background removal, compliance check, size selection, and print layout.",
+    "keywords": "id photo,passport photo,background removal,compliance check"
+  },
+  "exportAction": "Export Watermark-Free Photo",
+  "workflow": "Upload -> Compliance Check -> Size Selection -> Preview (watermarked) -> Export after login (1 Credit each)",
+  "steps": {
+    "upload": "Upload",
+    "detection": "Detect",
+    "spec": "Size",
+    "preview": "Preview",
+    "export": "Export"
+  },
+  "upload": {
+    "title": "1. Upload Photo & Detect Face",
+    "hint": "For best results, use a front-facing photo with even lighting and visible shoulders.",
+    "failed": "Upload failed. Please try again later.",
+    "detecting": "Uploading & detecting...",
+    "button": "Upload & Detect"
+  },
+  "detection": {
+    "title": "2. Detection Results",
+    "imageSize": "Image size: {{width}} x {{height}}",
+    "engine": "Detection engine: {{engine}}",
+    "faceCount": "Faces detected: {{count}}",
+    "sessionId": "Session ID: {{id}}..."
+  },
+  "spec": {
+    "title": "3. Choose Size & Background",
+    "hint": "After generating a watermarked preview, log in to export the clean photo and 6x4 print layout.",
+    "loadingSpecs": "Loading size options...",
+    "processingFailed": "Processing failed. Please try again later.",
+    "processing": "Processing...",
+    "generatePreview": "Generate Preview",
+    "previewLabel": "{{name}} - {{width}}x{{height}}px - Model {{model}}"
+  },
+  "export": {
+    "title": "4. Export & Print Layout",
+    "hint": "Both watermark-free export and 6x4 print layout require login and cost 1 Credit each.",
+    "exportPhoto": "Export Watermark-Free Photo",
+    "insufficientCredits": "Insufficient credits for export.",
+    "loginRequired": "Export failed. Please log in and try again.",
+    "exporting": "Exporting...",
+    "fileInfo": "Exported file: {{filename}} - {{size}}",
+    "downloadPhoto": "Download Photo",
+    "layoutCount": "Layout copies (optional)",
+    "generateLayout": "Generate 6x4 Layout",
+    "layoutInsufficientCredits": "Insufficient credits for print layout.",
+    "layoutLoginRequired": "Layout export failed. Please log in and try again.",
+    "generatingLayout": "Generating..."
+  },
+  "preview": {
+    "watermarkAlt": "Preview (watermarked)",
+    "title": "ID Photo Preview"
+  },
+  "compliance": {
+    "title": "Compliance Check Results",
+    "pass": "Passed",
+    "needReview": "Needs Review",
+    "score": "Score {{score}}"
+  },
+  "sizeStandard": {
+    "title": "Photo Size"
+  },
+  "bgColor": {
+    "white": "White",
+    "blue": "Blue",
+    "lightBlue": "Light Blue",
+    "red": "Red",
+    "title": "Background Color",
+    "customLabel": "Custom background color"
+  },
+  "modelTier": {
+    "fast": "Fast",
+    "fastDesc": "Speed-first, suitable for most cases",
+    "balanced": "Balanced",
+    "balancedDesc": "Balance between quality and speed",
+    "quality": "High Quality",
+    "qualityDesc": "Slower, best for complex backgrounds",
+    "title": "Background Removal Model"
+  },
+  "paywall": {
+    "title": "Log in to Export",
+    "description": "Both watermark-free export and 6x4 print layout require login and cost 1 Credit each.",
+    "login": "Log In",
+    "register": "Sign Up"
+  },
+  "printLayout": {
+    "generated": "6x4 Layout Ready",
+    "download": "Download Layout"
+  },
+  "standards": {
+    "ukPassport": "UK Passport",
+    "schengenVisa": "Schengen Visa",
+    "cnPassport": "Chinese Passport/Visa",
+    "us2x2": "US 2x2 Inch"
+  }
+}

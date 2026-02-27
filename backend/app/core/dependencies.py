@@ -35,6 +35,8 @@ async def get_optional_user(
     jti = token.raw.get("jti")
     if jti and token_blacklist.is_revoked(jti):
         raise UnauthorizedError("Token has been revoked")
+    if jti and await token_blacklist.is_revoked_async(db, jti):
+        raise UnauthorizedError("Token has been revoked")
 
     try:
         user_id = int(token.sub)
@@ -45,6 +47,13 @@ async def get_optional_user(
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         return None
+
+    # Check if all tokens were revoked (logout-all)
+    if user.tokens_revoked_at is not None:
+        iat = token.iat
+        if iat < int(user.tokens_revoked_at.timestamp()):
+            raise UnauthorizedError("Token has been revoked")
+
     return user
 
 

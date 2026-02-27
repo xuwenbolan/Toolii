@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { RedeemForm } from '@/components/credits/RedeemForm'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,8 @@ export function RedeemCreditsDialog({
   onChanged,
   closeOnRedeemed = false,
 }: Props) {
+  const { t } = useTranslation('credits')
+
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -32,7 +35,7 @@ export function RedeemCreditsDialog({
     <div className="fixed inset-0 z-[60]">
       <button
         type="button"
-        aria-label="关闭兑换弹窗"
+        aria-label={t('redeem.closeDialog')}
         className="absolute inset-0 bg-black/45"
         onClick={() => onOpenChange(false)}
       />
@@ -40,9 +43,9 @@ export function RedeemCreditsDialog({
         <div className="mx-auto flex min-h-full w-full max-w-md items-start sm:items-center">
           <Card className="w-full shadow-2xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">兑换 Credits</CardTitle>
+              <CardTitle className="text-base">{t('redeem.title')}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                输入卡密后会立即到账。格式：TOOL-XXXX-XXXX-XXXX。
+                {t('redeem.dialogDescription')}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -55,7 +58,7 @@ export function RedeemCreditsDialog({
 
               <div className="flex justify-end">
                 <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
-                  关闭
+                  {t('redeem.close')}
                 </Button>
               </div>
             </CardContent>
