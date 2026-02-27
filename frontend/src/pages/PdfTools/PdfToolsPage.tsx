@@ -445,9 +445,10 @@ export function PdfToolsPage() {
         description={t('pdf.subtitle')}
         width="full"
         layout="workspace"
+        sidebarClassName="lg:sticky lg:top-20"
         sidebar={
           <div className="space-y-4">
-            <div className="rounded-xl border border-border/70 bg-card p-4 shadow-sm">
+            <div className="rounded-xl border border-border/70 bg-gradient-to-br from-card to-muted/30 p-4 shadow-sm">
               <div className="space-y-3">
                 <p className="text-sm font-medium">{t('pdf.workspace.processingPanel')}</p>
                 {inputSummary ? <p className="text-xs text-muted-foreground">{inputSummary}</p> : null}
@@ -457,6 +458,7 @@ export function PdfToolsPage() {
                     filename={singlePdfFile.name}
                     sizeText={formatBytes(singlePdfFile.size)}
                     mediaKind="pdf"
+                    mediaUrl={sidebarPdfPreview}
                   />
                 ) : null}
                 <ProcessingStatus pending={pending} error={error} />
@@ -480,124 +482,96 @@ export function PdfToolsPage() {
         }
       >
         <div className="space-y-5">
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-4">
             <Label>{t('pdf.workspace.operationLabel')}</Label>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              <Button
-                type="button"
-                variant={operation === 'merge' ? 'secondary' : 'outline'}
-                onClick={() => {
-                  navigate(getOperationPath('merge'))
-                  reset()
-                  setResult(null)
-                }}
-              >
-                {t('pdf.merge.title')}
-              </Button>
-              <Button
-                type="button"
-                variant={operation === 'split' ? 'secondary' : 'outline'}
-                onClick={() => {
-                  navigate(getOperationPath('split'))
-                  reset()
-                  setResult(null)
-                }}
-              >
-                {t('pdf.split.title')}
-              </Button>
-              <Button
-                type="button"
-                variant={operation === 'compress' ? 'secondary' : 'outline'}
-                onClick={() => {
-                  navigate(getOperationPath('compress'))
-                  reset()
-                  setResult(null)
-                }}
-              >
-                {t('pdf.compress.title')}
-              </Button>
-              <Button
-                type="button"
-                variant={operation === 'pages' ? 'secondary' : 'outline'}
-                onClick={() => {
-                  navigate(getOperationPath('pages'))
-                  reset()
-                  setResult(null)
-                }}
-              >
-                {t('pdf.pages.title')}
-              </Button>
-              <Button
-                type="button"
-                variant={operation === 'imagesToPdf' ? 'secondary' : 'outline'}
-                onClick={() => {
-                  navigate(getOperationPath('imagesToPdf'))
-                  reset()
-                  setResult(null)
-                }}
-              >
-                {t('pdf.imagesToPdf.title')}
-              </Button>
+              {WORKSPACE_OPERATION_ORDER.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    operation === item
+                      ? 'border-primary/45 bg-primary/5'
+                      : 'border-border/70 bg-card hover:border-primary/30 hover:bg-muted/40',
+                  )}
+                  onClick={() => {
+                    if (operation === item) return
+                    navigate(getOperationPath(item))
+                    reset()
+                    setResult(null)
+                  }}
+                >
+                  <p className="text-sm font-semibold">{operationTitle[item]}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{activeDescription[item]}</p>
+                </button>
+              ))}
             </div>
-            <p className="text-xs text-muted-foreground">{activeDescription[operation]}</p>
           </div>
 
-          <FileDropzone
-            accept={operation === 'imagesToPdf' ? 'image/*' : 'application/pdf'}
-            multiple={operation === 'merge' || operation === 'imagesToPdf'}
-            maxFiles={20}
-            showCamera={operation === 'imagesToPdf'}
-            onFiles={(picked) => {
-              reset()
-              setResult(null)
-              if (operation === 'imagesToPdf') {
-                setImageFiles(picked)
-              } else {
-                setPdfFiles(operation === 'merge' ? picked : picked.slice(0, 1))
-              }
-            }}
-          />
-          <p className="text-xs text-muted-foreground">{t('pdf.workspace.uploadHint')}</p>
-
-          {operation === 'merge' ? (
-            <SortableFileList
-              files={pdfFiles}
-              kind="pdf"
-              hint={t('pdf.merge.orderHint')}
-              onReorder={setPdfFiles}
-              onRemove={(index) => {
-                setPdfFiles((prev) => prev.filter((_, i) => i !== index))
+          <div className="space-y-3 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
+            <FileDropzone
+              accept={operation === 'imagesToPdf' ? 'image/*' : 'application/pdf'}
+              multiple={operation === 'merge' || operation === 'imagesToPdf'}
+              maxFiles={20}
+              showCamera={operation === 'imagesToPdf'}
+              onFiles={(picked) => {
+                reset()
+                setResult(null)
+                if (operation === 'imagesToPdf') {
+                  setImageFiles(picked)
+                } else {
+                  setPdfFiles(operation === 'merge' ? picked : picked.slice(0, 1))
+                }
               }}
             />
-          ) : null}
+            <p className="text-xs text-muted-foreground">{t('pdf.workspace.uploadHint')}</p>
 
-          {operation === 'imagesToPdf' ? (
-            <SortableFileList
-              files={imageFiles}
-              kind="image"
-              hint={t('pdf.imagesToPdf.orderHint')}
-              onReorder={setImageFiles}
-              onRemove={(index) => {
-                setImageFiles((prev) => prev.filter((_, i) => i !== index))
-              }}
-            />
-          ) : null}
+            {operation === 'merge' ? (
+              <SortableFileList
+                files={pdfFiles}
+                kind="pdf"
+                hint={t('pdf.merge.orderHint')}
+                onReorder={setPdfFiles}
+                onRemove={(index) => {
+                  setPdfFiles((prev) => prev.filter((_, i) => i !== index))
+                  setResult(null)
+                }}
+              />
+            ) : null}
+
+            {operation === 'imagesToPdf' ? (
+              <SortableFileList
+                files={imageFiles}
+                kind="image"
+                hint={t('pdf.imagesToPdf.orderHint')}
+                onReorder={setImageFiles}
+                onRemove={(index) => {
+                  setImageFiles((prev) => prev.filter((_, i) => i !== index))
+                  setResult(null)
+                }}
+              />
+            ) : null}
+          </div>
 
           {operation === 'split' ? (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
               <Label htmlFor="ranges">{t('pdf.split.rangesLabel')}</Label>
               <Input
                 id="ranges"
                 value={ranges}
                 placeholder={t('pdf.split.rangesPlaceholder')}
-                onChange={(e) => setRanges(e.target.value)}
+                onChange={(e) => {
+                  setRanges(e.target.value)
+                  setResult(null)
+                }}
               />
               <p className="text-xs text-muted-foreground">{t('pdf.split.rangesHint')}</p>
             </div>
           ) : null}
 
           {operation === 'compress' ? (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
               <Label htmlFor="targetKb">{t('pdf.compress.targetSizeLabel')}</Label>
               <Input
                 id="targetKb"
@@ -605,14 +579,17 @@ export function PdfToolsPage() {
                 min={1}
                 value={targetKbInput}
                 placeholder={t('pdf.compress.targetSizePlaceholder')}
-                onChange={(e) => setTargetKbInput(e.target.value)}
+                onChange={(e) => {
+                  setTargetKbInput(e.target.value)
+                  setResult(null)
+                }}
               />
               <p className="text-xs text-muted-foreground">{t('pdf.compress.targetSizeHint')}</p>
             </div>
           ) : null}
 
           {operation === 'imagesToPdf' ? (
-            <div className="space-y-2">
+            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
               <Label htmlFor="dpi">DPI（72-600）</Label>
               <Input
                 id="dpi"
@@ -620,174 +597,204 @@ export function PdfToolsPage() {
                 min={72}
                 max={600}
                 value={dpiInput}
-                onChange={(e) => setDpiInput(e.target.value)}
+                onChange={(e) => {
+                  setDpiInput(e.target.value)
+                  setResult(null)
+                }}
               />
             </div>
           ) : null}
 
           {operation === 'pages' ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="pageOperation">{t('pdf.pages.operationLabel')}</Label>
-                <select
-                  id="pageOperation"
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  value={pagesOperation}
-                  onChange={(e) => {
-                    dispatchPageEditor({
-                      type: 'set',
-                      patch: { pagesOperation: e.target.value as PageOperation },
-                    })
-                    setResult(null)
-                  }}
-                >
-                  <option value="extract">{t('pdf.pages.extract')}</option>
-                  <option value="delete">{t('pdf.pages.delete')}</option>
-                  <option value="rotate">{t('pdf.pages.rotate')}</option>
-                  <option value="reorder">{t('pdf.pages.reorder')}</option>
-                </select>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!canUndoPagesEdit}
-                  onClick={handleUndoPagesEdit}
-                >
-                  {t('pdf.workspace.undo')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={!canRedoPagesEdit}
-                  onClick={handleRedoPagesEdit}
-                >
-                  {t('pdf.workspace.redo')}
-                </Button>
-              </div>
-
-              {pagesOperation === 'reorder' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="orderInput">{t('pdf.pages.newOrderLabel')}</Label>
-                  <Input
-                    id="orderInput"
-                    placeholder={t('pdf.pages.newOrderPlaceholder')}
-                    value={orderInput}
-                    onChange={(e) =>
+            <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.55fr)]">
+              <div className="space-y-3">
+                {singlePdfFile ? (
+                  <PdfPageWorkspace
+                    file={singlePdfFile}
+                    mode={pagesOperation === 'reorder' ? 'reorder' : 'select'}
+                    pageOperation={pagesOperation}
+                    selectedPages={visualSelectedPages}
+                    reorderPages={visualOrderPages}
+                    onSelectedPagesChange={(pages) => {
                       dispatchPageEditor({
                         type: 'set',
-                        patch: { orderInput: e.target.value },
+                        patch: { pagesInput: formatPageList(pages) },
                       })
-                    }
-                  />
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="pagesInput">
-                    {t('pdf.pages.pagesLabel')}
-                    {pagesOperation === 'rotate' ? t('pdf.pages.pagesLabelAllSuffix') : ''}
-                  </Label>
-                  <Input
-                    id="pagesInput"
-                    placeholder={pagesOperation === 'rotate' ? t('pdf.pages.pagesPlaceholderAll') : t('pdf.pages.pagesPlaceholder')}
-                    value={pagesInput}
-                    onChange={(e) =>
+                      setResult(null)
+                    }}
+                    onReorderPagesChange={(pages) => {
                       dispatchPageEditor({
                         type: 'set',
-                        patch: { pagesInput: e.target.value },
+                        patch: { orderInput: formatPageList(pages) },
                       })
-                    }
+                      setResult(null)
+                    }}
+                    onQuickApplyPage={handleQuickApplyPage}
+                    onQuickApplySelectedPages={handleQuickApplySelectedPages}
+                    quickApplyPending={pending}
                   />
-                </div>
-              )}
-
-              {pagesOperation === 'rotate' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="rotation">{t('pdf.pages.rotationLabel')}</Label>
-                  <Input
-                    id="rotation"
-                    type="number"
-                    step={90}
-                    value={rotationInput}
-                    onChange={(e) =>
-                      dispatchPageEditor({
-                        type: 'set',
-                        patch: { rotationInput: e.target.value },
-                      })
-                    }
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={rotationInput === '90' ? 'secondary' : 'outline'}
-                      onClick={() =>
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { rotationInput: '90' },
-                        })
-                      }
-                    >
-                      {t('pdf.workspace.rotate90')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={rotationInput === '180' ? 'secondary' : 'outline'}
-                      onClick={() =>
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { rotationInput: '180' },
-                        })
-                      }
-                    >
-                      {t('pdf.workspace.rotate180')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={rotationInput === '270' ? 'secondary' : 'outline'}
-                      onClick={() =>
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { rotationInput: '270' },
-                        })
-                      }
-                    >
-                      {t('pdf.workspace.rotate270')}
-                    </Button>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/15 p-6 text-sm text-muted-foreground">
+                    {t('pdf.workspace.uploadHint')}
                   </div>
+                )}
+              </div>
+
+              <div className="space-y-4 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pageOperation">{t('pdf.pages.operationLabel')}</Label>
+                  <select
+                    id="pageOperation"
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    value={pagesOperation}
+                    onChange={(e) => {
+                      dispatchPageEditor({
+                        type: 'set',
+                        patch: { pagesOperation: e.target.value as PageOperation },
+                      })
+                      setResult(null)
+                    }}
+                  >
+                    <option value="extract">{t('pdf.pages.extract')}</option>
+                    <option value="delete">{t('pdf.pages.delete')}</option>
+                    <option value="rotate">{t('pdf.pages.rotate')}</option>
+                    <option value="reorder">{t('pdf.pages.reorder')}</option>
+                  </select>
                 </div>
-              ) : null}
 
-              {singlePdfFile ? (
-                <PdfPageWorkspace
-                  file={singlePdfFile}
-                  mode={pagesOperation === 'reorder' ? 'reorder' : 'select'}
-                  pageOperation={pagesOperation}
-                  selectedPages={visualSelectedPages}
-                  reorderPages={visualOrderPages}
-                  onSelectedPagesChange={(pages) => {
-                    dispatchPageEditor({
-                      type: 'set',
-                      patch: { pagesInput: formatPageList(pages) },
-                    })
-                  }}
-                  onReorderPagesChange={(pages) => {
-                    dispatchPageEditor({
-                      type: 'set',
-                      patch: { orderInput: formatPageList(pages) },
-                    })
-                  }}
-                  onQuickApplyPage={handleQuickApplyPage}
-                  onQuickApplySelectedPages={handleQuickApplySelectedPages}
-                  quickApplyPending={pending}
-                />
-              ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canUndoPagesEdit}
+                    onClick={handleUndoPagesEdit}
+                  >
+                    {t('pdf.workspace.undo')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={!canRedoPagesEdit}
+                    onClick={handleRedoPagesEdit}
+                  >
+                    {t('pdf.workspace.redo')}
+                  </Button>
+                </div>
 
-              {pageInputError ? <p className="text-sm text-destructive">{pageInputError}</p> : null}
+                {pagesOperation === 'reorder' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="orderInput">{t('pdf.pages.newOrderLabel')}</Label>
+                    <Input
+                      id="orderInput"
+                      placeholder={t('pdf.pages.newOrderPlaceholder')}
+                      value={orderInput}
+                      onChange={(e) => {
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { orderInput: e.target.value },
+                        })
+                        setResult(null)
+                      }}
+                    />
+                    {visualOrderPages.length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('shared.parsedPages')}: {formatPageList(visualOrderPages)}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="pagesInput">
+                      {t('pdf.pages.pagesLabel')}
+                      {pagesOperation === 'rotate' ? t('pdf.pages.pagesLabelAllSuffix') : ''}
+                    </Label>
+                    <Input
+                      id="pagesInput"
+                      placeholder={pagesOperation === 'rotate' ? t('pdf.pages.pagesPlaceholderAll') : t('pdf.pages.pagesPlaceholder')}
+                      value={pagesInput}
+                      onChange={(e) => {
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { pagesInput: e.target.value },
+                        })
+                        setResult(null)
+                      }}
+                    />
+                    {visualSelectedPages.length > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('shared.parsedPages')}: {formatPageList(visualSelectedPages)}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
+                {pagesOperation === 'rotate' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="rotation">{t('pdf.pages.rotationLabel')}</Label>
+                    <Input
+                      id="rotation"
+                      type="number"
+                      step={90}
+                      value={rotationInput}
+                      onChange={(e) => {
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { rotationInput: e.target.value },
+                        })
+                        setResult(null)
+                      }}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={rotationInput === '90' ? 'secondary' : 'outline'}
+                        onClick={() => {
+                          dispatchPageEditor({
+                            type: 'set',
+                            patch: { rotationInput: '90' },
+                          })
+                          setResult(null)
+                        }}
+                      >
+                        {t('pdf.workspace.rotate90')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={rotationInput === '180' ? 'secondary' : 'outline'}
+                        onClick={() => {
+                          dispatchPageEditor({
+                            type: 'set',
+                            patch: { rotationInput: '180' },
+                          })
+                          setResult(null)
+                        }}
+                      >
+                        {t('pdf.workspace.rotate180')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={rotationInput === '270' ? 'secondary' : 'outline'}
+                        onClick={() => {
+                          dispatchPageEditor({
+                            type: 'set',
+                            patch: { rotationInput: '270' },
+                          })
+                          setResult(null)
+                        }}
+                      >
+                        {t('pdf.workspace.rotate270')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {pageInputError ? <p className="text-sm text-destructive">{pageInputError}</p> : null}
+              </div>
             </div>
           ) : null}
         </div>

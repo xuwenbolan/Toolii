@@ -48,7 +48,7 @@ export function ShareClaimPage() {
         if (!active) return
         setInfo(data)
       })
-      .catch((err) => {
+      .catch(() => {
         if (!active) return
         setError(t('claimPage.linkInvalid'))
       })
@@ -111,7 +111,7 @@ export function ShareClaimPage() {
                       setClaimResult(result)
                       setInfo((prev) => (prev ? { ...prev, status: 'claimed', can_claim: false } : prev))
                       void credits.refreshBalance()
-                    } catch (err) {
+                    } catch {
                       setClaimError(t('claimPage.claimFailed'))
                       void getShareInfo(token)
                         .then((data) => setInfo(data))

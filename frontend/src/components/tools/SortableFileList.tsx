@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core'
 import {
   arrayMove,
+  rectSortingStrategy,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -53,13 +54,11 @@ type SortableItem = {
 
 type RowProps = {
   item: SortableItem
-  kind: FileKind
   onRemove?: (index: number) => void
 }
 
-function SortableFileRow({ item, kind, onRemove }: RowProps) {
+function SortablePdfRow({ item, onRemove }: RowProps) {
   const { t } = useTranslation('tools')
-  const previewUrl = useObjectUrl(kind === 'image' ? item.file : null)
 
   const {
     attributes,
@@ -98,22 +97,9 @@ function SortableFileRow({ item, kind, onRemove }: RowProps) {
         </button>
 
         <div className="h-10 w-10 shrink-0 overflow-hidden rounded border bg-muted/40">
-          {kind === 'image' && previewUrl ? (
-            <img
-              src={previewUrl}
-              alt={item.file.name}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          ) : kind === 'image' ? (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <ImageIcon className="h-4 w-4" aria-hidden="true" />
-            </div>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <FileText className="h-4 w-4" aria-hidden="true" />
-            </div>
-          )}
+          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <FileText className="h-4 w-4" aria-hidden="true" />
+          </div>
         </div>
 
         <div className="min-w-0 flex-1">
@@ -133,6 +119,80 @@ function SortableFileRow({ item, kind, onRemove }: RowProps) {
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         ) : null}
+      </div>
+    </div>
+  )
+}
+
+function SortableImageCard({ item, onRemove }: RowProps) {
+  const { t } = useTranslation('tools')
+  const previewUrl = useObjectUrl(item.file)
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: transform
+      ? `translate3d(${Math.round(transform.x)}px, ${Math.round(transform.y)}px, 0)`
+      : undefined,
+    transition,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative overflow-hidden rounded-lg border bg-card p-2 transition-shadow',
+        isDragging && 'shadow-lg ring-1 ring-primary/40',
+      )}
+    >
+      <button
+        type="button"
+        className="absolute left-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded border bg-background/90 text-muted-foreground backdrop-blur hover:bg-muted"
+        aria-label={t('shared.dragHandle')}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-4 w-4" aria-hidden="true" />
+      </button>
+
+      {onRemove ? (
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="absolute right-2 top-2 z-10 h-7 w-7 rounded border bg-background/90 backdrop-blur hover:bg-muted"
+          onClick={() => onRemove(item.index)}
+          aria-label={t('shared.remove')}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      ) : null}
+
+      <div className="overflow-hidden rounded-md border bg-muted/20">
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt={item.file.name}
+            className="h-36 w-full object-cover sm:h-40"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-36 w-full items-center justify-center text-muted-foreground sm:h-40">
+            <ImageIcon className="h-5 w-5" aria-hidden="true" />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-2 min-w-0 space-y-0.5">
+        <p className="truncate text-sm font-medium">{item.index + 1}. {item.file.name}</p>
+        <p className="text-xs text-muted-foreground">{formatBytes(item.file.size)}</p>
       </div>
     </div>
   )
@@ -176,18 +236,31 @@ export function SortableFileList({ files, kind, hint, onReorder, onRemove }: Pro
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {items.map((item) => (
-              <SortableFileRow
-                key={item.id}
-                item={item}
-                kind={kind}
-                onRemove={onRemove}
-              />
-            ))}
-          </div>
-        </SortableContext>
+        {kind === 'image' ? (
+          <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {items.map((item) => (
+                <SortableImageCard
+                  key={item.id}
+                  item={item}
+                  onRemove={onRemove}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        ) : (
+          <SortableContext items={items.map((item) => item.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <SortablePdfRow
+                  key={item.id}
+                  item={item}
+                  onRemove={onRemove}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        )}
       </DndContext>
     </div>
   )

@@ -44,7 +44,7 @@ async def test_api_credits_redeem_balance_transactions(
     session_factory,
     create_user,
 ) -> None:
-    user = await create_user(email=f"api-credits-{int(time.time() * 1000)}@example.com", balance=0)
+    user = await create_user(email=f"api-credits-{int(time.time() * 1000)}@example.com", balance=0, email_verified=True)
     access_token, _ = create_access_token(user_id=user.id)
     headers = {"Authorization": f"Bearer {access_token}"}
 
@@ -71,7 +71,7 @@ async def test_api_credits_redeem_invalid_format(
     async_client,
     create_user,
 ) -> None:
-    user = await create_user(email=f"api-credits-format-{int(time.time() * 1000)}@example.com", balance=0)
+    user = await create_user(email=f"api-credits-format-{int(time.time() * 1000)}@example.com", balance=0, email_verified=True)
     access_token, _ = create_access_token(user_id=user.id)
     headers = {"Authorization": f"Bearer {access_token}"}
 
@@ -88,7 +88,7 @@ async def test_api_credits_redeem_accepts_lowercase_and_blocks_reuse(
     session_factory,
     create_user,
 ) -> None:
-    user = await create_user(email=f"api-credits-reuse-{int(time.time() * 1000)}@example.com", balance=0)
+    user = await create_user(email=f"api-credits-reuse-{int(time.time() * 1000)}@example.com", balance=0, email_verified=True)
     access_token, _ = create_access_token(user_id=user.id)
     headers = {"Authorization": f"Bearer {access_token}"}
 

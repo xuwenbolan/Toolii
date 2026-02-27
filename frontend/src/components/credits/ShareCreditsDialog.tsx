@@ -56,7 +56,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
     try {
       const res = await fetchShareLinks({ limit: 20, offset: 0 })
       setLinks(res.items)
-    } catch (err) {
+    } catch {
       setLinksError(t('share.linksLoadFailed'))
     } finally {
       setLoadingLinks(false)
@@ -190,7 +190,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                                 await cancelShareLink(item.id)
                                 await loadLinks()
                                 onChanged?.()
-                              } catch (err) {
+                              } catch {
                                 setLinksError(t('share.cancelFailed'))
                               }
                             }}
