@@ -4,7 +4,17 @@ import { Button } from '@/components/ui/button'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import { formatBytes } from '@/lib/fileValidation'
-import type { BatchResponse } from '@/services/imageApi'
+import type { FileResult } from '@/services/imageApi'
+
+type BatchResponseItem = {
+  input_filename: string
+  output: FileResult
+}
+
+type BatchResponse = {
+  archive: FileResult
+  items: BatchResponseItem[]
+}
 
 type Props = {
   batch: BatchResponse

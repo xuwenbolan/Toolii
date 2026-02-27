@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation } from 'react-router-dom'
 
 import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner'
@@ -14,6 +15,7 @@ const gaMeasurementId = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undef
 export function RootLayout() {
   const { bootstrap } = useAuth()
   const location = useLocation()
+  const { t } = useTranslation('common')
   const cookieConsent = useConsentStore((s) => s.cookieConsent)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
 
@@ -35,7 +37,9 @@ export function RootLayout() {
   if (isBootstrapping) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background text-foreground">
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <div className="text-muted-foreground text-sm" role="status" aria-live="polite">
+          {t('actions.processingWait')}
+        </div>
       </div>
     )
   }
@@ -45,7 +49,14 @@ export function RootLayout() {
       <Header />
       <EmailVerificationBanner />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <Outlet />
+        <Suspense fallback={<div className="text-sm text-muted-foreground">{t('actions.processingWait')}</div>}>
+          <div
+            key={location.pathname}
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-reduce:animate-none"
+          >
+            <Outlet />
+          </div>
+        </Suspense>
       </main>
       <Footer />
       <CookieBanner />

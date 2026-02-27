@@ -21,6 +21,13 @@ export function Header() {
         <nav className="ml-auto hidden items-center gap-2 md:flex">
           {user ? (
             <>
+              {user.is_admin && (
+                <NavLink to="/admin">
+                  <Button variant="ghost" size="sm">
+                    {t('nav.admin', 'Admin')}
+                  </Button>
+                </NavLink>
+              )}
               <NavLink to="/dashboard">
                 <Button variant="ghost" size="sm">
                   {t('nav.dashboard')}

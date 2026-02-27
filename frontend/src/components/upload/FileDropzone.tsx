@@ -1,6 +1,7 @@
 import { useCallback, useRef } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useTranslation } from 'react-i18next'
+import { UploadCloud } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -48,12 +49,13 @@ export function FileDropzone({
       <Card
         {...getRootProps()}
         className={[
-          'border-dashed p-4',
-          isDragActive ? 'bg-accent/40' : 'bg-card',
+          'min-h-[8.5rem] border-dashed p-4 transition-colors duration-200 motion-reduce:transition-none',
+          isDragActive ? 'border-primary/60 bg-accent/40' : 'border-border/70 bg-card',
         ].join(' ')}
       >
         <input {...getInputProps()} />
-        <div className="space-y-1 text-center">
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+          <UploadCloud className="h-6 w-6 text-muted-foreground" aria-hidden="true" />
           <p className="text-sm font-medium">{t('upload.dropHere')}</p>
           <p className="text-xs text-muted-foreground">{t('upload.orSelectBelow')}</p>
         </div>

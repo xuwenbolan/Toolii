@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 
 import { fetchMe, logoutApi } from '@/services/authApi'
+import { api } from '@/services/api'
 import { useAuthStore } from '@/stores/authStore'
 
 export function useAuth() {
@@ -20,7 +21,6 @@ export function useAuth() {
     }
     // No access token in memory -> try refreshing via HttpOnly cookie
     try {
-      const { api } = await import('@/services/api')
       const res = await api.post('/api/auth/refresh')
       const access = res.data?.tokens?.access_token as string | undefined
       if (access) {
