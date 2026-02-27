@@ -4,7 +4,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi import Depends
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, dynamic_rate_limit_heavy, limiter
 from app.core.task_limiter import acquire_task_slot
@@ -70,7 +70,7 @@ async def preview(
 async def export(
     request: Request,
     payload: PhotoExportRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> FileResult:
     sem = await acquire_task_slot(request)
@@ -85,7 +85,7 @@ async def export(
 async def layout(
     request: Request,
     payload: PhotoLayoutRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> FileResult:
     sem = await acquire_task_slot(request)

@@ -98,5 +98,5 @@ def register_rate_limiter(app: FastAPI) -> None:
         _record_violation(ip)
         return JSONResponse(
             status_code=429,
-            content={"code": "RATE_LIMITED", "message": "请求过于频繁，请稍后再试"},
+            content={"code": "RATE_LIMITED", "message": "Too many requests, please try again later"},
         )

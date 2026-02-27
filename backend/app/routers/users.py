@@ -37,13 +37,13 @@ async def change_password(
     if not user.hashed_password:
         raise AppError(
             code="NO_PASSWORD",
-            message="该账号使用 Google 登录，无法修改密码",
+            message="This account uses Google login, password cannot be changed",
             status_code=400,
         )
     if not verify_password(payload.current_password, user.hashed_password):
         raise AppError(
             code="WRONG_PASSWORD",
-            message="当前密码错误",
+            message="Current password is incorrect",
             status_code=400,
         )
     user.hashed_password = hash_password(payload.new_password)
@@ -51,7 +51,7 @@ async def change_password(
     from slowapi.util import get_remote_address
     ip = get_remote_address(request)
     log_auth_event("password_changed", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "密码修改成功"})
+    return JSONResponse(content={"message": "Password changed successfully"})
 
 
 @router.put("/profile")
@@ -76,7 +76,7 @@ async def update_profile(
             # Check uniqueness
             result = await db.execute(select(User).where(User.email == new_email))
             if result.scalar_one_or_none() is not None:
-                raise AppError(code="EMAIL_EXISTS", message="该邮箱已被使用", status_code=409)
+                raise AppError(code="EMAIL_EXISTS", message="Email already in use", status_code=409)
             user.email = new_email
             user.email_verified = False
             email_changed = True
@@ -102,7 +102,7 @@ async def update_profile(
     log_auth_event("profile_updated", user_id=user.id, ip=ip)
 
     body: dict = {
-        "message": "资料更新成功" + ("，请验证新邮箱" if email_changed else ""),
+        "message": "Profile updated" + (", please verify new email" if email_changed else ""),
         "user": UserPublic.model_validate(user).model_dump(),
     }
     if dev_token is not None:
@@ -126,13 +126,13 @@ async def delete_me(
         if not payload.password:
             raise AppError(
                 code="PASSWORD_REQUIRED",
-                message="请输入密码以确认删除",
+                message="Please enter password to confirm deletion",
                 status_code=400,
             )
         if not verify_password(payload.password, user.hashed_password):
             raise AppError(
                 code="WRONG_PASSWORD",
-                message="密码错误",
+                message="Wrong password",
                 status_code=400,
             )
 
@@ -144,7 +144,7 @@ async def delete_me(
 
     ip = get_remote_address(request)
     log_auth_event("account_deleted", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "账号已标记删除，7 天内可通过登录恢复"})
+    return JSONResponse(content={"message": "Account marked for deletion, recoverable within 7 days by logging in"})
 
 
 @router.post("/recover")
@@ -165,16 +165,16 @@ async def recover_account(
     user = result.scalar_one_or_none()
 
     if user is None or not user.deleted_at:
-        raise AppError(code="NOT_FOUND", message="未找到可恢复的账号", status_code=404)
+        raise AppError(code="NOT_FOUND", message="No recoverable account found", status_code=404)
 
     # Check 7-day recovery window
     now = datetime.now(timezone.utc)
     if now - user.deleted_at > timedelta(days=7):
-        raise AppError(code="EXPIRED", message="恢复期已过，账号已永久删除", status_code=410)
+        raise AppError(code="EXPIRED", message="Recovery period expired, account permanently deleted", status_code=410)
 
     # Verify password
     if not user.hashed_password or not verify_password(payload.password, user.hashed_password):
-        raise AppError(code="WRONG_PASSWORD", message="密码错误", status_code=401)
+        raise AppError(code="WRONG_PASSWORD", message="Wrong password", status_code=401)
 
     user.is_active = True
     user.deleted_at = None
@@ -183,7 +183,7 @@ async def recover_account(
 
     ip = get_remote_address(request)
     log_auth_event("account_recovered", user_id=user.id, email=user.email, ip=ip)
-    return JSONResponse(content={"message": "账号已恢复，请重新登录"})
+    return JSONResponse(content={"message": "Account recovered, please log in again"})
 
 
 @router.get("/sessions")
@@ -238,7 +238,7 @@ async def revoke_session(
     )
     entry = result.scalar_one_or_none()
     if entry is None:
-        raise AppError(code="SESSION_NOT_FOUND", message="会话不存在", status_code=404)
+        raise AppError(code="SESSION_NOT_FOUND", message="Session not found", status_code=404)
 
     if entry.refresh_jti:
         await token_blacklist.revoke(
@@ -251,4 +251,4 @@ async def revoke_session(
 
     ip = get_remote_address(request)
     log_auth_event("session_revoked", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "会话已终止"})
+    return JSONResponse(content={"message": "Session terminated"})

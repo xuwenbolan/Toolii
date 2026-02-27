@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -15,8 +15,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
+import { usePdfThumbnails } from '@/hooks/usePdfThumbnails'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
+import { cn } from '@/lib/utils'
 import {
   compressPdf,
   editPdfPages,
@@ -28,6 +30,100 @@ import {
 
 type WorkspaceOperation = 'compress' | 'merge' | 'split' | 'pages' | 'imagesToPdf'
 type PageOperation = 'rotate' | 'delete' | 'extract' | 'reorder'
+type PageEditorSnapshot = {
+  pagesOperation: PageOperation
+  pagesInput: string
+  orderInput: string
+  rotationInput: string
+}
+
+type PageEditorState = PageEditorSnapshot & {
+  history: PageEditorSnapshot[]
+  historyIndex: number
+}
+
+type PageEditorAction =
+  | { type: 'set'; patch: Partial<PageEditorSnapshot>; pushHistory?: boolean }
+  | { type: 'undo' }
+  | { type: 'redo' }
+
+const INITIAL_PAGE_EDITOR_SNAPSHOT: PageEditorSnapshot = {
+  pagesOperation: 'extract',
+  pagesInput: '',
+  orderInput: '',
+  rotationInput: '90',
+}
+
+function snapshotsEqual(a: PageEditorSnapshot, b: PageEditorSnapshot) {
+  return (
+    a.pagesOperation === b.pagesOperation &&
+    a.pagesInput === b.pagesInput &&
+    a.orderInput === b.orderInput &&
+    a.rotationInput === b.rotationInput
+  )
+}
+
+function pageEditorReducer(state: PageEditorState, action: PageEditorAction): PageEditorState {
+  if (action.type === 'undo') {
+    if (state.historyIndex <= 0) return state
+    const nextIndex = state.historyIndex - 1
+    const snapshot = state.history[nextIndex]
+    return {
+      ...state,
+      ...snapshot,
+      historyIndex: nextIndex,
+    }
+  }
+
+  if (action.type === 'redo') {
+    if (state.historyIndex >= state.history.length - 1) return state
+    const nextIndex = state.historyIndex + 1
+    const snapshot = state.history[nextIndex]
+    return {
+      ...state,
+      ...snapshot,
+      historyIndex: nextIndex,
+    }
+  }
+
+  const currentSnapshot: PageEditorSnapshot = {
+    pagesOperation: state.pagesOperation,
+    pagesInput: state.pagesInput,
+    orderInput: state.orderInput,
+    rotationInput: state.rotationInput,
+  }
+  const nextSnapshot: PageEditorSnapshot = {
+    ...currentSnapshot,
+    ...action.patch,
+  }
+  if (snapshotsEqual(currentSnapshot, nextSnapshot)) {
+    return state
+  }
+
+  if (action.pushHistory === false) {
+    return {
+      ...state,
+      ...nextSnapshot,
+    }
+  }
+
+  const historyBase = state.history.slice(0, state.historyIndex + 1)
+  const historyTail = historyBase[historyBase.length - 1]
+  if (historyTail && snapshotsEqual(historyTail, nextSnapshot)) {
+    return {
+      ...state,
+      ...nextSnapshot,
+    }
+  }
+
+  const nextHistory = [...historyBase, nextSnapshot]
+  return {
+    ...state,
+    ...nextSnapshot,
+    history: nextHistory,
+    historyIndex: nextHistory.length - 1,
+  }
+}
 
 function resolveOperationFromPath(pathname: string): WorkspaceOperation {
   if (pathname.endsWith('/compress')) return 'compress'
@@ -91,6 +187,8 @@ function getOperationPath(operation: WorkspaceOperation) {
   }
 }
 
+const WORKSPACE_OPERATION_ORDER: WorkspaceOperation[] = ['merge', 'split', 'compress', 'pages', 'imagesToPdf']
+
 export function PdfToolsPage() {
   const { t } = useTranslation('tools')
   const location = useLocation()
@@ -101,12 +199,16 @@ export function PdfToolsPage() {
   const [targetKbInput, setTargetKbInput] = useState('')
   const [ranges, setRanges] = useState('')
   const [dpiInput, setDpiInput] = useState('150')
-  const [pagesOperation, setPagesOperation] = useState<PageOperation>('extract')
-  const [pagesInput, setPagesInput] = useState('')
-  const [orderInput, setOrderInput] = useState('')
-  const [rotationInput, setRotationInput] = useState('90')
+  const [pageEditor, dispatchPageEditor] = useReducer(pageEditorReducer, {
+    ...INITIAL_PAGE_EDITOR_SNAPSHOT,
+    history: [INITIAL_PAGE_EDITOR_SNAPSHOT],
+    historyIndex: 0,
+  })
   const [result, setResult] = useState<FileResult | null>(null)
   const operation = resolveOperationFromPath(location.pathname)
+  const { pagesOperation, pagesInput, orderInput, rotationInput } = pageEditor
+  const canUndoPagesEdit = pageEditor.historyIndex > 0
+  const canRedoPagesEdit = pageEditor.historyIndex < pageEditor.history.length - 1
 
   const targetKb = parseFiniteNumber(targetKbInput)
   const targetKbValid = targetKbInput.trim() === '' || (targetKb != null && isIntInRange(targetKb, 1, 1_000_000))
@@ -157,6 +259,19 @@ export function PdfToolsPage() {
 
   const singlePdfFile = pdfFiles[0] ?? null
   const isMultiMode = operation === 'merge' || operation === 'imagesToPdf'
+  const sidebarPreviewFile = !isMultiMode && operation !== 'pages' ? singlePdfFile : null
+  const { thumbnails: sidebarPreviewThumbnails } = usePdfThumbnails(sidebarPreviewFile, {
+    maxPages: 1,
+    thumbnailWidth: 360,
+  })
+  const sidebarPdfPreview = sidebarPreviewThumbnails[0]?.dataUrl ?? null
+  const operationTitle: Record<WorkspaceOperation, string> = {
+    compress: t('pdf.compress.title'),
+    merge: t('pdf.merge.title'),
+    split: t('pdf.split.title'),
+    pages: t('pdf.pages.title'),
+    imagesToPdf: t('pdf.imagesToPdf.title'),
+  }
   const activeDescription: Record<WorkspaceOperation, string> = {
     compress: t('pdf.compress.description'),
     merge: t('pdf.merge.description'),
@@ -250,12 +365,25 @@ export function PdfToolsPage() {
     }
   }
 
+  const handleUndoPagesEdit = () => {
+    dispatchPageEditor({ type: 'undo' })
+    setResult(null)
+  }
+
+  const handleRedoPagesEdit = () => {
+    dispatchPageEditor({ type: 'redo' })
+    setResult(null)
+  }
+
   const handleQuickApplyPage = async (pageNumber: number) => {
     if (operation !== 'pages') return
     if (pagesOperation === 'reorder') return
     if (!singlePdfFile || pending) return
 
-    setPagesInput(String(pageNumber))
+    dispatchPageEditor({
+      type: 'set',
+      patch: { pagesInput: String(pageNumber) },
+    })
     setResult(null)
     try {
       const res = await run((onProgress) =>
@@ -281,7 +409,10 @@ export function PdfToolsPage() {
     if (!singlePdfFile || pending || pages.length === 0) return
 
     const uniquePages = [...new Set(pages)].sort((a, b) => a - b)
-    setPagesInput(formatPageList(uniquePages))
+    dispatchPageEditor({
+      type: 'set',
+      patch: { pagesInput: formatPageList(uniquePages) },
+    })
     setResult(null)
     try {
       const res = await run((onProgress) =>
@@ -503,7 +634,10 @@ export function PdfToolsPage() {
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                   value={pagesOperation}
                   onChange={(e) => {
-                    setPagesOperation(e.target.value as PageOperation)
+                    dispatchPageEditor({
+                      type: 'set',
+                      patch: { pagesOperation: e.target.value as PageOperation },
+                    })
                     setResult(null)
                   }}
                 >
@@ -513,6 +647,26 @@ export function PdfToolsPage() {
                   <option value="reorder">{t('pdf.pages.reorder')}</option>
                 </select>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!canUndoPagesEdit}
+                  onClick={handleUndoPagesEdit}
+                >
+                  {t('pdf.workspace.undo')}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={!canRedoPagesEdit}
+                  onClick={handleRedoPagesEdit}
+                >
+                  {t('pdf.workspace.redo')}
+                </Button>
+              </div>
 
               {pagesOperation === 'reorder' ? (
                 <div className="space-y-2">
@@ -521,7 +675,12 @@ export function PdfToolsPage() {
                     id="orderInput"
                     placeholder={t('pdf.pages.newOrderPlaceholder')}
                     value={orderInput}
-                    onChange={(e) => setOrderInput(e.target.value)}
+                    onChange={(e) =>
+                      dispatchPageEditor({
+                        type: 'set',
+                        patch: { orderInput: e.target.value },
+                      })
+                    }
                   />
                 </div>
               ) : (
@@ -534,7 +693,12 @@ export function PdfToolsPage() {
                     id="pagesInput"
                     placeholder={pagesOperation === 'rotate' ? t('pdf.pages.pagesPlaceholderAll') : t('pdf.pages.pagesPlaceholder')}
                     value={pagesInput}
-                    onChange={(e) => setPagesInput(e.target.value)}
+                    onChange={(e) =>
+                      dispatchPageEditor({
+                        type: 'set',
+                        patch: { pagesInput: e.target.value },
+                      })
+                    }
                   />
                 </div>
               )}
@@ -547,8 +711,54 @@ export function PdfToolsPage() {
                     type="number"
                     step={90}
                     value={rotationInput}
-                    onChange={(e) => setRotationInput(e.target.value)}
+                    onChange={(e) =>
+                      dispatchPageEditor({
+                        type: 'set',
+                        patch: { rotationInput: e.target.value },
+                      })
+                    }
                   />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={rotationInput === '90' ? 'secondary' : 'outline'}
+                      onClick={() =>
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { rotationInput: '90' },
+                        })
+                      }
+                    >
+                      {t('pdf.workspace.rotate90')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={rotationInput === '180' ? 'secondary' : 'outline'}
+                      onClick={() =>
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { rotationInput: '180' },
+                        })
+                      }
+                    >
+                      {t('pdf.workspace.rotate180')}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={rotationInput === '270' ? 'secondary' : 'outline'}
+                      onClick={() =>
+                        dispatchPageEditor({
+                          type: 'set',
+                          patch: { rotationInput: '270' },
+                        })
+                      }
+                    >
+                      {t('pdf.workspace.rotate270')}
+                    </Button>
+                  </div>
                 </div>
               ) : null}
 
@@ -560,10 +770,16 @@ export function PdfToolsPage() {
                   selectedPages={visualSelectedPages}
                   reorderPages={visualOrderPages}
                   onSelectedPagesChange={(pages) => {
-                    setPagesInput(formatPageList(pages))
+                    dispatchPageEditor({
+                      type: 'set',
+                      patch: { pagesInput: formatPageList(pages) },
+                    })
                   }}
                   onReorderPagesChange={(pages) => {
-                    setOrderInput(formatPageList(pages))
+                    dispatchPageEditor({
+                      type: 'set',
+                      patch: { orderInput: formatPageList(pages) },
+                    })
                   }}
                   onQuickApplyPage={handleQuickApplyPage}
                   onQuickApplySelectedPages={handleQuickApplySelectedPages}

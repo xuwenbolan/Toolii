@@ -117,16 +117,16 @@ class CreditService:
         autocommit: bool = True,
     ) -> tuple[CreditTransaction, int, int]:
         if amount_delta == 0:
-            raise AppError(code="INVALID_CREDIT_AMOUNT", message="Credits 变更数量不能为 0", status_code=400)
+            raise AppError(code="INVALID_CREDIT_AMOUNT", message="Credit change amount cannot be 0", status_code=400)
         if not tx_type.strip():
-            raise AppError(code="INVALID_TX_TYPE", message="交易类型不能为空", status_code=400)
+            raise AppError(code="INVALID_TX_TYPE", message="Transaction type cannot be empty", status_code=400)
 
         async def _run() -> tuple[CreditTransaction, int, int]:
             wallet = await self._get_or_create_wallet(user_id=user_id, for_update=True)
             balance_before = int(wallet.balance)
             balance_after = balance_before + int(amount_delta)
             if balance_after < 0:
-                raise AppError(code="INSUFFICIENT_CREDITS", message="Credits 余额不足", status_code=402)
+                raise AppError(code="INSUFFICIENT_CREDITS", message="Insufficient credits", status_code=402)
             wallet.balance = balance_after
             tx = await self._record_tx(
                 user_id=user_id,
@@ -152,7 +152,7 @@ class CreditService:
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Credit change failed for user %s", user_id)
-            raise AppError(code="CREDIT_CHANGE_FAILED", message="Credits 余额变更失败", status_code=500) from exc
+            raise AppError(code="CREDIT_CHANGE_FAILED", message="Credit balance change failed", status_code=500) from exc
 
     async def get_balance(self, *, user_id: int) -> int:
         result = await self._db.execute(select(UserCredit).where(UserCredit.user_id == user_id))
@@ -169,9 +169,9 @@ class CreditService:
         offset: int = 0,
     ) -> CreditTransactionListResult:
         if limit < 1 or limit > 100:
-            raise AppError(code="INVALID_LIMIT", message="limit 必须在 1-100 之间", status_code=400)
+            raise AppError(code="INVALID_LIMIT", message="limit must be between 1 and 100", status_code=400)
         if offset < 0:
-            raise AppError(code="INVALID_OFFSET", message="offset 不能小于 0", status_code=400)
+            raise AppError(code="INVALID_OFFSET", message="offset must not be negative", status_code=400)
 
         total_result = await self._db.execute(
             select(func.count())
@@ -201,7 +201,7 @@ class CreditService:
         autocommit: bool = True,
     ) -> CreditAddResult:
         if amount <= 0:
-            raise AppError(code="INVALID_CREDIT_AMOUNT", message="增加数量必须大于 0", status_code=400)
+            raise AppError(code="INVALID_CREDIT_AMOUNT", message="Amount to add must be greater than 0", status_code=400)
         try:
             tx, balance_before, balance_after = await self._apply_delta(
                 user_id=user_id,
@@ -225,7 +225,7 @@ class CreditService:
         except SQLAlchemyError as exc:
             if autocommit:
                 logger.exception("Credit add failed for user %s", user_id)
-                raise AppError(code="CREDIT_ADD_FAILED", message="余额增加失败", status_code=500) from exc
+                raise AppError(code="CREDIT_ADD_FAILED", message="Credit add failed", status_code=500) from exc
             raise
 
     async def consume(
@@ -239,7 +239,7 @@ class CreditService:
         autocommit: bool = True,
     ) -> CreditConsumeResult:
         if amount <= 0:
-            raise AppError(code="INVALID_CREDIT_AMOUNT", message="扣费数量必须大于 0", status_code=400)
+            raise AppError(code="INVALID_CREDIT_AMOUNT", message="Amount to consume must be greater than 0", status_code=400)
         try:
             tx, balance_before, balance_after = await self._apply_delta(
                 user_id=user_id,
@@ -263,7 +263,7 @@ class CreditService:
         except SQLAlchemyError as exc:
             if autocommit:
                 logger.exception("Credit consume failed for user %s", user_id)
-                raise AppError(code="CREDIT_CONSUME_FAILED", message="余额扣费失败", status_code=500) from exc
+                raise AppError(code="CREDIT_CONSUME_FAILED", message="Credit consume failed", status_code=500) from exc
             raise
 
     async def redeem_code(
@@ -274,7 +274,7 @@ class CreditService:
     ) -> CreditRedeemResult:
         code = plain_code.strip().upper()
         if not code:
-            raise AppError(code="INVALID_CARD_CODE", message="卡密不能为空", status_code=400)
+            raise AppError(code="INVALID_CARD_CODE", message="Card code cannot be empty", status_code=400)
 
         code_hash = sha256_hex(code)
 
@@ -283,13 +283,13 @@ class CreditService:
             result = await self._db.execute(stmt)
             card = result.scalar_one_or_none()
             if card is None:
-                raise AppError(code="INVALID_CARD_CODE", message="卡密无效", status_code=400)
+                raise AppError(code="INVALID_CARD_CODE", message="Invalid card code", status_code=400)
             if card.status != "unused":
-                raise AppError(code="CARD_CODE_USED", message="卡密已被使用", status_code=409)
+                raise AppError(code="CARD_CODE_USED", message="Card code already used", status_code=409)
             if _is_expired(card.expires_at):
                 card.status = "expired"
                 await self._db.commit()
-                raise AppError(code="CARD_CODE_EXPIRED", message="卡密已过期", status_code=400)
+                raise AppError(code="CARD_CODE_EXPIRED", message="Card code expired", status_code=400)
 
             card.status = "redeemed"
             card.redeemed_by_user_id = user_id
@@ -299,7 +299,7 @@ class CreditService:
                 user_id=user_id,
                 amount=int(card.credits),
                 tx_type="redeem",
-                description=f"卡密兑换（{card.card_type}）",
+                description=f"Card redemption ({card.card_type})",
                 reference_id=f"card-redeem:{card.id}",
                 autocommit=False,
             )
@@ -319,4 +319,4 @@ class CreditService:
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Card redeem failed for user %s", user_id)
-            raise AppError(code="CARD_REDEEM_FAILED", message="卡密兑换失败", status_code=500) from exc
+            raise AppError(code="CARD_REDEEM_FAILED", message="Card redemption failed", status_code=500) from exc

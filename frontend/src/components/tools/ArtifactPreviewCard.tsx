@@ -53,7 +53,7 @@ export function ArtifactPreviewCard({
   previewClassName,
   imageFit = 'contain',
 }: Props) {
-  const isImage = mediaKind === 'image' && Boolean(mediaUrl)
+  const hasPreviewMedia = Boolean(mediaUrl)
   const previewHeightClass = mediaKind === 'image' ? 'min-h-[18rem] sm:min-h-[22rem]' : 'min-h-[11rem]'
 
   return (
@@ -70,7 +70,7 @@ export function ArtifactPreviewCard({
 
         <div className={cn('overflow-hidden rounded-lg border border-border/70 bg-muted/20', previewClassName)}>
           <div className={cn('relative flex items-center justify-center p-3', previewHeightClass)}>
-            {isImage ? (
+            {hasPreviewMedia ? (
               <img
                 src={mediaUrl ?? undefined}
                 alt={filename}

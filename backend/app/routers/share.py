@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.rate_limiter import limiter
 from app.models.share_link import ShareLink
 from app.models.user import User
@@ -59,7 +59,7 @@ def _to_item(link: ShareLink) -> ShareLinkItem:
 async def create_share(
     request: Request,  # noqa: ARG001
     payload: ShareCreateRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> ShareCreateResponse:
     service = ShareService(db)
@@ -81,7 +81,7 @@ async def claim_share(
 ) -> ShareClaimResponse:
     result = await ShareService(db).claim(token=token, user_id=user.id)
     return ShareClaimResponse(
-        message="领取成功",
+        message="Claimed successfully",
         amount=result.amount,
         balance=result.balance_after,
     )

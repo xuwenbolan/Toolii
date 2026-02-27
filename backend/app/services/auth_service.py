@@ -35,7 +35,7 @@ class AuthService:
 
         result = await self._db.execute(select(User).where(User.email == email))
         if result.scalar_one_or_none() is not None:
-            raise AppError(code="EMAIL_EXISTS", message="邮箱已注册", status_code=409)
+            raise AppError(code="EMAIL_EXISTS", message="Email already registered", status_code=409)
 
         user = User(email=email, hashed_password=hash_password(password), name=name)
         self._db.add(user)
@@ -70,29 +70,29 @@ class AuthService:
         user = result.scalar_one_or_none()
         if user is None:
             login_guard.record_failure(email)
-            raise UnauthorizedError("邮箱或密码错误")
+            raise UnauthorizedError("Invalid email or password")
         if not user.is_active and user.deleted_at is not None:
             raise AppError(
                 code="ACCOUNT_DELETED",
-                message="该账号已删除，7 天内可通过恢复功能找回",
+                message="Account deleted, recoverable within 7 days",
                 status_code=403,
             )
         if not user.is_active:
             login_guard.record_failure(email)
-            raise UnauthorizedError("邮箱或密码错误")
+            raise UnauthorizedError("Invalid email or password")
         if not user.hashed_password:
             login_guard.record_failure(email)
-            raise UnauthorizedError("该账号仅支持 Google 登录")
+            raise UnauthorizedError("This account only supports Google login")
         if not verify_password(password, user.hashed_password):
             login_guard.record_failure(email)
-            raise UnauthorizedError("邮箱或密码错误")
+            raise UnauthorizedError("Invalid email or password")
 
         login_guard.record_success(email)
         return user
 
     async def google_auth(self, *, access_token: str, link_password: str | None = None) -> User:
         if not settings.google_oauth_client_id:
-            raise AppError(code="GOOGLE_OAUTH_DISABLED", message="Google 登录未配置", status_code=400)
+            raise AppError(code="GOOGLE_OAUTH_DISABLED", message="Google login not configured", status_code=400)
 
         import httpx
 
@@ -106,15 +106,15 @@ class AuthService:
                 resp.raise_for_status()
                 payload = resp.json()
         except (httpx.HTTPError, ValueError, KeyError) as exc:
-            raise UnauthorizedError("Google 凭证无效") from exc
+            raise UnauthorizedError("Invalid Google credentials") from exc
 
         sub = payload.get("sub")
         email = payload.get("email")
         email_verified = payload.get("email_verified")
         if not isinstance(sub, str) or not isinstance(email, str):
-            raise UnauthorizedError("Google 凭证无效")
+            raise UnauthorizedError("Invalid Google credentials")
         if email_verified is False:
-            raise UnauthorizedError("Google 邮箱未验证")
+            raise UnauthorizedError("Google email not verified")
 
         email = email.strip().lower()
 
@@ -146,13 +146,13 @@ class AuthService:
             if not link_password:
                 raise AppError(
                     code="LINK_REQUIRES_PASSWORD",
-                    message="该邮箱已有账号，请输入密码以关联 Google 登录",
+                    message="An account with this email already exists, please enter password to link Google login",
                     status_code=409,
                 )
             if not verify_password(link_password, user.hashed_password):
                 raise AppError(
                     code="WRONG_PASSWORD",
-                    message="密码错误",
+                    message="Wrong password",
                     status_code=401,
                 )
             user.google_sub = sub
@@ -173,7 +173,7 @@ class AuthService:
             await self._db.commit()
         except IntegrityError as exc:
             await self._db.rollback()
-            raise AppError(code="GOOGLE_AUTH_CONFLICT", message="Google 登录冲突", status_code=409) from exc
+            raise AppError(code="GOOGLE_AUTH_CONFLICT", message="Google login conflict", status_code=409) from exc
 
         await self._db.refresh(user)
         return user
@@ -223,7 +223,7 @@ class AuthService:
         if record is None:
             raise AppError(
                 code="INVALID_VERIFICATION_TOKEN",
-                message="验证链接无效或已过期",
+                message="Verification link invalid or expired",
                 status_code=400,
             )
 
@@ -232,7 +232,7 @@ class AuthService:
         result = await self._db.execute(select(User).where(User.id == record.user_id))
         user = result.scalar_one_or_none()
         if user is None:
-            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+            raise AppError(code="USER_NOT_FOUND", message="User not found", status_code=404)
 
         user.email_verified = True
         await self._db.commit()
@@ -244,9 +244,9 @@ class AuthService:
         result = await self._db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user is None:
-            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+            raise AppError(code="USER_NOT_FOUND", message="User not found", status_code=404)
         if user.email_verified:
-            raise AppError(code="ALREADY_VERIFIED", message="邮箱已验证", status_code=400)
+            raise AppError(code="ALREADY_VERIFIED", message="Email already verified", status_code=400)
 
         raw_token = await self._create_verification_token(user.id)
         await self._db.commit()
@@ -325,7 +325,7 @@ class AuthService:
         if record is None:
             raise AppError(
                 code="INVALID_RESET_TOKEN",
-                message="重置链接无效或已过期",
+                message="Reset link invalid or expired",
                 status_code=400,
             )
 
@@ -334,7 +334,7 @@ class AuthService:
         result = await self._db.execute(select(User).where(User.id == record.user_id))
         user = result.scalar_one_or_none()
         if user is None or not user.is_active:
-            raise AppError(code="USER_NOT_FOUND", message="用户不存在", status_code=404)
+            raise AppError(code="USER_NOT_FOUND", message="User not found", status_code=404)
 
         user.hashed_password = hash_password(new_password)
         # Revoke all existing sessions for security

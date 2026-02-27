@@ -37,7 +37,7 @@ class PdfService:
 
     async def compress(self, *, pdf_bytes: bytes, filename: str, target_kb: int | None) -> FileResult:
         if target_kb is not None and target_kb <= 0:
-            raise AppError(code="INVALID_TARGET_KB", message="target_kb 必须大于 0", status_code=400)
+            raise AppError(code="INVALID_TARGET_KB", message="target_kb must be greater than 0", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -46,7 +46,7 @@ class PdfService:
                 partial(compress_pdf, pdf_bytes, target_kb=target_kb),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PDF_PROCESS_FAILED", message="PDF 压缩失败", status_code=400) from exc
+            raise AppError(code="PDF_PROCESS_FAILED", message="PDF compression failed", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-compressed.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
@@ -54,13 +54,13 @@ class PdfService:
 
     async def merge(self, *, pdf_files: list[tuple[str, bytes]]) -> FileResult:
         if len(pdf_files) < 2:
-            raise AppError(code="INVALID_FILES", message="至少需要 2 个 PDF 文件", status_code=400)
+            raise AppError(code="INVALID_FILES", message="At least 2 PDF files required", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
             out = await loop.run_in_executor(None, partial(merge_pdfs, [data for _, data in pdf_files]))
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PDF_PROCESS_FAILED", message="PDF 合并失败", status_code=400) from exc
+            raise AppError(code="PDF_PROCESS_FAILED", message="PDF merge failed", status_code=400) from exc
 
         out_name = "toolii-merged.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
@@ -92,7 +92,7 @@ class PdfService:
                 ),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PDF_PROCESS_FAILED", message="PDF 页面处理失败", status_code=400) from exc
+            raise AppError(code="PDF_PROCESS_FAILED", message="PDF page processing failed", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-{op_value}.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
@@ -101,7 +101,7 @@ class PdfService:
     async def split(self, *, pdf_bytes: bytes, filename: str, ranges: str) -> FileResult:
         ranges = ranges.strip()
         if not ranges:
-            raise AppError(code="MISSING_RANGES", message="ranges 不能为空", status_code=400)
+            raise AppError(code="MISSING_RANGES", message="ranges cannot be empty", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -110,7 +110,7 @@ class PdfService:
                 partial(split_pdf, pdf_bytes, ranges=ranges),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PDF_PROCESS_FAILED", message=f"PDF 拆分失败: {exc}", status_code=400) from exc
+            raise AppError(code="PDF_PROCESS_FAILED", message=f"PDF split failed: {exc}", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-split.zip"
         stored = self._files.save_bytes(data=zip_bytes, filename=out_name, content_type="application/zip")
@@ -123,9 +123,9 @@ class PdfService:
         dpi: int = 150,
     ) -> FileResult:
         if not image_files:
-            raise AppError(code="INVALID_FILES", message="至少上传 1 张图片", status_code=400)
+            raise AppError(code="INVALID_FILES", message="At least 1 image required", status_code=400)
         if dpi < 72 or dpi > 600:
-            raise AppError(code="INVALID_DPI", message="dpi 必须在 72-600 之间", status_code=400)
+            raise AppError(code="INVALID_DPI", message="dpi must be between 72 and 600", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -134,7 +134,7 @@ class PdfService:
                 partial(images_to_pdf, [data for _, data in image_files], dpi=dpi),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PDF_PROCESS_FAILED", message="图转 PDF 失败", status_code=400) from exc
+            raise AppError(code="PDF_PROCESS_FAILED", message="Images to PDF conversion failed", status_code=400) from exc
 
         if len(image_files) == 1:
             out_name = f"{self._safe_stem(image_files[0][0], 'image')}.pdf"

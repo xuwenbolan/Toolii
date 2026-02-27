@@ -78,7 +78,7 @@ class ShareService:
             result = await self._db.execute(select(ShareLink.id).where(ShareLink.token == token))
             if result.scalar_one_or_none() is None:
                 return token
-        raise AppError(code="SHARE_TOKEN_GENERATE_FAILED", message="生成分享链接失败", status_code=500)
+        raise AppError(code="SHARE_TOKEN_GENERATE_FAILED", message="Failed to generate share link", status_code=500)
 
     async def _get_link_by_token(self, token: str, *, for_update: bool = False) -> ShareLink:
         stmt = select(ShareLink).where(ShareLink.token == token)
@@ -87,7 +87,7 @@ class ShareService:
         result = await self._db.execute(stmt)
         link = result.scalar_one_or_none()
         if link is None:
-            raise NotFoundError("分享链接不存在")
+            raise NotFoundError("Share link not found")
         return link
 
     async def _get_link_by_id(self, link_id: int, *, for_update: bool = False) -> ShareLink:
@@ -97,7 +97,7 @@ class ShareService:
         result = await self._db.execute(stmt)
         link = result.scalar_one_or_none()
         if link is None:
-            raise NotFoundError("分享链接不存在")
+            raise NotFoundError("Share link not found")
         return link
 
     async def _refund_to_sender(
@@ -121,9 +121,9 @@ class ShareService:
 
     async def create_share_link(self, *, user_id: int, amount: int) -> ShareCreateResult:
         if amount <= 0:
-            raise AppError(code="INVALID_SHARE_AMOUNT", message="分享数量必须大于 0", status_code=400)
+            raise AppError(code="INVALID_SHARE_AMOUNT", message="Share amount must be greater than 0", status_code=400)
         if amount > 1000:
-            raise AppError(code="INVALID_SHARE_AMOUNT", message="单次分享数量过大", status_code=400)
+            raise AppError(code="INVALID_SHARE_AMOUNT", message="Share amount too large", status_code=400)
 
         try:
             token = await self._generate_unique_token()
@@ -142,7 +142,7 @@ class ShareService:
                 user_id=user_id,
                 amount=int(amount),
                 tx_type="share_create",
-                description="创建 Credits 分享链接（冻结）",
+                description="Create credits share link (frozen)",
                 reference_id=f"share:{link.id}",
                 autocommit=False,
             )
@@ -154,7 +154,7 @@ class ShareService:
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Share link creation failed for user %s", user_id)
-            raise AppError(code="SHARE_CREATE_FAILED", message="创建分享链接失败", status_code=500) from exc
+            raise AppError(code="SHARE_CREATE_FAILED", message="Failed to create share link", status_code=500) from exc
 
     async def get_info(self, *, token: str) -> ShareLink:
         return await self._get_link_by_token(token, for_update=False)
@@ -181,26 +181,26 @@ class ShareService:
         try:
             link = await self._get_link_by_token(token, for_update=True)
             if link.from_user_id == user_id:
-                raise ForbiddenError("不能领取自己创建的分享")
+                raise ForbiddenError("Cannot claim your own share link")
 
             if link.status != "pending":
-                raise AppError(code="SHARE_NOT_CLAIMABLE", message="该分享链接不可领取", status_code=409)
+                raise AppError(code="SHARE_NOT_CLAIMABLE", message="This share link is not claimable", status_code=409)
 
             if _is_expired(link.expires_at):
                 link.status = "expired"
                 await self._refund_to_sender(
                     link=link,
                     tx_type="share_expire_refund",
-                    description="分享链接过期退回",
+                    description="Share link expired refund",
                 )
                 await self._db.commit()
-                raise AppError(code="SHARE_EXPIRED", message="分享链接已过期", status_code=409)
+                raise AppError(code="SHARE_EXPIRED", message="Share link has expired", status_code=409)
 
             add_result = await self._credits.add(
                 user_id=user_id,
                 amount=int(link.amount),
                 tx_type="share_claim",
-                description="领取 Credits 分享",
+                description="Claimed credits share",
                 reference_id=f"share:{link.id}",
                 autocommit=False,
             )
@@ -216,43 +216,43 @@ class ShareService:
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Share claim failed for token %s", token)
-            raise AppError(code="SHARE_CLAIM_FAILED", message="领取分享失败", status_code=500) from exc
+            raise AppError(code="SHARE_CLAIM_FAILED", message="Failed to claim share", status_code=500) from exc
 
     async def cancel(self, *, link_id: int, user_id: int) -> ShareCancelResult:
         try:
             link = await self._get_link_by_id(link_id, for_update=True)
             if link.from_user_id != user_id:
-                raise ForbiddenError("无权取消该分享链接")
+                raise ForbiddenError("Not authorized to cancel this share link")
 
             if link.status != "pending":
-                raise AppError(code="SHARE_NOT_CANCELABLE", message="该分享链接不可取消", status_code=409)
+                raise AppError(code="SHARE_NOT_CANCELABLE", message="This share link cannot be canceled", status_code=409)
 
             if _is_expired(link.expires_at):
                 link.status = "expired"
                 refund = await self._refund_to_sender(
                     link=link,
                     tx_type="share_expire_refund",
-                    description="分享链接过期退回",
+                    description="Share link expired refund",
                 )
                 await self._db.commit()
-                return ShareCancelResult(link=link, balance_after=refund.balance_after, message="分享已过期，Credits 已退回")
+                return ShareCancelResult(link=link, balance_after=refund.balance_after, message="Share expired, credits refunded")
 
             link.status = "canceled"
             link.canceled_at = _utcnow()
             refund = await self._refund_to_sender(
                 link=link,
                 tx_type="share_cancel_refund",
-                description="取消分享链接退回",
+                description="Share link canceled refund",
             )
             await self._db.commit()
-            return ShareCancelResult(link=link, balance_after=refund.balance_after, message="分享链接已取消，Credits 已退回")
+            return ShareCancelResult(link=link, balance_after=refund.balance_after, message="Share link canceled, credits refunded")
         except AppError:
             await self._db.rollback()
             raise
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Share cancel failed for link %s", link_id)
-            raise AppError(code="SHARE_CANCEL_FAILED", message="取消分享失败", status_code=500) from exc
+            raise AppError(code="SHARE_CANCEL_FAILED", message="Failed to cancel share", status_code=500) from exc
 
     async def expire_pending_links(self, *, limit: int = 500) -> int:
         now = _utcnow()
@@ -272,7 +272,7 @@ class ShareService:
                 await self._refund_to_sender(
                     link=link,
                     tx_type="share_expire_refund",
-                    description="分享链接过期退回",
+                    description="Share link expired refund",
                 )
                 expired_count += 1
 
@@ -285,4 +285,4 @@ class ShareService:
         except SQLAlchemyError as exc:
             await self._db.rollback()
             logger.exception("Share expire job failed")
-            raise AppError(code="SHARE_EXPIRE_JOB_FAILED", message="过期分享处理失败", status_code=500) from exc
+            raise AppError(code="SHARE_EXPIRE_JOB_FAILED", message="Failed to process expired shares", status_code=500) from exc

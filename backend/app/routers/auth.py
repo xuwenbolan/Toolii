@@ -243,7 +243,7 @@ async def verify_email(
     ip = get_remote_address(request)
     user = await AuthService(db).verify_email(token=payload.token)
     log_auth_event("email_verified", email=user.email, user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "邮箱验证成功"})
+    return JSONResponse(content={"message": "Email verified successfully"})
 
 
 @router.post("/resend-verification")
@@ -256,7 +256,7 @@ async def resend_verification(
     ip = get_remote_address(request)
     dev_token = await AuthService(db).resend_verification(user_id=user.id)
     log_auth_event("resend_verification", email=user.email, user_id=user.id, ip=ip)
-    body: dict = {"message": "验证邮件已发送"}
+    body: dict = {"message": "Verification email sent"}
     if dev_token is not None:
         body["_dev_verification_token"] = dev_token
     return JSONResponse(content=body)
@@ -273,7 +273,7 @@ async def forgot_password(
     dev_token = await AuthService(db).forgot_password(email=payload.email)
     log_auth_event("forgot_password", email=payload.email, ip=ip)
     # Always return success to prevent email enumeration
-    body: dict = {"message": "如果该邮箱已注册，您将收到密码重置邮件"}
+    body: dict = {"message": "If this email is registered, you will receive a password reset email"}
     if dev_token is not None:
         body["_dev_reset_token"] = dev_token
     return JSONResponse(content=body)
@@ -291,4 +291,4 @@ async def reset_password(
         token=payload.token, new_password=payload.password
     )
     log_auth_event("password_reset", email=user.email, user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "密码重置成功，请重新登录"})
+    return JSONResponse(content={"message": "Password reset successfully, please log in again"})

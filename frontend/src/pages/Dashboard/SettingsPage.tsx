@@ -50,12 +50,9 @@ function ProfileSection() {
         { name: values.name || null, email: values.email },
       )
       setUser(res.data.user)
-      setMsg(res.data.message)
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? t('settings.profile.updateFailed')
-      setError(detail)
+      setMsg(t('settings.profile.updateSuccess'))
+    } catch {
+      setError(t('settings.profile.updateFailed'))
     }
   }
 
@@ -353,7 +350,7 @@ type Session = {
 }
 
 function SessionsSection() {
-  const { t } = useTranslation('credits')
+  const { t, i18n } = useTranslation('credits')
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [revoking, setRevoking] = useState<number | null>(null)
@@ -387,7 +384,7 @@ function SessionsSection() {
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '-'
-    return new Date(iso).toLocaleString('zh-CN')
+    return new Date(iso).toLocaleString(i18n.language)
   }
 
   const shortenUA = (ua: string | null) => {

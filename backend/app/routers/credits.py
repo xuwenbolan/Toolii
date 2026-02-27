@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db
+from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.rate_limiter import limiter
 from app.models.user import User
 from app.schemas.credit import (
@@ -23,7 +23,7 @@ router = APIRouter(prefix=f"{settings.api_prefix}/credits", tags=["credits"])
 async def redeem(
     request: Request,  # noqa: ARG001
     payload: RedeemRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> RedeemResponse:
     result = await CreditService(db).redeem_code(user_id=user.id, plain_code=payload.code)

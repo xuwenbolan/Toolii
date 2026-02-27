@@ -59,15 +59,15 @@ class ImageService:
         if output_format is not None and output_format.lower() not in {"jpeg", "jpg", "png", "webp"}:
             raise AppError(
                 code="INVALID_OUTPUT_FORMAT",
-                message="output_format 仅支持 jpeg/png/webp",
+                message="output_format only supports jpeg/png/webp",
                 status_code=400,
             )
 
         max_bytes = int(target_kb * 1024) if target_kb else None
         if quality is not None and not (1 <= quality <= 100):
-            raise AppError(code="INVALID_QUALITY", message="quality 必须在 1-100 之间", status_code=400)
+            raise AppError(code="INVALID_QUALITY", message="quality must be between 1 and 100", status_code=400)
         if target_kb is not None and target_kb <= 0:
-            raise AppError(code="INVALID_TARGET_KB", message="target_kb 必须大于 0", status_code=400)
+            raise AppError(code="INVALID_TARGET_KB", message="target_kb must be greater than 0", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -82,7 +82,7 @@ class ImageService:
                 ),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="图片压缩失败", status_code=400) from exc
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image compression failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-compressed{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
@@ -99,11 +99,11 @@ class ImageService:
         if output_format.lower() not in {"jpeg", "jpg", "png", "webp"}:
             raise AppError(
                 code="INVALID_OUTPUT_FORMAT",
-                message="output_format 仅支持 jpeg/png/webp",
+                message="output_format only supports jpeg/png/webp",
                 status_code=400,
             )
         if quality is not None and not (1 <= quality <= 100):
-            raise AppError(code="INVALID_QUALITY", message="quality 必须在 1-100 之间", status_code=400)
+            raise AppError(code="INVALID_QUALITY", message="quality must be between 1 and 100", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -112,7 +112,7 @@ class ImageService:
                 partial(convert_image, image_bytes, output_format=output_format, quality=quality),  # type: ignore[arg-type]
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="图片转换失败", status_code=400) from exc
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image conversion failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
@@ -133,7 +133,7 @@ class ImageService:
                 partial(mosaic_image, image_bytes, regions=regions, pixel_size=pixel_size),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="图片马赛克失败", status_code=400) from exc
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image mosaic failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-mosaic{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
@@ -147,13 +147,13 @@ class ImageService:
         mode: str,
     ) -> FileResult:
         if mode not in {"bw", "color"}:
-            raise AppError(code="INVALID_MODE", message="mode 仅支持 bw/color", status_code=400)
+            raise AppError(code="INVALID_MODE", message="mode only supports bw/color", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
             out, mime = await loop.run_in_executor(None, partial(enhance_scan, image_bytes, mode=mode))  # type: ignore[arg-type]
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="扫描增强失败", status_code=400) from exc
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="Scan enhancement failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-scan{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
@@ -168,7 +168,7 @@ class ImageService:
     ) -> FileResult:
         valid_models = {"silueta", "u2net_human_seg", "birefnet-portrait"}
         if model_name not in valid_models:
-            raise AppError(code="INVALID_MODEL", message="model_name 无效", status_code=400)
+            raise AppError(code="INVALID_MODEL", message="Invalid model_name", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -177,7 +177,7 @@ class ImageService:
                 partial(remove_background, image_bytes, model_name=model_name),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="背景移除失败", status_code=400) from exc
+            raise AppError(code="IMAGE_PROCESS_FAILED", message="Background removal failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-nobg.png"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")

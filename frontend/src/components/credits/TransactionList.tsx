@@ -9,10 +9,10 @@ type Props = {
   emptyText?: string
 }
 
-function formatTime(value: string) {
+function formatTime(value: string, locale: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', {
+  return date.toLocaleString(locale, {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -26,7 +26,7 @@ export function TransactionList({
   error,
   emptyText,
 }: Props) {
-  const { t } = useTranslation('credits')
+  const { t, i18n } = useTranslation('credits')
 
   const txLabelMap: Record<string, string> = {
     redeem: t('transaction.redeem'),
@@ -62,7 +62,7 @@ export function TransactionList({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium">{formatTxLabel(item.tx_type)}</p>
             <p className="truncate text-xs text-muted-foreground">
-              {item.description || '--'} · {formatTime(item.created_at)}
+              {item.description || '--'} · {formatTime(item.created_at, i18n.language)}
             </p>
             <p className="truncate text-[11px] text-muted-foreground">
               {item.reference_id ? `Ref: ${item.reference_id}` : `Tx #${item.id}`}

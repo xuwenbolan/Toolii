@@ -27,6 +27,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCredits } from '@/hooks/useCredits'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
+import { getApiErrorCode } from '@/lib/apiErrors'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
 import {
@@ -40,11 +41,6 @@ import {
   uploadIdPhoto,
 } from '@/services/idPhotoApi'
 import type { FileResult } from '@/services/imageApi'
-
-function getApiErrorCode(error: unknown): string | undefined {
-  const maybe = error as { response?: { data?: { code?: string } } }
-  return maybe?.response?.data?.code
-}
 
 export function IdPhotoPage() {
   const { t } = useTranslation('idPhoto')
@@ -361,7 +357,9 @@ export function IdPhotoPage() {
                           setExportResult(result)
                           void credits.refreshAll()
                         } catch (error) {
-                          if (handleInsufficientCredits(error, t('export.exportPhoto'))) {
+                          if (getApiErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
+                            setExportError(t('common:errors.emailNotVerified'))
+                          } else if (handleInsufficientCredits(error, t('export.exportPhoto'))) {
                             setExportError(t('export.insufficientCredits'))
                           } else {
                             setExportError(t('export.loginRequired'))
@@ -421,7 +419,9 @@ export function IdPhotoPage() {
                             setLayoutResult(result)
                             void credits.refreshAll()
                           } catch (error) {
-                            if (handleInsufficientCredits(error, t('export.generateLayout'))) {
+                            if (getApiErrorCode(error) === 'EMAIL_NOT_VERIFIED') {
+                              setLayoutError(t('common:errors.emailNotVerified'))
+                            } else if (handleInsufficientCredits(error, t('export.generateLayout'))) {
                               setLayoutError(t('export.layoutInsufficientCredits'))
                             } else {
                               setLayoutError(t('export.layoutLoginRequired'))

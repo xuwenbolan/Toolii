@@ -1,9 +1,17 @@
 import type { PhotoStandard } from '@/services/idPhotoApi'
 
+// Map standard code to idPhoto namespace translation key
+export const STANDARD_I18N_MAP: Record<string, string> = {
+  'uk-passport': 'standards.ukPassport',
+  'schengen-visa': 'standards.schengenVisa',
+  'cn-passport': 'standards.cnPassport',
+  'us-2x2': 'standards.us2x2',
+}
+
 export const PHOTO_STANDARDS_FALLBACK: PhotoStandard[] = [
   {
     code: 'uk-passport',
-    name: '英国护照',
+    name: 'UK Passport',
     country: 'UK',
     width_mm: 35,
     height_mm: 45,
@@ -14,7 +22,7 @@ export const PHOTO_STANDARDS_FALLBACK: PhotoStandard[] = [
   },
   {
     code: 'schengen-visa',
-    name: '申根签证',
+    name: 'Schengen Visa',
     country: 'EU',
     width_mm: 35,
     height_mm: 45,
@@ -25,7 +33,7 @@ export const PHOTO_STANDARDS_FALLBACK: PhotoStandard[] = [
   },
   {
     code: 'cn-passport',
-    name: '中国护照/签证',
+    name: 'Chinese Passport/Visa',
     country: 'CN',
     width_mm: 33,
     height_mm: 48,
@@ -36,7 +44,7 @@ export const PHOTO_STANDARDS_FALLBACK: PhotoStandard[] = [
   },
   {
     code: 'us-2x2',
-    name: '美国 2x2 英寸',
+    name: 'US 2x2 Inch',
     country: 'US',
     width_mm: 50.8,
     height_mm: 50.8,

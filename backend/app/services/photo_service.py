@@ -125,7 +125,7 @@ class PhotoService:
     def _get_standard(self, code: str) -> dict[str, Any]:
         item = self._standards_map.get(code)
         if item is None:
-            raise AppError(code="STANDARD_NOT_FOUND", message="证件照规格不存在", status_code=404)
+            raise AppError(code="STANDARD_NOT_FOUND", message="Photo standard not found", status_code=404)
         return item
 
     def _to_file_result(self, stored: StoredFile, *, filename: str) -> FileResult:
@@ -150,14 +150,14 @@ class PhotoService:
         async with _session_lock:
             session = _upload_sessions.get(upload_id)
         if session is None:
-            raise AppError(code="UPLOAD_NOT_FOUND", message="上传会话不存在或已过期", status_code=404)
+            raise AppError(code="UPLOAD_NOT_FOUND", message="Upload session not found or expired", status_code=404)
         return session
 
     async def _get_processed_session(self, processed_id: str) -> ProcessedSession:
         async with _session_lock:
             session = _processed_sessions.get(processed_id)
         if session is None:
-            raise AppError(code="PROCESS_NOT_FOUND", message="处理会话不存在或已过期", status_code=404)
+            raise AppError(code="PROCESS_NOT_FOUND", message="Processing session not found or expired", status_code=404)
         return session
 
     @staticmethod
@@ -172,28 +172,28 @@ class PhotoService:
         face_count = len(faces)
 
         if engine == "fallback-center" or face_count == 0:
-            warnings.append("未检测到人脸，请上传正面、光线充足的照片")
+            warnings.append("No face detected, please upload a front-facing, well-lit photo")
         elif "profile" in engine:
-            warnings.append("检测到侧面人脸，证件照要求正面朝向镜头")
+            warnings.append("Side face detected, ID photos require facing the camera")
         elif face_count > 1:
-            warnings.append(f"检测到 {face_count} 张人脸，证件照要求仅含一人")
+            warnings.append(f"{face_count} faces detected, ID photos require only one person")
 
         if width < 600 or height < 600:
-            warnings.append(f"图片分辨率 {width}x{height} 偏低，建议至少 600x600 像素")
+            warnings.append(f"Image resolution {width}x{height} is low, at least 600x600 pixels recommended")
 
         if face_count == 1 and faces:
             face = faces[0] if isinstance(faces[0], dict) else {}
             conf = float(face.get("confidence", 1.0))
             if conf < 0.5:
-                warnings.append("人脸检测置信度较低，可能影响后续处理效果")
+                warnings.append("Low face detection confidence, may affect processing quality")
             fw = int(face.get("w", 0))
             fh = int(face.get("h", 0))
             if height > 0 and fh > 0:
                 ratio = fh / height
                 if ratio < 0.15:
-                    warnings.append("人脸在画面中占比过小，建议裁剪或靠近拍摄")
+                    warnings.append("Face too small in the frame, consider cropping or moving closer")
                 elif ratio > 0.85:
-                    warnings.append("人脸在画面中占比过大，建议拉远距离拍摄")
+                    warnings.append("Face too large in the frame, consider moving further away")
 
         return warnings
 
@@ -209,7 +209,7 @@ class PhotoService:
         try:
             detection = await loop.run_in_executor(None, partial(detect_faces, image_bytes))
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_DETECT_FAILED", message="人脸检测失败，请确认上传的是有效图片", status_code=400) from exc
+            raise AppError(code="PHOTO_DETECT_FAILED", message="Face detection failed, please upload a valid image", status_code=400) from exc
 
         width = int(detection["width"])
         height = int(detection["height"])
@@ -224,7 +224,7 @@ class PhotoService:
                 partial(remove_background, image_bytes, model_name="silueta"),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_BG_REMOVE_FAILED", message="背景去除失败", status_code=400) from exc
+            raise AppError(code="PHOTO_BG_REMOVE_FAILED", message="Background removal failed", status_code=400) from exc
 
         # Compliance check
         try:
@@ -239,7 +239,7 @@ class PhotoService:
                 ),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_COMPLIANCE_FAILED", message="合规检测失败", status_code=400) from exc
+            raise AppError(code="PHOTO_COMPLIANCE_FAILED", message="Compliance check failed", status_code=400) from exc
 
         # Save original image and cutout PNG to disk
         stored_original = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
@@ -309,7 +309,7 @@ class PhotoService:
         except AppError:
             raise
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_PREVIEW_FAILED", message="证件照预览生成失败", status_code=400) from exc
+            raise AppError(code="PHOTO_PREVIEW_FAILED", message="ID photo preview generation failed", status_code=400) from exc
 
         out_name = f"{standard_code}-id-photo.png"
         stored = self._files.save_bytes(data=processed_png, filename=out_name, content_type="image/png")
@@ -348,7 +348,7 @@ class PhotoService:
             user_id=user_id,
             amount=1,
             tx_type="photo_export",
-            description=f"证件照导出（{processed.standard_code}）",
+            description=f"ID photo export ({processed.standard_code})",
             reference_id=f"photo-export:{processed_id}",
         )
         return self._to_file_result(stored, filename=filename)
@@ -368,7 +368,7 @@ class PhotoService:
 
         count = int(copies or standard.get("layout_default_copies", 8))
         if count < 1 or count > 20:
-            raise AppError(code="INVALID_COPIES", message="copies 必须在 1-20 之间", status_code=400)
+            raise AppError(code="INVALID_COPIES", message="copies must be between 1 and 20", status_code=400)
 
         loop = asyncio.get_running_loop()
         try:
@@ -377,7 +377,7 @@ class PhotoService:
                 partial(create_print_layout, photo_bytes, copies=count),
             )
         except (OSError, ValueError, RuntimeError) as exc:
-            raise AppError(code="PHOTO_LAYOUT_FAILED", message="排版导出失败", status_code=400) from exc
+            raise AppError(code="PHOTO_LAYOUT_FAILED", message="Print layout export failed", status_code=400) from exc
 
         filename = f"{processed.standard_code}-layout-6x4.jpg"
         layout_stored = self._files.save_bytes(
@@ -390,7 +390,7 @@ class PhotoService:
             user_id=user_id,
             amount=1,
             tx_type="photo_layout",
-            description=f"证件照排版导出（{processed.standard_code}）",
+            description=f"ID photo layout export ({processed.standard_code})",
             reference_id=f"photo-layout:{processed_id}:{count}",
         )
         return self._to_file_result(layout_stored, filename=filename)

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { getApiErrorCode } from '@/lib/apiErrors'
 import { redeemCredits, type RedeemCreditsResponse } from '@/services/creditsApi'
 
 type Props = {
@@ -11,11 +12,6 @@ type Props = {
 }
 
 const CARD_CODE_RE = /^TOOL-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string } } }
-  return maybe?.response?.data?.message || fallback
-}
 
 export function RedeemForm({ onRedeemed }: Props) {
   const { t } = useTranslation('credits')
@@ -46,7 +42,11 @@ export function RedeemForm({ onRedeemed }: Props) {
           setCode('')
           onRedeemed?.(result)
         } catch (err) {
-          setError(getApiErrorMessage(err, t('redeem.failed')))
+          if (getApiErrorCode(err) === 'EMAIL_NOT_VERIFIED') {
+            setError(t('common:errors.emailNotVerified'))
+          } else {
+            setError(t('redeem.failed'))
+          }
         } finally {
           setPending(false)
         }

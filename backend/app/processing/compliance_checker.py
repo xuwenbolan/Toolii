@@ -242,48 +242,48 @@ def check_photo_compliance(
             }
         )
 
-    add_check("face_detected", "检测到人脸", face_count > 0, "已检测到人脸" if face_count > 0 else "未检测到人脸", "error")
-    add_check("single_face", "单人照片", face_count == 1, f"检测到 {face_count} 张人脸", "error")
-    add_check("resolution", "分辨率充足", width >= 600 and height >= 600, f"{width}x{height}px", "error")
+    add_check("face_detected", "Face detected", face_count > 0, "Face detected" if face_count > 0 else "No face detected", "error")
+    add_check("single_face", "Single face", face_count == 1, f"{face_count} face(s) detected", "error")
+    add_check("resolution", "Resolution", width >= 600 and height >= 600, f"{width}x{height}px", "error")
     add_check(
         "brightness",
-        "亮度适中",
+        "Brightness",
         78 <= brightness <= 210 and lighting_delta <= 0.28,
-        f"亮度 {brightness:.0f}，光照差异 {lighting_delta:.2f}",
+        f"Brightness {brightness:.0f}, lighting delta {lighting_delta:.2f}",
     )
-    add_check("contrast", "对比度足够", contrast >= 20 and tonal_span >= 35, f"对比度 {contrast:.1f}，明暗跨度 {tonal_span:.0f}")
-    add_check("sharpness", "清晰度", sharpness >= 45, f"锐度指标 {sharpness:.1f}")
+    add_check("contrast", "Contrast", contrast >= 20 and tonal_span >= 35, f"Contrast {contrast:.1f}, tonal span {tonal_span:.0f}")
+    add_check("sharpness", "Sharpness", sharpness >= 45, f"Sharpness score {sharpness:.1f}")
     add_check(
         "centered",
-        "人脸居中",
+        "Face centered",
         centered if face_box else False,
-        "人脸位置居中"
+        "Face is centered"
         if centered
         else (
-            f"横向偏移 {centered_offset_ratio:.2f}"
+            f"Horizontal offset {centered_offset_ratio:.2f}"
             if centered_offset_ratio is not None
-            else "建议调整构图"
+            else "Consider adjusting composition"
         ),
     )
     add_check(
         "face_ratio",
-        "头部比例",
+        "Head ratio",
         (0.5 <= head_height_ratio <= 0.8) if head_height_ratio is not None else False,
         (
-            f"头部高度占比 {(head_height_ratio * 100):.0f}%（bbox {(face_ratio * 100):.0f}%）"
+            f"Head height ratio {(head_height_ratio * 100):.0f}% (bbox {(face_ratio * 100):.0f}%)"
             if head_height_ratio is not None and face_ratio is not None
-            else "未检测到头部比例"
+            else "Head ratio not detected"
         ),
         "error",
     )
     add_check(
         "head_tilt",
-        "头部角度",
+        "Head tilt",
         (abs(eye_angle) <= 8.0) if eyes_detected >= 2 else False,
         (
-            f"双眼连线角度 {eye_angle:.1f}°"
+            f"Eye line angle {eye_angle:.1f} deg"
             if eyes_detected >= 2
-            else "未稳定检测到双眼，无法精确估计头部倾斜"
+            else "Both eyes not reliably detected, cannot estimate head tilt"
         ),
     )
     eyes_open_pass = bool(
@@ -293,42 +293,42 @@ def check_photo_compliance(
     )
     add_check(
         "eyes_open",
-        "双眼状态",
+        "Eyes open",
         eyes_open_pass,
         (
-            f"检测到 {eyes_detected} 只眼，开眼指标 {eye_openness:.2f}"
+            f"{eyes_detected} eye(s) detected, openness {eye_openness:.2f}"
             if eye_openness is not None
-            else f"检测到 {eyes_detected} 只眼"
+            else f"{eyes_detected} eye(s) detected"
         ),
     )
     mouth_closed_pass = bool(not smile_detected and (mouth_in_lower_face is not False))
     add_check(
         "mouth_closed",
-        "嘴部状态",
+        "Mouth closed",
         mouth_closed_pass,
-        "未检测到明显微笑/张嘴特征"
+        "No smile or open mouth detected"
         if mouth_closed_pass
-        else "检测到微笑或嘴部位置异常，建议闭嘴重拍",
+        else "Smile or abnormal mouth position detected, keep mouth closed",
     )
     expression_pass = bool(not smile_detected and abs(eye_angle) <= 10 and eyes_detected >= 2)
     add_check(
         "expression",
-        "表情自然",
+        "Expression",
         expression_pass,
-        "表情与姿态接近证件照要求"
+        "Expression and posture meet ID photo requirements"
         if expression_pass
-        else "建议保持中性表情、直视镜头",
+        else "Maintain neutral expression, look directly at camera",
     )
     background_pass = bool(alpha_quality is None or alpha_quality.get("usable"))
-    bg_msg = "背景抠图质量可用于替换底色"
+    bg_msg = "Background cutout quality suitable for color replacement"
     if alpha_quality is not None:
         bg_msg = (
-            f"抠图质量 {float(alpha_quality.get('score', 0.0)):.2f}，"
-            f"前景占比 {float(alpha_quality.get('foreground_ratio', 0.0)):.2f}"
+            f"Cutout quality {float(alpha_quality.get('score', 0.0)):.2f}, "
+            f"foreground ratio {float(alpha_quality.get('foreground_ratio', 0.0)):.2f}"
         )
     if detection_engine and "profile" in detection_engine:
-        bg_msg += "；检测到侧脸特征，结果需人工复核"
-    add_check("background", "背景可替换", background_pass, bg_msg)
+        bg_msg += "; side face detected, manual review recommended"
+    add_check("background", "Background", background_pass, bg_msg)
 
     critical_fail = any((not c["passed"]) and c["severity"] == "error" for c in checks)
     total_weight = 0

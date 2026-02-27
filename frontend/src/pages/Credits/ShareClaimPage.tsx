@@ -10,20 +10,15 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCredits } from '@/hooks/useCredits'
 import { claimShareLink, getShareInfo, type ShareClaimResponse, type ShareInfoResponse } from '@/services/creditsApi'
 
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  const maybe = error as { response?: { data?: { message?: string } } }
-  return maybe?.response?.data?.message || fallback
-}
-
-function formatTime(value: string | null) {
+function formatTime(value: string | null, locale: string) {
   if (!value) return '--'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return date.toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 export function ShareClaimPage() {
-  const { t } = useTranslation('credits')
+  const { t, i18n } = useTranslation('credits')
   const { token = '' } = useParams()
   const { isAuthenticated } = useAuth()
   const credits = useCredits({ enabled: isAuthenticated, includeTransactions: false })
@@ -55,7 +50,7 @@ export function ShareClaimPage() {
       })
       .catch((err) => {
         if (!active) return
-        setError(getApiErrorMessage(err, t('claimPage.linkInvalid')))
+        setError(t('claimPage.linkInvalid'))
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -83,13 +78,13 @@ export function ShareClaimPage() {
             <div className="rounded-lg border bg-muted/30 p-3 text-sm">
               <p>{t('claimPage.amount', { amount: info.amount })}</p>
               <p>{t('claimPage.status', { status: statusLabel(info.status) })}</p>
-              <p>{t('claimPage.createdAt', { date: formatTime(info.created_at) })}</p>
-              <p>{t('claimPage.expiresAt', { date: formatTime(info.expires_at) })}</p>
+              <p>{t('claimPage.createdAt', { date: formatTime(info.created_at, i18n.language) })}</p>
+              <p>{t('claimPage.expiresAt', { date: formatTime(info.expires_at, i18n.language) })}</p>
             </div>
 
             {claimResult ? (
               <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                {claimResult.message}{', '}{t('claimPage.claimSuccess', { amount: claimResult.amount, balance: claimResult.balance })}
+                {t('claimPage.claimSuccess', { amount: claimResult.amount, balance: claimResult.balance })}
               </div>
             ) : null}
 
@@ -117,7 +112,7 @@ export function ShareClaimPage() {
                       setInfo((prev) => (prev ? { ...prev, status: 'claimed', can_claim: false } : prev))
                       void credits.refreshBalance()
                     } catch (err) {
-                      setClaimError(getApiErrorMessage(err, t('claimPage.claimFailed')))
+                      setClaimError(t('claimPage.claimFailed'))
                       void getShareInfo(token)
                         .then((data) => setInfo(data))
                         .catch(() => undefined)

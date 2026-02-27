@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db as _get_db
-from app.core.exceptions import ForbiddenError, UnauthorizedError
+from app.core.exceptions import AppError, ForbiddenError, UnauthorizedError
 from app.core.security import decode_jwt_token
 from app.core.token_blacklist import token_blacklist
 from app.models.user import User
@@ -62,6 +62,19 @@ async def get_current_user(
 ) -> User:
     if user is None:
         raise UnauthorizedError()
+    return user
+
+
+async def get_verified_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    """Require a logged-in user whose email address has been verified."""
+    if not user.email_verified:
+        raise AppError(
+            code="EMAIL_NOT_VERIFIED",
+            message="Email verification required",
+            status_code=403,
+        )
     return user
 
 

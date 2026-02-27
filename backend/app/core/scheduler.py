@@ -104,3 +104,78 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         replace_existing=True,
         misfire_grace_time=60,
     )
+
+    async def _delete_unverified_accounts() -> None:
+        import logging
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import delete, select
+
+        from sqlalchemy import update
+
+        from app.models.credit_transaction import CreditTransaction
+        from app.models.email_verification import EmailVerificationToken
+        from app.models.login_history import LoginHistory
+        from app.models.password_reset import PasswordResetToken
+        from app.models.processing_history import ProcessingHistory
+        from app.models.share_link import ShareLink
+        from app.models.token_blacklist import TokenBlacklist
+        from app.models.user import User
+        from app.models.user_credit import UserCredit
+
+        logger = logging.getLogger("app.scheduler")
+        cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        async with SessionLocal() as db:
+            result = await db.execute(
+                select(User.id).where(
+                    User.email_verified.is_(False),
+                    User.created_at < cutoff,
+                    User.is_active.is_(True),
+                    User.google_sub.is_(None),
+                )
+            )
+            user_ids = [row[0] for row in result.all()]
+            if not user_ids:
+                return
+
+            # Delete rows with non-nullable FK
+            for table in (
+                CreditTransaction,
+                EmailVerificationToken,
+                PasswordResetToken,
+                TokenBlacklist,
+                LoginHistory,
+                UserCredit,
+            ):
+                await db.execute(
+                    delete(table).where(table.user_id.in_(user_ids))
+                )
+            # Nullify nullable FK references
+            await db.execute(
+                update(ProcessingHistory)
+                .where(ProcessingHistory.user_id.in_(user_ids))
+                .values(user_id=None)
+            )
+            await db.execute(
+                delete(ShareLink).where(ShareLink.from_user_id.in_(user_ids))
+            )
+            await db.execute(
+                update(ShareLink)
+                .where(ShareLink.to_user_id.in_(user_ids))
+                .values(to_user_id=None)
+            )
+            await db.execute(delete(User).where(User.id.in_(user_ids)))
+            await db.commit()
+            logger.info(
+                "Deleted %d unverified accounts older than 7 days",
+                len(user_ids),
+            )
+
+    scheduler.add_job(
+        _delete_unverified_accounts,
+        "interval",
+        hours=6,
+        id="delete_unverified_accounts",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
