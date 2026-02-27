@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: backend
+    env_file:
+      - ../.env
+    environment:
+      ENV: prod
+      DATABASE_URL: sqlite+aiosqlite:///../data/toolii.db
+      FILE_STORAGE_DIR: ../data/files
+      CORS_ORIGINS: http://localhost
+    volumes:
+      - ../data:/app/data
+      - ../models:/app/models
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: web
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

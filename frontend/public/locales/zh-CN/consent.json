@@ -1,0 +1,9 @@
+{
+  "cookieBanner": {
+    "message": "我们使用必要存储来维持登录状态，并在你同意后启用统计分析。继续使用前请先做出选择。",
+    "privacyLink": "隐私政策",
+    "termsLink": "使用条款",
+    "reject": "仅必要",
+    "accept": "同意并继续"
+  }
+}

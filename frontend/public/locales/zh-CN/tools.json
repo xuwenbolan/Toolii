@@ -1,0 +1,28 @@
+{
+  "title": "图片工具",
+  "compress": {
+    "title": "图片压缩",
+    "description": "支持质量压缩与目标大小压缩。"
+  },
+  "heicToJpg": {
+    "title": "HEIC 转 JPG",
+    "description": "将 HEIC/HEIF 图片转换为 JPG。"
+  },
+  "convert": {
+    "title": "格式转换",
+    "description": "支持 JPG / PNG / WEBP。"
+  },
+  "mosaic": {
+    "title": "图片马赛克",
+    "description": "当前版本：整图马赛克（后续支持框选区域）。"
+  },
+  "scanEnhance": {
+    "title": "扫描件增强",
+    "description": "自动增强、黑白化（适合材料提交）。"
+  },
+  "batch": {
+    "title": "批量处理",
+    "description": "多图处理后打包 ZIP 下载。"
+  }
+}
+

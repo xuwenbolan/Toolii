@@ -1,0 +1,10 @@
+{
+  "title": "证件照",
+  "wizard": {
+    "upload": "上传照片",
+    "compliance": "合规检测",
+    "spec": "规格选择",
+    "preview": "预览",
+    "export": "导出"
+  }
+}

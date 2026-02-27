@@ -1,0 +1,10 @@
+{
+  "appName": "Toolii",
+  "actions": {
+    "backHome": "返回首页"
+  },
+  "home": {
+    "title": "Toolii 在线工具平台",
+    "subtitle": "证件照处理、图片处理、PDF 工具，一站式在线完成。"
+  }
+}

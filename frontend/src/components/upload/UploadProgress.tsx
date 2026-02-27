@@ -1,0 +1,23 @@
+type Props = {
+  value: number | null
+  label?: string
+}
+
+export function UploadProgress({ value, label = '上传进度' }: Props) {
+  if (value == null) return null
+
+  const pct = Math.max(0, Math.min(100, Math.round(value)))
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{label}</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-muted">
+        <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+

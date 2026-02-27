@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from fastapi import Depends
+
+from app.core.config import settings
+from app.core.dependencies import get_current_user, get_db
+from app.core.rate_limiter import dynamic_rate_limit, limiter
+from app.core.task_limiter import acquire_task_slot
+from app.models.user import User
+from app.schemas.image import FileResult
+from app.schemas.photo import (
+    PhotoExportRequest,
+    PhotoLayoutRequest,
+    PhotoProcessRequest,
+    PhotoProcessResponse,
+    PhotoStandard,
+    PhotoUploadResponse,
+)
+from app.services.photo_service import PhotoService
+
+router = APIRouter(prefix=f"{settings.api_prefix}/photo", tags=["photo"])
+
+
+def _max_image_bytes() -> int:
+    return settings.max_upload_image_mb * 1024 * 1024
+
+
+@router.post("/upload", response_model=PhotoUploadResponse)
+@limiter.limit(dynamic_rate_limit)
+async def upload(
+    request: Request,
+    file: UploadFile = File(...),
+) -> PhotoUploadResponse:
+    sem = await acquire_task_slot(request)
+    try:
+        data = await file.read()
+        if len(data) > _max_image_bytes():
+            raise HTTPException(status_code=413, detail="File too large")
+        return await PhotoService().upload_and_detect(
+            image_bytes=data,
+            filename=file.filename or "photo",
+            content_type=file.content_type or "application/octet-stream",
+        )
+    finally:
+        sem.release()
+
+
+@router.post("/process", response_model=PhotoProcessResponse)
+@limiter.limit(dynamic_rate_limit)
+async def process(
+    request: Request,
+    payload: PhotoProcessRequest,
+) -> PhotoProcessResponse:
+    sem = await acquire_task_slot(request)
+    try:
+        return await PhotoService().process(
+            upload_id=payload.upload_id,
+            standard_code=payload.standard,
+            background_color=payload.background_color,
+            model_tier=payload.model_tier,
+        )
+    finally:
+        sem.release()
+
+
+@router.post("/export", response_model=FileResult)
+@limiter.limit(dynamic_rate_limit)
+async def export(
+    request: Request,
+    payload: PhotoExportRequest,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> FileResult:
+    sem = await acquire_task_slot(request)
+    try:
+        return await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
+    finally:
+        sem.release()
+
+
+@router.post("/layout", response_model=FileResult)
+@limiter.limit(dynamic_rate_limit)
+async def layout(
+    request: Request,
+    payload: PhotoLayoutRequest,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+) -> FileResult:
+    sem = await acquire_task_slot(request)
+    try:
+        return await PhotoService().layout(
+            processed_id=payload.processed_id,
+            user_id=user.id,
+            db=db,
+            copies=payload.copies,
+        )
+    finally:
+        sem.release()
+
+
+@router.get("/standards", response_model=list[PhotoStandard])
+async def standards() -> list[PhotoStandard]:
+    return PhotoService().get_standards()
