@@ -23,5 +23,6 @@ CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "800
 
 
 FROM nginx:1.27-alpine AS web
+RUN sed -i '/application\/javascript/s/;$/ mjs;/' /etc/nginx/mime.types
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html

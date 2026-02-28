@@ -7,10 +7,7 @@ import { GoogleLinkPasswordDialog } from '@/components/auth/GoogleLinkPasswordDi
 import { loginWithGoogleAccessToken } from '@/services/authApi'
 import { Button } from '@/components/ui/button'
 import { sanitizeRedirect } from '@/lib/authRedirect'
-
-type ApiError = {
-  response?: { data?: { code?: string; detail?: string } }
-}
+import { getApiErrorCode, getTranslatedApiError } from '@/lib/apiErrors'
 
 function GoogleIcon() {
   return (
@@ -56,14 +53,11 @@ export function GoogleOAuthButton() {
       setPendingAccessToken(null)
       navigate(redirectTo, { replace: true })
     } catch (err: unknown) {
-      const code = (err as ApiError)?.response?.data?.code
-      if (code === 'LINK_REQUIRES_PASSWORD') {
+      if (getApiErrorCode(err) === 'LINK_REQUIRES_PASSWORD') {
         setPendingAccessToken(accessToken)
         setShowLinkDialog(true)
       } else {
-        const message =
-          (err as ApiError)?.response?.data?.detail ?? t('loginForm.loginFailed')
-        setError(message)
+        setError(getTranslatedApiError(err, t('loginForm.loginFailed')))
       }
     } finally {
       setLoading(false)

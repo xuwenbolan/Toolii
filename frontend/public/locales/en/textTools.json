@@ -1,0 +1,35 @@
+{
+  "title": "Text Tools",
+  "subtitle": "Client-side text analysis. Your text never leaves your browser.",
+  "seoTitle": "Free Online Text Tools",
+  "seoDescription": "Free online text tools: word counter, character counter, token counter for AI models. Private and fast.",
+  "seoKeywords": "text tools,word counter,character counter,token counter",
+  "wordCounter": {
+    "title": "Word / Character / Token Counter",
+    "indexDescription": "Count words, characters, sentences, and AI model tokens in real time.",
+    "seoTitle": "Free Word Counter & AI Token Counter Online",
+    "seoDescription": "Free online word counter, character counter, and AI token counter. Supports GPT-4o, Claude, Gemini, Llama, DeepSeek, Qwen, Mistral. Real-time and private.",
+    "seoKeywords": "word counter,character counter,token counter,GPT token counter,Claude token counter,AI token counter,online word count,free token counter",
+    "description": "Count words, characters, sentences, paragraphs, and AI model tokens in real time. All processing happens in your browser.",
+    "placeholder": "Type or paste your text here...",
+    "copyStats": "Copy Stats to Clipboard"
+  },
+  "stats": {
+    "words": "Words",
+    "characters": "Characters",
+    "charactersNoSpaces": "Chars (no spaces)",
+    "cjkCharacters": "CJK Characters",
+    "sentences": "Sentences",
+    "paragraphs": "Paragraphs",
+    "lines": "Lines",
+    "readingTime": "Reading Time",
+    "lessThanOneMin": "< 1 min",
+    "minutes": "{{count}} min"
+  },
+  "token": {
+    "model": "AI Model",
+    "tokens": "Tokens",
+    "exact": "{{pct}}% Exact",
+    "estimate": "~{{pct}}% Est."
+  }
+}

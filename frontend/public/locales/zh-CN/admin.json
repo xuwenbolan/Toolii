@@ -5,7 +5,8 @@
     "dashboard": "仪表盘",
     "users": "用户管理",
     "cards": "卡密管理",
-    "operations": "运营数据"
+    "operations": "运营数据",
+    "feedback": "用户反馈"
   },
   "dashboard": {
     "totalUsers": "用户总数",
@@ -139,6 +140,30 @@
       "transactions": "交易数",
       "totalCredits": "总积分",
       "totalTransactions": "总交易数"
+    }
+  },
+  "feedback": {
+    "title": "用户反馈",
+    "allStatus": "全部状态",
+    "totalCount": "共 {{count}} 条",
+    "user": "用户",
+    "categoryLabel": "类别",
+    "contentLabel": "内容",
+    "statusLabel": "状态",
+    "time": "时间",
+    "fullContent": "完整内容",
+    "adminNote": "管理员备注",
+    "save": "保存",
+    "status": {
+      "pending": "待处理",
+      "reviewed": "已查看",
+      "resolved": "已解决"
+    },
+    "categories": {
+      "feature_request": "功能需求",
+      "bug_report": "问题反馈",
+      "suggestion": "建议",
+      "other": "其他"
     }
   },
   "common": {

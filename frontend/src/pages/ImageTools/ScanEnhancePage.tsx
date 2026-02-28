@@ -4,53 +4,92 @@ import { useTranslation } from 'react-i18next'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
-import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
+import { ToolActionBar } from '@/components/tools/ToolActionBar'
+import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
+import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { SEOHead } from '@/components/common/SEOHead'
+import { buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
-import { UploadProgress } from '@/components/upload/UploadProgress'
 import { Button } from '@/components/ui/button'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
+import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
+import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
 import { enhanceScan, type FileResult } from '@/services/imageApi'
 
 type Mode = 'bw' | 'color'
 
 export function ScanEnhancePage() {
-  const { t } = useTranslation('tools')
+  const { t } = useTranslation(['tools', 'common'])
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<Mode>('bw')
   const [result, setResult] = useState<FileResult | null>(null)
-  const { pending, progress, error, reset, run } = useFileUpload()
+  const [resultPanelOpen, setResultPanelOpen] = useState(false)
+  const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
   const inputPreviewUrl = useObjectUrl(file)
 
   const fileInfo = useMemo(() => {
     if (!file) return null
     return `${file.name} · ${formatBytes(file.size)}`
   }, [file])
+  const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
+  const runState = useToolRunState({
+    mode: 'auto',
+    hasInput: Boolean(file),
+    hasResult: Boolean(result),
+    pending,
+    error,
+    texts: {
+      input: fileInfo ?? undefined,
+      result: resultInfo,
+    },
+  })
+
+  const runEnhance = async (input: File, nextMode = mode) => {
+    setResult(null)
+    setResultPanelOpen(false)
+
+    try {
+      const res = await run((onProgress) => enhanceScan(input, { mode: nextMode }, onProgress))
+      setResult(res)
+      setResultPanelOpen(true)
+    } catch {
+      // Error message is handled by useFileUpload.
+    }
+  }
 
   return (
     <>
-      <SEOHead title={t('scanEnhance.seoTitle')} description={t('scanEnhance.seoDescription')} keywords={t('scanEnhance.seoKeywords')} canonicalPath="/image-tools/scan-enhance" />
-      <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')}>
-      <div className="space-y-5">
+      <SEOHead title={t('scanEnhance.seoTitle')} description={t('scanEnhance.seoDescription')} keywords={t('scanEnhance.seoKeywords')} canonicalPath="/image-tools/scan-enhance" jsonLd={buildToolJsonLd({ name: t('scanEnhance.seoTitle'), description: t('scanEnhance.seoDescription'), url: '/image-tools/scan-enhance' })} />
+      <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')} backTo="/image-tools">
+      <div className="space-y-5 tool-section-stagger">
         <FileDropzone
           accept="image/*"
           onFiles={(files) => {
             reset()
             setResult(null)
-            setFile(files[0])
+            setResultPanelOpen(false)
+            const nextFile = files[0]
+            setFile(nextFile)
+            void runEnhance(nextFile)
           }}
+        />
+        <ToolErrorBanner
+          error={error}
+          errorMeta={errorMeta}
+          onRetry={file ? () => retry() : undefined}
         />
 
         {file ? (
           <ArtifactPreviewCard
-            label={t('common:preview.input')}
-            filename={file.name}
-            sizeText={formatBytes(file.size)}
+            label={result ? t('common:preview.output') : t('common:preview.input')}
+            filename={result ? result.filename : file.name}
+            sizeText={result ? formatBytes(result.size) : formatBytes(file.size)}
             mediaKind="image"
-            mediaUrl={inputPreviewUrl}
+            mediaUrl={result ? result.download_url : inputPreviewUrl}
+            action={result ? <DownloadButton url={result.download_url} size="sm" className="w-auto" /> : undefined}
           />
         ) : null}
 
@@ -60,67 +99,68 @@ export function ScanEnhancePage() {
             <Button
               type="button"
               variant={mode === 'bw' ? 'secondary' : 'outline'}
-              onClick={() => setMode('bw')}
+              disabled={pending}
+              onClick={() => {
+                setMode('bw')
+                if (file && mode !== 'bw' && !pending) {
+                  void runEnhance(file, 'bw')
+                }
+              }}
             >
               {t('scanEnhance.bw')}
             </Button>
             <Button
               type="button"
               variant={mode === 'color' ? 'secondary' : 'outline'}
-              onClick={() => setMode('color')}
+              disabled={pending}
+              onClick={() => {
+                setMode('color')
+                if (file && mode !== 'color' && !pending) {
+                  void runEnhance(file, 'color')
+                }
+              }}
             >
               {t('scanEnhance.color')}
             </Button>
           </div>
         </div>
-
-        <ProcessingStatus pending={pending} error={error} />
-        <UploadProgress value={pending ? progress : null} />
-
-        <div className="space-y-4">
-          <Button
-            type="button"
-            className="w-full"
-            disabled={!file || pending}
-            onClick={async () => {
-              if (!file) return
-              setResult(null)
-              try {
-                const res = await run((onProgress) => enhanceScan(file, { mode }, onProgress))
-                setResult(res)
-              } catch {
-                // Error message is handled by useFileUpload.
-              }
-            }}
-          >
-            {pending ? t('scanEnhance.processing') : t('scanEnhance.startProcess')}
-          </Button>
-
-          {result ? (
-            <div className="space-y-3">
-              {fileInfo ? (
-                <BeforeAfterPreview
-                  beforeFilename={file?.name ?? '-'}
-                  beforeSizeText={file ? formatBytes(file.size) : undefined}
-                  beforeUrl={inputPreviewUrl}
-                  afterFilename={result.filename}
-                  afterSizeText={formatBytes(result.size)}
-                  afterUrl={result.download_url}
-                />
-              ) : null}
-              <ArtifactPreviewCard
-                label={t('common:preview.output')}
-                filename={result.filename}
-                sizeText={formatBytes(result.size)}
-                mediaKind="image"
-                mediaUrl={result.download_url}
-                action={<DownloadButton url={result.download_url} className="w-auto" />}
-              />
-            </div>
-          ) : null}
-        </div>
       </div>
     </ToolPageShell>
+
+    <ToolActionBar
+      mode="auto"
+      status={runState.statusText}
+      pending={pending}
+      progress={progress}
+      error={error}
+      done={runState.phase === 'done'}
+    />
+
+    <ToolResultPanel
+      open={Boolean(result && resultPanelOpen)}
+      title={t('common:actions.downloadResult')}
+      onClose={() => setResultPanelOpen(false)}
+    >
+      {result && file ? (
+        <div className="space-y-4">
+          <BeforeAfterPreview
+            beforeFilename={file.name}
+            beforeSizeText={formatBytes(file.size)}
+            beforeUrl={inputPreviewUrl}
+            afterFilename={result.filename}
+            afterSizeText={formatBytes(result.size)}
+            afterUrl={result.download_url}
+          />
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
+              {t('common:actions.back')}
+            </Button>
+            <ShareTransferButton fileId={result.file_id} className="w-auto" />
+            <DownloadButton url={result.download_url} className="w-auto" />
+          </div>
+        </div>
+      ) : null}
+    </ToolResultPanel>
     </>
   )
 }

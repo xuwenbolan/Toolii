@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '@/services/api'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useAuthStore } from '@/stores/authStore'
 
 export function EmailVerificationBanner() {
@@ -20,10 +21,7 @@ export function EmailVerificationBanner() {
       await api.post('/api/auth/resend-verification')
       setSent(true)
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? t('emailVerification.sendFailed')
-      setError(msg)
+      setError(getTranslatedApiError(err, t('emailVerification.sendFailed')))
     } finally {
       setSending(false)
     }

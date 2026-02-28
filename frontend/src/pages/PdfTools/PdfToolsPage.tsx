@@ -1,436 +1,238 @@
-import { useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  ArrowLeft,
+  CheckSquare,
+  RotateCw,
+  Scissors,
+  Square,
+  Trash2,
+  XCircle,
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 
+import { PdfPageLightbox } from '@/components/pdf/PdfPageLightbox'
+import { PdfWorkspaceEmpty } from '@/components/pdf/PdfWorkspaceEmpty'
+import { PdfWorkspaceGrid } from '@/components/pdf/PdfWorkspaceGrid'
 import { SEOHead } from '@/components/common/SEOHead'
-import { PdfPageWorkspace } from '@/components/pdf/PdfPageWorkspace'
-import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
-import { DownloadButton } from '@/components/tools/DownloadButton'
-import { ProcessingStatus } from '@/components/tools/ProcessingStatus'
-import { SortableFileList } from '@/components/tools/SortableFileList'
-import { ToolPageShell } from '@/components/tools/ToolPageShell'
-import { FileDropzone } from '@/components/upload/FileDropzone'
-import { UploadProgress } from '@/components/upload/UploadProgress'
+import { ToolActionBar } from '@/components/tools/ToolActionBar'
+import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
+import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useFileDownload } from '@/hooks/useFileDownload'
 import { useFileUpload } from '@/hooks/useFileUpload'
-import { usePdfThumbnails } from '@/hooks/usePdfThumbnails'
+import { useMultiPdfThumbnails } from '@/hooks/useMultiPdfThumbnails'
+import { usePdfWorkspace } from '@/hooks/usePdfWorkspace'
+import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
-import { cn } from '@/lib/utils'
 import {
   compressPdf,
   editPdfPages,
   imagesToPdf,
   mergePdfs,
-  splitPdf,
   type FileResult,
 } from '@/services/pdfApi'
 
-type WorkspaceOperation = 'compress' | 'merge' | 'split' | 'pages' | 'imagesToPdf'
-type PageOperation = 'rotate' | 'delete' | 'extract' | 'reorder'
-type PageEditorSnapshot = {
-  pagesOperation: PageOperation
-  pagesInput: string
-  orderInput: string
-  rotationInput: string
+async function downloadResultAsFile(result: FileResult): Promise<File> {
+  const response = await fetch(result.download_url, { credentials: 'include' })
+  if (!response.ok) throw new Error('Failed to download intermediate result')
+  const blob = await response.blob()
+  return new File([blob], result.filename, { type: 'application/pdf' })
 }
-
-type PageEditorState = PageEditorSnapshot & {
-  history: PageEditorSnapshot[]
-  historyIndex: number
-}
-
-type PageEditorAction =
-  | { type: 'set'; patch: Partial<PageEditorSnapshot>; pushHistory?: boolean }
-  | { type: 'undo' }
-  | { type: 'redo' }
-
-const INITIAL_PAGE_EDITOR_SNAPSHOT: PageEditorSnapshot = {
-  pagesOperation: 'extract',
-  pagesInput: '',
-  orderInput: '',
-  rotationInput: '90',
-}
-
-function snapshotsEqual(a: PageEditorSnapshot, b: PageEditorSnapshot) {
-  return (
-    a.pagesOperation === b.pagesOperation &&
-    a.pagesInput === b.pagesInput &&
-    a.orderInput === b.orderInput &&
-    a.rotationInput === b.rotationInput
-  )
-}
-
-function pageEditorReducer(state: PageEditorState, action: PageEditorAction): PageEditorState {
-  if (action.type === 'undo') {
-    if (state.historyIndex <= 0) return state
-    const nextIndex = state.historyIndex - 1
-    const snapshot = state.history[nextIndex]
-    return {
-      ...state,
-      ...snapshot,
-      historyIndex: nextIndex,
-    }
-  }
-
-  if (action.type === 'redo') {
-    if (state.historyIndex >= state.history.length - 1) return state
-    const nextIndex = state.historyIndex + 1
-    const snapshot = state.history[nextIndex]
-    return {
-      ...state,
-      ...snapshot,
-      historyIndex: nextIndex,
-    }
-  }
-
-  const currentSnapshot: PageEditorSnapshot = {
-    pagesOperation: state.pagesOperation,
-    pagesInput: state.pagesInput,
-    orderInput: state.orderInput,
-    rotationInput: state.rotationInput,
-  }
-  const nextSnapshot: PageEditorSnapshot = {
-    ...currentSnapshot,
-    ...action.patch,
-  }
-  if (snapshotsEqual(currentSnapshot, nextSnapshot)) {
-    return state
-  }
-
-  if (action.pushHistory === false) {
-    return {
-      ...state,
-      ...nextSnapshot,
-    }
-  }
-
-  const historyBase = state.history.slice(0, state.historyIndex + 1)
-  const historyTail = historyBase[historyBase.length - 1]
-  if (historyTail && snapshotsEqual(historyTail, nextSnapshot)) {
-    return {
-      ...state,
-      ...nextSnapshot,
-    }
-  }
-
-  const nextHistory = [...historyBase, nextSnapshot]
-  return {
-    ...state,
-    ...nextSnapshot,
-    history: nextHistory,
-    historyIndex: nextHistory.length - 1,
-  }
-}
-
-function resolveOperationFromPath(pathname: string): WorkspaceOperation {
-  if (pathname.endsWith('/compress')) return 'compress'
-  if (pathname.endsWith('/split')) return 'split'
-  if (pathname.endsWith('/pages')) return 'pages'
-  if (pathname.endsWith('/from-images')) return 'imagesToPdf'
-  if (pathname.endsWith('/merge')) return 'merge'
-  return 'merge'
-}
-
-function parsePageSpec(input: string, t: (key: string) => string): number[] {
-  const raw = input.trim()
-  if (!raw) return []
-
-  const values: number[] = []
-  for (const part of raw.split(',')) {
-    const token = part.trim()
-    if (!token) continue
-
-    if (token.includes('-')) {
-      const [startRaw, endRaw] = token.split('-', 2).map((s) => s.trim())
-      const start = Number(startRaw)
-      const end = Number(endRaw)
-      if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end <= 0) {
-        throw new Error(t('pdf.pages.invalidPageRange'))
-      }
-      const step = start <= end ? 1 : -1
-      for (let n = start; step > 0 ? n <= end : n >= end; n += step) {
-        values.push(n)
-      }
-      continue
-    }
-
-    const page = Number(token)
-    if (!Number.isInteger(page) || page <= 0) {
-      throw new Error(t('pdf.pages.invalidPage'))
-    }
-    values.push(page)
-  }
-
-  return values
-}
-
-function formatPageList(pages: number[]) {
-  return pages.join(',')
-}
-
-function getOperationPath(operation: WorkspaceOperation) {
-  switch (operation) {
-    case 'compress':
-      return '/pdf-tools/compress'
-    case 'split':
-      return '/pdf-tools/split'
-    case 'pages':
-      return '/pdf-tools/pages'
-    case 'imagesToPdf':
-      return '/pdf-tools/from-images'
-    case 'merge':
-    default:
-      return '/pdf-tools/merge'
-  }
-}
-
-const WORKSPACE_OPERATION_ORDER: WorkspaceOperation[] = ['merge', 'split', 'compress', 'pages', 'imagesToPdf']
 
 export function PdfToolsPage() {
-  const { t } = useTranslation('tools')
-  const location = useLocation()
-  const navigate = useNavigate()
-  const { pending, progress, error, reset, run } = useFileUpload()
-  const [pdfFiles, setPdfFiles] = useState<File[]>([])
-  const [imageFiles, setImageFiles] = useState<File[]>([])
-  const [targetKbInput, setTargetKbInput] = useState('')
-  const [ranges, setRanges] = useState('')
-  const [dpiInput, setDpiInput] = useState('150')
-  const [pageEditor, dispatchPageEditor] = useReducer(pageEditorReducer, {
-    ...INITIAL_PAGE_EDITOR_SNAPSHOT,
-    history: [INITIAL_PAGE_EDITOR_SNAPSHOT],
-    historyIndex: 0,
-  })
-  const [result, setResult] = useState<FileResult | null>(null)
-  const operation = resolveOperationFromPath(location.pathname)
-  const { pagesOperation, pagesInput, orderInput, rotationInput } = pageEditor
-  const canUndoPagesEdit = pageEditor.historyIndex > 0
-  const canRedoPagesEdit = pageEditor.historyIndex < pageEditor.history.length - 1
-
-  const targetKb = parseFiniteNumber(targetKbInput)
-  const targetKbValid = targetKbInput.trim() === '' || (targetKb != null && isIntInRange(targetKb, 1, 1_000_000))
-  const dpi = parseFiniteNumber(dpiInput)
-  const dpiValid = dpi != null && isIntInRange(dpi, 72, 600)
-
-  const parsedPagesPreview = useMemo(() => {
-    try {
-      return { pages: parsePageSpec(pagesInput, t), error: null as string | null }
-    } catch (err) {
-      return {
-        pages: [] as number[],
-        error: err instanceof Error ? err.message : t('pdf.pages.invalidPage'),
-      }
-    }
-  }, [pagesInput, t])
-
-  const parsedOrderPreview = useMemo(() => {
-    try {
-      if (!orderInput.trim()) return { pages: [] as number[], error: null as string | null }
-      return { pages: parsePageSpec(orderInput, t), error: null as string | null }
-    } catch (err) {
-      return {
-        pages: [] as number[],
-        error: err instanceof Error ? err.message : t('pdf.pages.invalidPage'),
-      }
-    }
-  }, [orderInput, t])
-
-  const visualSelectedPages = useMemo(
-    () => [...new Set(parsedPagesPreview.pages)].sort((a, b) => a - b),
-    [parsedPagesPreview.pages],
+  const { t } = useTranslation(['tools', 'common'])
+  const download = useFileDownload()
+  const workspace = usePdfWorkspace()
+  const { thumbnails, pageCounts, loading: thumbsLoading } = useMultiPdfThumbnails(
+    workspace.sourceFiles,
+    { maxPagesPerFile: 100, thumbnailWidth: 184 },
   )
-  const visualOrderPages = useMemo(
-    () => [...parsedOrderPreview.pages],
-    [parsedOrderPreview.pages],
-  )
+  const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
+  const [exportStep, setExportStep] = useState<string | null>(null)
+  const [resultPanelOpen, setResultPanelOpen] = useState(false)
+  const [resultSummary, setResultSummary] = useState<string | null>(null)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
-  const pageInputError = pagesOperation === 'reorder' ? parsedOrderPreview.error : parsedPagesPreview.error
-  const rotation = parseFiniteNumber(rotationInput)
-  const rotationValid =
-    pagesOperation !== 'rotate' ||
-    (rotation != null && isIntInRange(rotation, -3600, 3600) && rotation % 90 === 0)
-  const pageRequiredInputMissing =
-    pagesOperation === 'reorder'
-      ? parsedOrderPreview.pages.length === 0
-      : (pagesOperation === 'extract' || pagesOperation === 'delete') && parsedPagesPreview.pages.length === 0
+  // Sync page counts from thumbnail rendering into workspace
+  useEffect(() => {
+    workspace.syncPageCounts(pageCounts, workspace.sourceFiles.length)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageCounts, workspace.sourceFiles.length])
 
-  const singlePdfFile = pdfFiles[0] ?? null
-  const isMultiMode = operation === 'merge' || operation === 'imagesToPdf'
-  const sidebarPreviewFile = !isMultiMode && operation !== 'pages' ? singlePdfFile : null
-  const { thumbnails: sidebarPreviewThumbnails } = usePdfThumbnails(sidebarPreviewFile, {
-    maxPages: 1,
-    thumbnailWidth: 360,
+  const hasPages = workspace.pages.length > 0
+  const selectionCount = workspace.selectedIds.size
+  const totalSize = workspace.sourceFiles.reduce((sum, f) => sum + f.size, 0)
+  const readyInfo = hasPages
+    ? `${workspace.pages.length} ${t('pdf.workspace.pageCount')} · ${workspace.sourceFiles.length} ${t('pdf.workspace.fileCount')} · ${formatBytes(totalSize)}`
+    : undefined
+  const runState = useToolRunState({
+    mode: 'manual',
+    hasInput: hasPages,
+    hasResult: Boolean(resultSummary),
+    pending,
+    error,
+    texts: {
+      empty: t('pdf.workspace.emptyTitle'),
+      input: readyInfo,
+      processing: exportStep ?? t('common:actions.processingWait'),
+      result: resultSummary ?? readyInfo,
+    },
   })
-  const sidebarPdfPreview = sidebarPreviewThumbnails[0]?.dataUrl ?? null
-  const operationTitle: Record<WorkspaceOperation, string> = {
-    compress: t('pdf.compress.title'),
-    merge: t('pdf.merge.title'),
-    split: t('pdf.split.title'),
-    pages: t('pdf.pages.title'),
-    imagesToPdf: t('pdf.imagesToPdf.title'),
-  }
-  const activeDescription: Record<WorkspaceOperation, string> = {
-    compress: t('pdf.compress.description'),
-    merge: t('pdf.merge.description'),
-    split: t('pdf.split.description'),
-    pages: t('pdf.pages.description'),
-    imagesToPdf: t('pdf.imagesToPdf.description'),
-  }
-  const actionLabel: Record<WorkspaceOperation, string> = {
-    compress: pending ? t('pdf.compress.processing') : t('pdf.compress.startCompress'),
-    merge: pending ? t('pdf.merge.processing') : t('pdf.merge.startMerge'),
-    split: pending ? t('pdf.split.processing') : t('pdf.split.startSplit'),
-    pages: pending ? t('pdf.pages.processing') : t('pdf.pages.startProcess'),
-    imagesToPdf: pending ? t('pdf.imagesToPdf.processing') : t('pdf.imagesToPdf.startConvert'),
-  }
 
-  const inputSummary = useMemo(() => {
-    if (operation === 'merge') {
-      if (pdfFiles.length === 0) return null
-      const total = pdfFiles.reduce((acc, file) => acc + file.size, 0)
-      return t('pdf.merge.fileInfo', { count: pdfFiles.length, size: formatBytes(total) })
-    }
-    if (operation === 'imagesToPdf') {
-      if (imageFiles.length === 0) return null
-      const total = imageFiles.reduce((acc, file) => acc + file.size, 0)
-      return t('pdf.imagesToPdf.fileInfo', { count: imageFiles.length, size: formatBytes(total) })
-    }
-    if (!singlePdfFile) return null
-    return `${singlePdfFile.name} · ${formatBytes(singlePdfFile.size)}`
-  }, [imageFiles, operation, pdfFiles, singlePdfFile, t])
+  const handleAddFiles = useCallback(
+    async (files: File[]) => {
+      const pdfs = files.filter((f) => f.type === 'application/pdf')
+      const images = files.filter((f) => f.type.startsWith('image/'))
 
-  const canRun = (() => {
-    switch (operation) {
-      case 'compress':
-        return Boolean(singlePdfFile) && targetKbValid
-      case 'merge':
-        return pdfFiles.length >= 2
-      case 'split':
-        return Boolean(singlePdfFile) && ranges.trim().length > 0
-      case 'pages':
-        return Boolean(singlePdfFile) && !pageInputError && !pageRequiredInputMissing && rotationValid
-      case 'imagesToPdf':
-        return imageFiles.length > 0 && dpiValid
-      default:
-        return false
-    }
-  })()
+      if (pdfs.length > 0) {
+        workspace.addFiles(pdfs)
+      }
 
-  const handleSubmit = async () => {
-    if (!canRun) return
-    setResult(null)
-    try {
-      const res = await run((onProgress) => {
-        switch (operation) {
-          case 'compress':
-            return compressPdf(singlePdfFile as File, {
-              targetKb: targetKbInput.trim() === '' ? undefined : (targetKb ?? undefined),
-            }, onProgress)
-          case 'merge':
-            return mergePdfs(pdfFiles, onProgress)
-          case 'split':
-            return splitPdf(singlePdfFile as File, { ranges: ranges.trim() }, onProgress)
-          case 'pages': {
-            const pagesList = pagesOperation === 'reorder' ? null : parsePageSpec(pagesInput, t)
-            const orderList = pagesOperation === 'reorder' ? parsePageSpec(orderInput, t) : null
-            const pagesPayload =
-              pagesOperation === 'rotate'
-                ? pagesList && pagesList.length > 0
-                  ? pagesList
-                  : undefined
-                : pagesList ?? undefined
-            return editPdfPages(
-              singlePdfFile as File,
-              {
-                operation: pagesOperation,
-                pages: pagesPayload,
-                order: orderList && orderList.length > 0 ? orderList : undefined,
-                rotation: rotation ?? 90,
-              },
-              onProgress,
-            )
-          }
-          case 'imagesToPdf':
-            return imagesToPdf(imageFiles, { dpi: dpi ?? undefined }, onProgress)
-          default:
-            return Promise.reject(new Error('Unsupported operation'))
+      if (images.length > 0) {
+        try {
+          const result = await run((onProgress) => imagesToPdf(images, {}, onProgress))
+          const pdfFile = await downloadResultAsFile(result)
+          workspace.addFiles([pdfFile])
+        } catch {
+          // Error handled by useFileUpload
         }
-      })
-      setResult(res)
-    } catch {
-      // Error message handled by useFileUpload.
-    }
-  }
+      }
+    },
+    [workspace, run],
+  )
 
-  const handleUndoPagesEdit = () => {
-    dispatchPageEditor({ type: 'undo' })
-    setResult(null)
-  }
+  const handleExport = useCallback(
+    async (compress = false) => {
+      if (workspace.pages.length === 0) return
+      reset()
+      setResultSummary(null)
+      setResultPanelOpen(false)
 
-  const handleRedoPagesEdit = () => {
-    dispatchPageEditor({ type: 'redo' })
-    setResult(null)
-  }
+      try {
+        let currentFile: File
+        let lastResult: FileResult | null = null
 
-  const handleQuickApplyPage = async (pageNumber: number) => {
-    if (operation !== 'pages') return
-    if (pagesOperation === 'reorder') return
-    if (!singlePdfFile || pending) return
+        // Step 1: Merge if multiple source files
+        if (workspace.sourceFiles.length > 1) {
+          setExportStep(t('pdf.workspace.exportStepMerge'))
+          lastResult = await run((onProgress) => mergePdfs(workspace.sourceFiles, onProgress))
+          currentFile = await downloadResultAsFile(lastResult)
+        } else {
+          currentFile = workspace.sourceFiles[0]
+        }
 
-    dispatchPageEditor({
-      type: 'set',
-      patch: { pagesInput: String(pageNumber) },
-    })
-    setResult(null)
+        // Step 2: Reorder + delete (combined as reorder with desired page list)
+        const desiredOrder = workspace.pages.map((p) => p.globalPageNumber)
+        const totalOriginal = workspace.totalOriginalPages
+        const isDefaultOrder =
+          desiredOrder.length === totalOriginal && desiredOrder.every((n, i) => n === i + 1)
+
+        if (!isDefaultOrder) {
+          setExportStep(t('pdf.workspace.exportStepPages'))
+          lastResult = await run((onProgress) =>
+            editPdfPages(currentFile, { operation: 'reorder', order: desiredOrder }, onProgress),
+          )
+          currentFile = await downloadResultAsFile(lastResult)
+        }
+
+        // Step 3: Rotate pages (grouped by angle)
+        const rotationGroups = new Map<number, number[]>()
+        workspace.pages.forEach((page, newIndex) => {
+          const normalized = ((page.rotation % 360) + 360) % 360
+          if (normalized !== 0) {
+            const group = rotationGroups.get(normalized) ?? []
+            group.push(newIndex + 1)
+            rotationGroups.set(normalized, group)
+          }
+        })
+
+        for (const [rotation, pageNumbers] of rotationGroups) {
+          setExportStep(t('pdf.workspace.exportStepRotate'))
+          lastResult = await run((onProgress) =>
+            editPdfPages(
+              currentFile,
+              { operation: 'rotate', pages: pageNumbers, rotation },
+              onProgress,
+            ),
+          )
+          currentFile = await downloadResultAsFile(lastResult)
+        }
+
+        // Step 4: Compress if requested
+        if (compress) {
+          setExportStep(t('pdf.workspace.exportStepCompress'))
+          lastResult = await run((onProgress) => compressPdf(currentFile, {}, onProgress))
+        }
+
+        // Step 5: Download
+        if (lastResult) {
+          download(lastResult.download_url)
+        } else {
+          // No server processing happened — download client-side file directly
+          const url = URL.createObjectURL(currentFile)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = currentFile.name
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+
+        setResultSummary(
+          `${compress ? t('pdf.workspace.compressExport') : t('pdf.workspace.export')} · ${workspace.pages.length} ${t('pdf.workspace.pageCount')}`,
+        )
+        setResultPanelOpen(true)
+        setExportStep(null)
+      } catch {
+        setResultSummary(null)
+        setExportStep(null)
+      }
+    },
+    [workspace, run, reset, download, t],
+  )
+
+  const handleExtractSelected = useCallback(async () => {
+    if (workspace.selectedIds.size === 0 || workspace.sourceFiles.length === 0) return
+    reset()
+    setResultSummary(null)
+    setResultPanelOpen(false)
+
     try {
-      const res = await run((onProgress) =>
+      let currentFile: File
+
+      if (workspace.sourceFiles.length > 1) {
+        setExportStep(t('pdf.workspace.exportStepMerge'))
+        const mergeResult = await run((onProgress) =>
+          mergePdfs(workspace.sourceFiles, onProgress),
+        )
+        currentFile = await downloadResultAsFile(mergeResult)
+      } else {
+        currentFile = workspace.sourceFiles[0]
+      }
+
+      const selectedGlobalPages = workspace.pages
+        .filter((p) => workspace.selectedIds.has(p.id))
+        .map((p) => p.globalPageNumber)
+
+      setExportStep(t('pdf.workspace.exportStepExtract'))
+      const result = await run((onProgress) =>
         editPdfPages(
-          singlePdfFile,
-          {
-            operation: pagesOperation,
-            pages: [pageNumber],
-            rotation: rotation ?? 90,
-          },
+          currentFile,
+          { operation: 'extract', pages: selectedGlobalPages },
           onProgress,
         ),
       )
-      setResult(res)
+      download(result.download_url)
+      setResultSummary(`${t('pdf.workspace.extract')} · ${selectedGlobalPages.length} ${t('pdf.workspace.pageCount')}`)
+      setResultPanelOpen(true)
+      setExportStep(null)
     } catch {
-      // Error message handled by useFileUpload.
+      setResultSummary(null)
+      setExportStep(null)
     }
-  }
-
-  const handleQuickApplySelectedPages = async (pages: number[]) => {
-    if (operation !== 'pages') return
-    if (pagesOperation === 'reorder') return
-    if (!singlePdfFile || pending || pages.length === 0) return
-
-    const uniquePages = [...new Set(pages)].sort((a, b) => a - b)
-    dispatchPageEditor({
-      type: 'set',
-      patch: { pagesInput: formatPageList(uniquePages) },
-    })
-    setResult(null)
-    try {
-      const res = await run((onProgress) =>
-        editPdfPages(
-          singlePdfFile,
-          {
-            operation: pagesOperation,
-            pages: uniquePages,
-            rotation: rotation ?? 90,
-          },
-          onProgress,
-        ),
-      )
-      setResult(res)
-    } catch {
-      // Error message handled by useFileUpload.
-    }
-  }
+  }, [workspace, run, reset, download, t])
 
   return (
     <>
@@ -440,365 +242,197 @@ export function PdfToolsPage() {
         keywords={t('pdf.seoKeywords')}
         canonicalPath="/pdf-tools"
       />
-      <ToolPageShell
-        title={t('pdf.title')}
-        description={t('pdf.subtitle')}
-        width="full"
-        layout="workspace"
-        sidebarClassName="lg:sticky lg:top-20"
-        sidebar={
-          <div className="space-y-4">
-            <div className="rounded-xl border border-border/70 bg-gradient-to-br from-card to-muted/30 p-4 shadow-sm">
-              <div className="space-y-3">
-                <p className="text-sm font-medium">{t('pdf.workspace.processingPanel')}</p>
-                {inputSummary ? <p className="text-xs text-muted-foreground">{inputSummary}</p> : null}
-                {!isMultiMode && singlePdfFile ? (
-                  <ArtifactPreviewCard
-                    label={t('common:preview.input')}
-                    filename={singlePdfFile.name}
-                    sizeText={formatBytes(singlePdfFile.size)}
-                    mediaKind="pdf"
-                    mediaUrl={sidebarPdfPreview}
-                  />
-                ) : null}
-                <ProcessingStatus pending={pending} error={error} />
-                <UploadProgress value={pending ? progress : null} />
-                <Button type="button" className="w-full" disabled={!canRun || pending} onClick={handleSubmit}>
-                  {actionLabel[operation]}
-                </Button>
-              </div>
-            </div>
 
-            {result ? (
-              <ArtifactPreviewCard
-                label={t('common:preview.output')}
-                filename={result.filename}
-                sizeText={formatBytes(result.size)}
-                mediaKind="pdf"
-                action={<DownloadButton url={result.download_url} className="w-auto" />}
-              />
-            ) : null}
+      <div className="mx-auto w-full max-w-[96rem] space-y-4">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
+              <Link to="/" className="inline-flex items-center gap-1.5">
+                <ArrowLeft className="h-4 w-4" />
+                <span>{t('common:actions.back')}</span>
+              </Link>
+            </Button>
+            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+              {t('pdf.workspace.title')}
+            </h1>
           </div>
-        }
-      >
-        <div className="space-y-5">
-          <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-4">
-            <Label>{t('pdf.workspace.operationLabel')}</Label>
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-              {WORKSPACE_OPERATION_ORDER.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={cn(
-                    'rounded-lg border p-3 text-left transition-colors',
-                    operation === item
-                      ? 'border-primary/45 bg-primary/5'
-                      : 'border-border/70 bg-card hover:border-primary/30 hover:bg-muted/40',
-                  )}
-                  onClick={() => {
-                    if (operation === item) return
-                    navigate(getOperationPath(item))
-                    reset()
-                    setResult(null)
-                  }}
-                >
-                  <p className="text-sm font-semibold">{operationTitle[item]}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{activeDescription[item]}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
-            <FileDropzone
-              accept={operation === 'imagesToPdf' ? 'image/*' : 'application/pdf'}
-              multiple={operation === 'merge' || operation === 'imagesToPdf'}
-              maxFiles={20}
-              showCamera={operation === 'imagesToPdf'}
-              onFiles={(picked) => {
-                reset()
-                setResult(null)
-                if (operation === 'imagesToPdf') {
-                  setImageFiles(picked)
-                } else {
-                  setPdfFiles(operation === 'merge' ? picked : picked.slice(0, 1))
-                }
-              }}
-            />
-            <p className="text-xs text-muted-foreground">{t('pdf.workspace.uploadHint')}</p>
-
-            {operation === 'merge' ? (
-              <SortableFileList
-                files={pdfFiles}
-                kind="pdf"
-                hint={t('pdf.merge.orderHint')}
-                onReorder={setPdfFiles}
-                onRemove={(index) => {
-                  setPdfFiles((prev) => prev.filter((_, i) => i !== index))
-                  setResult(null)
-                }}
-              />
-            ) : null}
-
-            {operation === 'imagesToPdf' ? (
-              <SortableFileList
-                files={imageFiles}
-                kind="image"
-                hint={t('pdf.imagesToPdf.orderHint')}
-                onReorder={setImageFiles}
-                onRemove={(index) => {
-                  setImageFiles((prev) => prev.filter((_, i) => i !== index))
-                  setResult(null)
-                }}
-              />
-            ) : null}
-          </div>
-
-          {operation === 'split' ? (
-            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
-              <Label htmlFor="ranges">{t('pdf.split.rangesLabel')}</Label>
-              <Input
-                id="ranges"
-                value={ranges}
-                placeholder={t('pdf.split.rangesPlaceholder')}
-                onChange={(e) => {
-                  setRanges(e.target.value)
-                  setResult(null)
-                }}
-              />
-              <p className="text-xs text-muted-foreground">{t('pdf.split.rangesHint')}</p>
-            </div>
-          ) : null}
-
-          {operation === 'compress' ? (
-            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
-              <Label htmlFor="targetKb">{t('pdf.compress.targetSizeLabel')}</Label>
-              <Input
-                id="targetKb"
-                type="number"
-                min={1}
-                value={targetKbInput}
-                placeholder={t('pdf.compress.targetSizePlaceholder')}
-                onChange={(e) => {
-                  setTargetKbInput(e.target.value)
-                  setResult(null)
-                }}
-              />
-              <p className="text-xs text-muted-foreground">{t('pdf.compress.targetSizeHint')}</p>
-            </div>
-          ) : null}
-
-          {operation === 'imagesToPdf' ? (
-            <div className="space-y-2 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
-              <Label htmlFor="dpi">DPI（72-600）</Label>
-              <Input
-                id="dpi"
-                type="number"
-                min={72}
-                max={600}
-                value={dpiInput}
-                onChange={(e) => {
-                  setDpiInput(e.target.value)
-                  setResult(null)
-                }}
-              />
-            </div>
-          ) : null}
-
-          {operation === 'pages' ? (
-            <div className="grid items-start gap-4 2xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,0.55fr)]">
-              <div className="space-y-3">
-                {singlePdfFile ? (
-                  <PdfPageWorkspace
-                    file={singlePdfFile}
-                    mode={pagesOperation === 'reorder' ? 'reorder' : 'select'}
-                    pageOperation={pagesOperation}
-                    selectedPages={visualSelectedPages}
-                    reorderPages={visualOrderPages}
-                    onSelectedPagesChange={(pages) => {
-                      dispatchPageEditor({
-                        type: 'set',
-                        patch: { pagesInput: formatPageList(pages) },
-                      })
-                      setResult(null)
-                    }}
-                    onReorderPagesChange={(pages) => {
-                      dispatchPageEditor({
-                        type: 'set',
-                        patch: { orderInput: formatPageList(pages) },
-                      })
-                      setResult(null)
-                    }}
-                    onQuickApplyPage={handleQuickApplyPage}
-                    onQuickApplySelectedPages={handleQuickApplySelectedPages}
-                    quickApplyPending={pending}
-                  />
-                ) : (
-                  <div className="rounded-xl border border-dashed border-border/70 bg-muted/15 p-6 text-sm text-muted-foreground">
-                    {t('pdf.workspace.uploadHint')}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4 rounded-xl border border-border/70 bg-card p-3 sm:p-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pageOperation">{t('pdf.pages.operationLabel')}</Label>
-                  <select
-                    id="pageOperation"
-                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                    value={pagesOperation}
-                    onChange={(e) => {
-                      dispatchPageEditor({
-                        type: 'set',
-                        patch: { pagesOperation: e.target.value as PageOperation },
-                      })
-                      setResult(null)
-                    }}
-                  >
-                    <option value="extract">{t('pdf.pages.extract')}</option>
-                    <option value="delete">{t('pdf.pages.delete')}</option>
-                    <option value="rotate">{t('pdf.pages.rotate')}</option>
-                    <option value="reorder">{t('pdf.pages.reorder')}</option>
-                  </select>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!canUndoPagesEdit}
-                    onClick={handleUndoPagesEdit}
-                  >
-                    {t('pdf.workspace.undo')}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={!canRedoPagesEdit}
-                    onClick={handleRedoPagesEdit}
-                  >
-                    {t('pdf.workspace.redo')}
-                  </Button>
-                </div>
-
-                {pagesOperation === 'reorder' ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="orderInput">{t('pdf.pages.newOrderLabel')}</Label>
-                    <Input
-                      id="orderInput"
-                      placeholder={t('pdf.pages.newOrderPlaceholder')}
-                      value={orderInput}
-                      onChange={(e) => {
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { orderInput: e.target.value },
-                        })
-                        setResult(null)
-                      }}
-                    />
-                    {visualOrderPages.length > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t('shared.parsedPages')}: {formatPageList(visualOrderPages)}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label htmlFor="pagesInput">
-                      {t('pdf.pages.pagesLabel')}
-                      {pagesOperation === 'rotate' ? t('pdf.pages.pagesLabelAllSuffix') : ''}
-                    </Label>
-                    <Input
-                      id="pagesInput"
-                      placeholder={pagesOperation === 'rotate' ? t('pdf.pages.pagesPlaceholderAll') : t('pdf.pages.pagesPlaceholder')}
-                      value={pagesInput}
-                      onChange={(e) => {
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { pagesInput: e.target.value },
-                        })
-                        setResult(null)
-                      }}
-                    />
-                    {visualSelectedPages.length > 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t('shared.parsedPages')}: {formatPageList(visualSelectedPages)}
-                      </p>
-                    ) : null}
-                  </div>
-                )}
-
-                {pagesOperation === 'rotate' ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="rotation">{t('pdf.pages.rotationLabel')}</Label>
-                    <Input
-                      id="rotation"
-                      type="number"
-                      step={90}
-                      value={rotationInput}
-                      onChange={(e) => {
-                        dispatchPageEditor({
-                          type: 'set',
-                          patch: { rotationInput: e.target.value },
-                        })
-                        setResult(null)
-                      }}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={rotationInput === '90' ? 'secondary' : 'outline'}
-                        onClick={() => {
-                          dispatchPageEditor({
-                            type: 'set',
-                            patch: { rotationInput: '90' },
-                          })
-                          setResult(null)
-                        }}
-                      >
-                        {t('pdf.workspace.rotate90')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={rotationInput === '180' ? 'secondary' : 'outline'}
-                        onClick={() => {
-                          dispatchPageEditor({
-                            type: 'set',
-                            patch: { rotationInput: '180' },
-                          })
-                          setResult(null)
-                        }}
-                      >
-                        {t('pdf.workspace.rotate180')}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={rotationInput === '270' ? 'secondary' : 'outline'}
-                        onClick={() => {
-                          dispatchPageEditor({
-                            type: 'set',
-                            patch: { rotationInput: '270' },
-                          })
-                          setResult(null)
-                        }}
-                      >
-                        {t('pdf.workspace.rotate270')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {pageInputError ? <p className="text-sm text-destructive">{pageInputError}</p> : null}
-              </div>
-            </div>
-          ) : null}
         </div>
-      </ToolPageShell>
+
+        {/* Workspace */}
+        {!hasPages && !thumbsLoading ? (
+          <PdfWorkspaceEmpty onFiles={(f) => void handleAddFiles(f)} />
+        ) : (
+          <PdfWorkspaceGrid
+            pages={workspace.pages}
+            thumbnails={thumbnails}
+            selectedIds={workspace.selectedIds}
+            loading={thumbsLoading}
+            onReorder={workspace.reorderPages}
+            onToggleSelect={workspace.toggleSelect}
+            onRotatePage={(id) => workspace.rotatePage(id, 90)}
+            onDeletePage={workspace.deletePage}
+            onAddFiles={(f) => void handleAddFiles(f)}
+            onPreviewPage={setPreviewIndex}
+          />
+        )}
+
+        {/* Status bar */}
+        {hasPages && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
+            <span>
+              {workspace.pages.length} {t('pdf.workspace.pageCount')}
+            </span>
+            <span>
+              {workspace.sourceFiles.length} {t('pdf.workspace.fileCount')} · {formatBytes(totalSize)}
+            </span>
+            <button
+              type="button"
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={workspace.clearWorkspace}
+            >
+              {t('pdf.workspace.clearAll')}
+            </button>
+          </div>
+        )}
+
+        <ToolErrorBanner
+          error={error}
+          errorMeta={errorMeta}
+          onRetry={hasPages ? () => retry() : undefined}
+        />
+      </div>
+
+      <ToolActionBar
+        mode="manual"
+        status={runState.statusText}
+        pending={pending}
+        progress={progress}
+        error={error}
+        done={runState.phase === 'done'}
+        secondaryCtaLabel={t('pdf.workspace.compressExport')}
+        secondaryCtaDisabled={!hasPages}
+        onSecondaryCta={() => {
+          void handleExport(true)
+        }}
+        ctaLabel={t('pdf.workspace.export')}
+        ctaDisabled={!hasPages}
+        onCta={() => {
+          void handleExport(false)
+        }}
+        maxWidthClassName="max-w-[96rem]"
+      />
+
+      <ToolResultPanel
+        open={Boolean(resultSummary && resultPanelOpen)}
+        title={t('common:actions.downloadResult')}
+        onClose={() => setResultPanelOpen(false)}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{resultSummary}</p>
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
+              {t('common:actions.back')}
+            </Button>
+          </div>
+        </div>
+      </ToolResultPanel>
+
+      <PdfPageLightbox
+        open={previewIndex !== null}
+        files={workspace.sourceFiles}
+        pages={workspace.pages}
+        initialIndex={previewIndex ?? 0}
+        onClose={() => setPreviewIndex(null)}
+      />
+
+      {/* Floating selection action bar */}
+      <div
+        className={[
+          'fixed inset-x-0 bottom-[4.75rem] z-40 flex justify-center transition-all duration-300',
+          selectionCount > 0
+            ? 'translate-y-0 opacity-100'
+            : 'pointer-events-none translate-y-full opacity-0',
+        ].join(' ')}
+      >
+        <div className="flex items-center gap-1.5 rounded-xl border border-border/50 bg-background/80 px-3 py-2 shadow-lg backdrop-blur-xl sm:gap-2 sm:px-4 sm:py-2.5">
+          <span className="mr-1 text-sm font-medium tabular-nums">
+            {selectionCount} {t('pdf.workspace.selected')}
+          </span>
+
+          <div className="h-4 w-px bg-border" />
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => workspace.rotateSelected(90)}
+          >
+            <RotateCw className="mr-1.5 h-3.5 w-3.5" />
+            {t('pdf.workspace.rotate')}
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={pending}
+            onClick={workspace.deleteSelected}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            {t('pdf.workspace.delete')}
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => void handleExtractSelected()}
+          >
+            <Scissors className="mr-1.5 h-3.5 w-3.5" />
+            {t('pdf.workspace.extract')}
+          </Button>
+
+          <div className="h-4 w-px bg-border" />
+
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (selectionCount === workspace.pages.length) {
+                workspace.clearSelection()
+              } else {
+                workspace.selectAll()
+              }
+            }}
+          >
+            {selectionCount === workspace.pages.length ? (
+              <>
+                <Square className="mr-1.5 h-3.5 w-3.5" />
+                {t('pdf.workspace.deselectAll')}
+              </>
+            ) : (
+              <>
+                <CheckSquare className="mr-1.5 h-3.5 w-3.5" />
+                {t('pdf.workspace.selectAllShort')}
+              </>
+            )}
+          </Button>
+
+          <button
+            type="button"
+            className="ml-1 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={workspace.clearSelection}
+            aria-label="Close"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </>
   )
 }

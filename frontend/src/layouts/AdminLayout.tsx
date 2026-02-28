@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/admin/users', labelKey: 'admin:nav.users' },
   { to: '/admin/cards', labelKey: 'admin:nav.cards' },
   { to: '/admin/operations', labelKey: 'admin:nav.operations' },
+  { to: '/admin/feedback', labelKey: 'admin:nav.feedback' },
 ]
 
 export function AdminLayout() {
@@ -35,17 +36,18 @@ export function AdminLayout() {
       </button>
 
       {/* Sidebar overlay for mobile */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/50 lg:hidden transition-opacity duration-[var(--duration-normal)] ease-[var(--ease-out)]',
+          sidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+        )}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r bg-card transition-transform lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r bg-card transition-transform duration-[var(--duration-normal)] ease-[var(--ease-out)] lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -59,7 +61,7 @@ export function AdminLayout() {
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3 [&>a]:motion-safe:animate-[section-in_0.25s_var(--ease-out)_both] [&>a:nth-child(1)]:motion-safe:[animation-delay:50ms] [&>a:nth-child(2)]:motion-safe:[animation-delay:100ms] [&>a:nth-child(3)]:motion-safe:[animation-delay:150ms] [&>a:nth-child(4)]:motion-safe:[animation-delay:200ms] [&>a:nth-child(5)]:motion-safe:[animation-delay:250ms]">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -90,7 +92,9 @@ export function AdminLayout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-4 lg:p-6">
-        <Outlet />
+        <div className="motion-safe:animate-[section-in_0.3s_var(--ease-out)_both]">
+          <Outlet />
+        </div>
       </main>
     </div>
   )

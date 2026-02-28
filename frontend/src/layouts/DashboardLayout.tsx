@@ -9,7 +9,9 @@ const ITEMS = [
   { to: '/dashboard/transactions', labelKey: 'dashboard.transactions' },
   { to: '/dashboard/history', labelKey: 'dashboard.processingHistory' },
   { to: '/dashboard/redeem', labelKey: 'dashboard.redeemShare' },
+  { to: '/dashboard/transfers', labelKey: 'dashboard.transfers' },
   { to: '/dashboard/settings', labelKey: 'dashboard.settings' },
+  { to: '/dashboard/feedback', labelKey: 'dashboard.feedback' },
 ]
 
 export function DashboardLayout() {
@@ -25,7 +27,7 @@ export function DashboardLayout() {
             end={item.end}
             className={({ isActive }) =>
               cn(
-                'rounded-md px-3 py-1.5 text-sm text-muted-foreground transition',
+                'rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-[color,background-color] duration-[var(--duration-normal)] ease-[var(--ease-out)]',
                 isActive && 'bg-accent text-foreground',
               )
             }
@@ -34,7 +36,9 @@ export function DashboardLayout() {
           </NavLink>
         ))}
       </nav>
-      <Outlet />
+      <div className="motion-safe:animate-[section-in_0.3s_var(--ease-out)_both]">
+        <Outlet />
+      </div>
     </div>
   )
 }

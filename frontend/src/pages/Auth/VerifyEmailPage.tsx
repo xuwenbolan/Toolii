@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SEOHead } from '@/components/common/SEOHead'
 import { api } from '@/services/api'
 import { fetchMe } from '@/services/authApi'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 
 type VerifyState = 'verifying' | 'success' | 'error'
 
@@ -15,30 +16,27 @@ export function VerifyEmailPage() {
   const token = searchParams.get('token')
   const [state, setState] = useState<VerifyState>('verifying')
   const [errorMsg, setErrorMsg] = useState('')
+  const verifiedRef = useRef(false)
 
   useEffect(() => {
-    if (!token) return
+    if (!token || verifiedRef.current) return
+    verifiedRef.current = true
 
-    let cancelled = false
+    const controller = new AbortController()
     ;(async () => {
       try {
-        await api.post('/api/auth/verify-email', { token })
-        if (cancelled) return
+        await api.post('/api/auth/verify-email', { token }, { signal: controller.signal })
         setState('success')
-        // Refresh user info so email_verified updates in store
         await fetchMe()
       } catch (err: unknown) {
-        if (cancelled) return
-        const msg =
-          (err as { response?: { data?: { detail?: string } } })?.response?.data
-            ?.detail ?? t('verifyEmail.failed')
+        if (controller.signal.aborted) return
         setState('error')
-        setErrorMsg(msg)
+        setErrorMsg(getTranslatedApiError(err, t('verifyEmail.failed')))
       }
     })()
 
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [token, t])
 

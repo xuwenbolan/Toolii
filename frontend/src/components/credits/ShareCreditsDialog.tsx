@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getApiErrorCode } from '@/lib/apiErrors'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
 import {
   cancelShareLink,
@@ -101,11 +101,7 @@ export function ShareCreditsDialog({ open, onOpenChange, onChanged }: Props) {
                   await loadLinks()
                   onChanged?.()
                 } catch (err) {
-                  if (getApiErrorCode(err) === 'EMAIL_NOT_VERIFIED') {
-                    setError(t('common:errors.emailNotVerified'))
-                  } else {
-                    setError(t('share.createFailed'))
-                  }
+                  setError(getTranslatedApiError(err, t('share.createFailed')))
                 } finally {
                   setPending(false)
                 }

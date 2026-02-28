@@ -11,6 +11,7 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/services/api'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 
 type FormValues = { password: string; confirmPassword: string }
 
@@ -72,10 +73,7 @@ export function ResetPasswordPage() {
       })
       setSuccess(true)
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? t('resetPassword.resetFailed')
-      setError(msg)
+      setError(getTranslatedApiError(err, t('resetPassword.resetFailed')))
     }
   }
 

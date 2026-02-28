@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useTranslation } from 'react-i18next'
 
@@ -7,6 +8,7 @@ type SEOHeadProps = {
   keywords?: string
   canonicalPath?: string
   noindex?: boolean
+  jsonLd?: Record<string, unknown>
 }
 
 const SITE_NAME = 'Toolii'
@@ -20,17 +22,37 @@ function buildCanonicalUrl(canonicalPath?: string): string | undefined {
   return `${window.location.origin}${normalizedPath}`
 }
 
+function useJsonLd(jsonLd?: Record<string, unknown>) {
+  const elRef = useRef<HTMLScriptElement | null>(null)
+
+  useEffect(() => {
+    if (!jsonLd) return
+    const script = document.createElement('script')
+    script.type = 'application/ld+json'
+    script.textContent = JSON.stringify(jsonLd)
+    document.head.appendChild(script)
+    elRef.current = script
+    return () => {
+      script.remove()
+      elRef.current = null
+    }
+  }, [JSON.stringify(jsonLd)]) // eslint-disable-line react-hooks/exhaustive-deps
+}
+
 export function SEOHead({
   title,
   description,
   keywords,
   canonicalPath,
   noindex = false,
+  jsonLd,
 }: SEOHeadProps) {
   const { t } = useTranslation('common')
   const resolvedDescription = description ?? t('seo.defaultDescription')
   const fullTitle = `${title} | ${SITE_NAME}`
   const canonicalUrl = buildCanonicalUrl(canonicalPath)
+
+  useJsonLd(jsonLd)
 
   return (
     <Helmet prioritizeSeoTags>
@@ -47,6 +69,9 @@ export function SEOHead({
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={resolvedDescription} />
       {canonicalUrl ? <link rel="canonical" href={canonicalUrl} /> : null}
+      {canonicalUrl ? <link rel="alternate" hrefLang="en" href={canonicalUrl} /> : null}
+      {canonicalUrl ? <link rel="alternate" hrefLang="zh-Hans" href={canonicalUrl} /> : null}
+      {canonicalUrl ? <link rel="alternate" hrefLang="x-default" href={canonicalUrl} /> : null}
     </Helmet>
   )
 }

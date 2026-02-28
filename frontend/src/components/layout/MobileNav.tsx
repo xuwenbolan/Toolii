@@ -2,10 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  Camera,
-  FileText,
   Home,
-  ImageIcon,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -29,12 +26,8 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/hooks/useAuth'
 
-// Translation keys for nav items
 const NAV_ITEMS = [
   { labelKey: 'nav.home', to: '/', icon: Home },
-  { labelKey: 'nav.idPhoto', to: '/id-photo', icon: Camera },
-  { labelKey: 'nav.imageTools', to: '/image-tools', icon: ImageIcon },
-  { labelKey: 'nav.pdfTools', to: '/pdf-tools', icon: FileText },
 ]
 
 const AUTH_NAV = [
@@ -60,14 +53,14 @@ export function MobileNav() {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-[85vw] max-w-xs p-0">
-        <SheetHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
+        <SheetHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 pr-16">
           <SheetTitle className="text-left text-base">
             <Logo size={20} />
           </SheetTitle>
           <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
           <LanguageSwitcher />
         </SheetHeader>
-        <nav className="flex flex-col gap-1 px-2 py-2">
+        <nav className="flex flex-col gap-1 px-2 py-2 [&>*]:motion-safe:animate-[section-in_0.25s_var(--ease-out)_both] [&>*:nth-child(1)]:motion-safe:[animation-delay:50ms] [&>*:nth-child(2)]:motion-safe:[animation-delay:100ms] [&>*:nth-child(3)]:motion-safe:[animation-delay:150ms] [&>*:nth-child(4)]:motion-safe:[animation-delay:200ms] [&>*:nth-child(5)]:motion-safe:[animation-delay:250ms] [&>*:nth-child(6)]:motion-safe:[animation-delay:300ms] [&>*:nth-child(7)]:motion-safe:[animation-delay:350ms]">
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}

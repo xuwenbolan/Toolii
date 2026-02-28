@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 
 type Props = {
   open: boolean
@@ -33,10 +34,7 @@ export function GoogleLinkPasswordDialog({ open, onConfirm, onCancel }: Props) {
     try {
       await onConfirm(password)
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? t('googleLink.wrongPassword')
-      setError(msg)
+      setError(getTranslatedApiError(err, t('googleLink.wrongPassword')))
     } finally {
       setLoading(false)
     }

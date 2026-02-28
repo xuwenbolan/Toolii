@@ -15,7 +15,7 @@ export function Logo({ showText = true, className, size = 24 }: LogoProps) {
         aria-hidden="true"
         className="shrink-0"
       >
-        <rect width="32" height="32" rx="8" fill="#4F46E5" />
+        <rect width="32" height="32" rx="8" fill="var(--accent-brand)" />
         <rect x="6" y="7" width="20" height="5" rx="2.5" fill="white" />
         <rect x="13.5" y="7" width="5" height="18" rx="2.5" fill="white" />
       </svg>

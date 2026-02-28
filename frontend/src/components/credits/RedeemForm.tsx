@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { getApiErrorCode } from '@/lib/apiErrors'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { redeemCredits, type RedeemCreditsResponse } from '@/services/creditsApi'
 
 type Props = {
@@ -42,11 +42,7 @@ export function RedeemForm({ onRedeemed }: Props) {
           setCode('')
           onRedeemed?.(result)
         } catch (err) {
-          if (getApiErrorCode(err) === 'EMAIL_NOT_VERIFIED') {
-            setError(t('common:errors.emailNotVerified'))
-          } else {
-            setError(t('redeem.failed'))
-          }
+          setError(getTranslatedApiError(err, t('redeem.failed')))
         } finally {
           setPending(false)
         }

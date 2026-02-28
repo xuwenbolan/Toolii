@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { AdminRoute } from '@/components/auth/AdminRoute'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { FORMAT_PAIRS } from '@/config/formatPairs'
 import { AdminLayout } from '@/layouts/AdminLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
@@ -22,8 +23,23 @@ const ConvertPage = lazy(() => import('@/pages/ImageTools/ConvertPage').then((m)
 const MosaicPage = lazy(() => import('@/pages/ImageTools/MosaicPage').then((m) => ({ default: m.MosaicPage })))
 const ScanEnhancePage = lazy(() => import('@/pages/ImageTools/ScanEnhancePage').then((m) => ({ default: m.ScanEnhancePage })))
 const RemoveBgPage = lazy(() => import('@/pages/ImageTools/RemoveBgPage').then((m) => ({ default: m.RemoveBgPage })))
+const FormatConvertPage = lazy(() => import('@/pages/ImageTools/FormatConvertPage').then((m) => ({ default: m.FormatConvertPage })))
+const UpscalePage = lazy(() => import('@/pages/ImageTools/UpscalePage').then((m) => ({ default: m.UpscalePage })))
+const RestoreFacePage = lazy(() => import('@/pages/ImageTools/RestoreFacePage').then((m) => ({ default: m.RestoreFacePage })))
+const DenoisePage = lazy(() => import('@/pages/ImageTools/DenoisePage').then((m) => ({ default: m.DenoisePage })))
+const ColorizePage = lazy(() => import('@/pages/ImageTools/ColorizePage').then((m) => ({ default: m.ColorizePage })))
+const InpaintPage = lazy(() => import('@/pages/ImageTools/InpaintPage').then((m) => ({ default: m.InpaintPage })))
+const OcrPage = lazy(() => import('@/pages/ImageTools/OcrPage').then((m) => ({ default: m.OcrPage })))
+const SegmentPage = lazy(() => import('@/pages/ImageTools/SegmentPage').then((m) => ({ default: m.SegmentPage })))
 
 const PdfToolsPage = lazy(() => import('@/pages/PdfTools/PdfToolsPage').then((m) => ({ default: m.PdfToolsPage })))
+
+const TextToolsIndexPage = lazy(() => import('@/pages/TextTools/TextToolsIndexPage').then((m) => ({ default: m.TextToolsIndexPage })))
+const WordCounterPage = lazy(() => import('@/pages/TextTools/WordCounterPage').then((m) => ({ default: m.WordCounterPage })))
+
+const TransferCreatePage = lazy(() => import('@/pages/Transfer/TransferCreatePage').then((m) => ({ default: m.TransferCreatePage })))
+const TransferReceivePage = lazy(() => import('@/pages/Transfer/TransferReceivePage').then((m) => ({ default: m.TransferReceivePage })))
+const TransferListPage = lazy(() => import('@/pages/Transfer/TransferListPage').then((m) => ({ default: m.TransferListPage })))
 
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage').then((m) => ({ default: m.RegisterPage })))
@@ -36,12 +52,14 @@ const TransactionHistoryPage = lazy(() => import('@/pages/Dashboard/TransactionH
 const ProcessingHistoryPage = lazy(() => import('@/pages/Dashboard/ProcessingHistoryPage').then((m) => ({ default: m.ProcessingHistoryPage })))
 const RedeemPage = lazy(() => import('@/pages/Credits/RedeemPage').then((m) => ({ default: m.RedeemPage })))
 const SettingsPage = lazy(() => import('@/pages/Dashboard/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const FeedbackPage = lazy(() => import('@/pages/Dashboard/FeedbackPage').then((m) => ({ default: m.FeedbackPage })))
 
 const AdminDashboardPage = lazy(() => import('@/pages/Admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
 const AdminUsersPage = lazy(() => import('@/pages/Admin/AdminUsersPage').then((m) => ({ default: m.AdminUsersPage })))
 const AdminUserDetailPage = lazy(() => import('@/pages/Admin/AdminUserDetailPage').then((m) => ({ default: m.AdminUserDetailPage })))
 const AdminCardsPage = lazy(() => import('@/pages/Admin/AdminCardsPage').then((m) => ({ default: m.AdminCardsPage })))
 const AdminOperationsPage = lazy(() => import('@/pages/Admin/AdminOperationsPage').then((m) => ({ default: m.AdminOperationsPage })))
+const AdminFeedbackPage = lazy(() => import('@/pages/Admin/AdminFeedbackPage').then((m) => ({ default: m.AdminFeedbackPage })))
 
 export const router = createBrowserRouter([
   {
@@ -54,6 +72,8 @@ export const router = createBrowserRouter([
       { path: 'legal/privacy', element: <PrivacyPolicyPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'share/:token', element: <ShareClaimPage /> },
+      { path: 'transfer', element: <TransferCreatePage /> },
+      { path: 't/:token', element: <TransferReceivePage /> },
       {
         path: 'image-tools',
         children: [
@@ -64,6 +84,17 @@ export const router = createBrowserRouter([
           { path: 'mosaic', element: <MosaicPage /> },
           { path: 'scan-enhance', element: <ScanEnhancePage /> },
           { path: 'remove-bg', element: <RemoveBgPage /> },
+          { path: 'upscale', element: <UpscalePage /> },
+          { path: 'restore-face', element: <RestoreFacePage /> },
+          { path: 'denoise', element: <DenoisePage /> },
+          { path: 'colorize', element: <ColorizePage /> },
+          { path: 'inpaint', element: <InpaintPage /> },
+          { path: 'ocr', element: <OcrPage /> },
+          { path: 'segment', element: <SegmentPage /> },
+          ...FORMAT_PAIRS.map((pair) => ({
+            path: pair.slug,
+            element: <FormatConvertPage {...pair} />,
+          })),
         ],
       },
       {
@@ -75,6 +106,13 @@ export const router = createBrowserRouter([
           { path: 'pages', element: <PdfToolsPage /> },
           { path: 'from-images', element: <PdfToolsPage /> },
           { path: 'split', element: <PdfToolsPage /> },
+        ],
+      },
+      {
+        path: 'text-tools',
+        children: [
+          { index: true, element: <TextToolsIndexPage /> },
+          { path: 'word-counter', element: <WordCounterPage /> },
         ],
       },
       {
@@ -101,6 +139,8 @@ export const router = createBrowserRouter([
           { path: 'history', element: <ProcessingHistoryPage /> },
           { path: 'redeem', element: <RedeemPage /> },
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'feedback', element: <FeedbackPage /> },
+          { path: 'transfers', element: <TransferListPage /> },
         ],
       },
       {
@@ -116,6 +156,7 @@ export const router = createBrowserRouter([
           { path: 'users/:id', element: <AdminUserDetailPage /> },
           { path: 'cards', element: <AdminCardsPage /> },
           { path: 'operations', element: <AdminOperationsPage /> },
+          { path: 'feedback', element: <AdminFeedbackPage /> },
         ],
       },
     ],

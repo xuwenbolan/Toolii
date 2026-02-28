@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { api } from '@/services/api'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
 
 // --- Profile form ---
@@ -135,10 +136,7 @@ function PasswordSection() {
       setMsg(t('settings.password.success'))
       reset()
     } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? t('settings.password.failed')
-      setError(detail)
+      setError(getTranslatedApiError(err, t('settings.password.failed')))
     }
   }
 
@@ -272,10 +270,7 @@ function DeleteAccountSection() {
       clear()
       window.location.href = '/'
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message ?? t('settings.deleteAccount.deleteFailed')
-      setDeleteError(msg)
+      setDeleteError(getTranslatedApiError(err, t('settings.deleteAccount.deleteFailed')))
     } finally {
       setDeleting(false)
     }

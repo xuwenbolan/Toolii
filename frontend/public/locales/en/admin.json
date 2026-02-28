@@ -5,7 +5,8 @@
     "dashboard": "Dashboard",
     "users": "Users",
     "cards": "Card Codes",
-    "operations": "Operations"
+    "operations": "Operations",
+    "feedback": "Feedback"
   },
   "dashboard": {
     "totalUsers": "Total Users",
@@ -139,6 +140,30 @@
       "transactions": "Transactions",
       "totalCredits": "Total Credits",
       "totalTransactions": "Total Transactions"
+    }
+  },
+  "feedback": {
+    "title": "User Feedback",
+    "allStatus": "All Status",
+    "totalCount": "{{count}} total",
+    "user": "User",
+    "categoryLabel": "Category",
+    "contentLabel": "Content",
+    "statusLabel": "Status",
+    "time": "Time",
+    "fullContent": "Full Content",
+    "adminNote": "Admin Note",
+    "save": "Save",
+    "status": {
+      "pending": "Pending",
+      "reviewed": "Reviewed",
+      "resolved": "Resolved"
+    },
+    "categories": {
+      "feature_request": "Feature Request",
+      "bug_report": "Bug Report",
+      "suggestion": "Suggestion",
+      "other": "Other"
     }
   },
   "common": {

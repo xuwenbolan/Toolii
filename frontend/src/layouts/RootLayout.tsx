@@ -18,6 +18,12 @@ export function RootLayout() {
   const { t } = useTranslation('common')
   const cookieConsent = useConsentStore((s) => s.cookieConsent)
   const [isBootstrapping, setIsBootstrapping] = useState(true)
+  const isToolWorkspaceRoute =
+    location.pathname === '/id-photo' ||
+    location.pathname.startsWith('/image-tools/') ||
+    location.pathname === '/pdf-tools' ||
+    location.pathname.startsWith('/pdf-tools/') ||
+    location.pathname === '/text-tools/word-counter'
 
   useEffect(() => {
     bootstrap().finally(() => setIsBootstrapping(false))
@@ -48,7 +54,12 @@ export function RootLayout() {
     <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <Header />
       <EmailVerificationBanner />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+      <main
+        className={[
+          'mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8',
+          isToolWorkspaceRoute ? 'pb-28 lg:pb-32' : null,
+        ].filter(Boolean).join(' ')}
+      >
         <Suspense fallback={<div className="text-sm text-muted-foreground">{t('actions.processingWait')}</div>}>
           <div
             key={location.pathname}
@@ -58,7 +69,7 @@ export function RootLayout() {
           </div>
         </Suspense>
       </main>
-      <Footer />
+      {isToolWorkspaceRoute ? null : <Footer />}
       <CookieBanner />
     </div>
   )

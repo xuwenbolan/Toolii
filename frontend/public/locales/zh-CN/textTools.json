@@ -1,0 +1,35 @@
+{
+  "title": "文本工具",
+  "subtitle": "纯客户端文本分析，文本不会离开浏览器。",
+  "seoTitle": "免费在线文本工具",
+  "seoDescription": "免费在线文本工具：字数统计、字符统计、AI 模型 Token 计数。隐私安全，快速高效。",
+  "seoKeywords": "文本工具,字数统计,字符统计,Token计数,在线字数统计",
+  "wordCounter": {
+    "title": "字数 / 字符 / Token 计数器",
+    "indexDescription": "实时统计字数、字符、句子和 AI 模型 Token。",
+    "seoTitle": "免费在线字数统计与 AI Token 计数器",
+    "seoDescription": "免费在线字数统计、字符统计和 AI Token 计数器。支持 GPT-4o、Claude、Llama、DeepSeek、Qwen、Mistral。实时计算，隐私安全。",
+    "seoKeywords": "字数统计,字符统计,Token计数,GPT Token计数,Claude Token计数,AI Token计数,在线字数统计,免费Token计数",
+    "description": "实时统计字数、字符、句子、段落和 AI 模型 Token。所有处理在浏览器本地完成。",
+    "placeholder": "在此输入或粘贴文本...",
+    "copyStats": "复制统计到剪贴板"
+  },
+  "stats": {
+    "words": "词数",
+    "characters": "字符数",
+    "charactersNoSpaces": "字符（无空格）",
+    "cjkCharacters": "中日韩字符",
+    "sentences": "句子",
+    "paragraphs": "段落",
+    "lines": "行数",
+    "readingTime": "阅读时间",
+    "lessThanOneMin": "< 1 分钟",
+    "minutes": "{{count}} 分钟"
+  },
+  "token": {
+    "model": "AI 模型",
+    "tokens": "Token 数",
+    "exact": "{{pct}}% 精确",
+    "estimate": "约 {{pct}}%"
+  }
+}
