@@ -41,10 +41,20 @@ def _record_violation(ip: str) -> None:
     hits = _violations.setdefault(ip, [])
     hits.append(now)
     cutoff = now - _BAN_WINDOW
-    _violations[ip] = [t for t in hits if t > cutoff]
-    if len(_violations[ip]) >= _BAN_THRESHOLD:
+    active = [t for t in hits if t > cutoff]
+    if len(active) >= _BAN_THRESHOLD:
         _banned[ip] = now + _BAN_DURATION
-        del _violations[ip]
+        _violations.pop(ip, None)
+    elif active:
+        _violations[ip] = active
+    else:
+        _violations.pop(ip, None)
+
+    # Periodic cleanup: evict stale entries to prevent unbounded growth
+    if len(_violations) > 1000:
+        stale = [k for k, v in _violations.items() if not v or v[-1] <= cutoff]
+        for k in stale:
+            del _violations[k]
 
 
 # ---------------------------------------------------------------------------

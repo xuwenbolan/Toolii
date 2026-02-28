@@ -8,6 +8,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, NotFoundError
+from app.utils.time_utils import utcnow
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
 from app.models.login_history import LoginHistory
@@ -23,16 +24,12 @@ logger = logging.getLogger(__name__)
 CARD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _days_ago(days: int) -> datetime:
-    return _utcnow() - timedelta(days=days)
+    return utcnow() - timedelta(days=days)
 
 
 def _today_start() -> datetime:
-    return _utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    return utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 class AdminService:
@@ -42,7 +39,7 @@ class AdminService:
     # ── Dashboard ──────────────────────────────────────────
 
     async def get_dashboard_stats(self, days: int = 30) -> dict:
-        now = _utcnow()
+        now = utcnow()
         today = _today_start()
         week_ago = _days_ago(7)
         period_start = _days_ago(days)
@@ -371,7 +368,7 @@ class AdminService:
     ) -> list[str]:
         expires_at = None
         if expires_days is not None:
-            expires_at = _utcnow() + timedelta(days=expires_days)
+            expires_at = utcnow() + timedelta(days=expires_days)
 
         codes: list[str] = []
         seen_hashes: set[str] = set()

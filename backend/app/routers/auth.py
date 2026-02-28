@@ -30,6 +30,7 @@ from app.schemas.auth import (
 )
 from app.schemas.user import UserPublic
 from app.services.auth_service import AuthService
+from app.services.email.lang import parse_lang
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,10 @@ async def register(
     db=Depends(get_db),
 ) -> JSONResponse:
     ip = get_remote_address(request)
+    lang = parse_lang(request.headers.get("accept-language"))
     try:
         user, dev_token = await AuthService(db).register(
-            email=payload.email, password=payload.password, name=payload.name
+            email=payload.email, password=payload.password, name=payload.name, lang=lang
         )
     except Exception:
         log_auth_event("register_failed", email=payload.email, ip=ip, success=False)
@@ -206,7 +208,7 @@ async def logout(
         except Exception:  # noqa: BLE001
             logger.debug("Could not blacklist refresh token during logout", exc_info=True)
     log_auth_event("logout", user_id=user.id, ip=ip)
-    response = JSONResponse(content={"message": "Logged out"})
+    response = JSONResponse(content={"code": "LOGGED_OUT", "message": "Logged out"})
     clear_refresh_cookie(response)
     return response
 
@@ -222,7 +224,7 @@ async def logout_all(
     user.tokens_revoked_at = datetime.now(timezone.utc)
     await db.commit()
     log_auth_event("logout_all_devices", user_id=user.id, ip=ip)
-    response = JSONResponse(content={"message": "All sessions revoked"})
+    response = JSONResponse(content={"code": "ALL_SESSIONS_REVOKED", "message": "All sessions revoked"})
     clear_refresh_cookie(response)
     return response
 
@@ -243,7 +245,7 @@ async def verify_email(
     ip = get_remote_address(request)
     user = await AuthService(db).verify_email(token=payload.token)
     log_auth_event("email_verified", email=user.email, user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "Email verified successfully"})
+    return JSONResponse(content={"code": "EMAIL_VERIFIED", "message": "Email verified successfully"})
 
 
 @router.post("/resend-verification")
@@ -254,9 +256,10 @@ async def resend_verification(
     db=Depends(get_db),
 ) -> JSONResponse:
     ip = get_remote_address(request)
-    dev_token = await AuthService(db).resend_verification(user_id=user.id)
+    lang = parse_lang(request.headers.get("accept-language"))
+    dev_token = await AuthService(db).resend_verification(user_id=user.id, lang=lang)
     log_auth_event("resend_verification", email=user.email, user_id=user.id, ip=ip)
-    body: dict = {"message": "Verification email sent"}
+    body: dict = {"code": "VERIFICATION_EMAIL_SENT", "message": "Verification email sent"}
     if dev_token is not None:
         body["_dev_verification_token"] = dev_token
     return JSONResponse(content=body)
@@ -270,10 +273,11 @@ async def forgot_password(
     db=Depends(get_db),
 ) -> JSONResponse:
     ip = get_remote_address(request)
-    dev_token = await AuthService(db).forgot_password(email=payload.email)
+    lang = parse_lang(request.headers.get("accept-language"))
+    dev_token = await AuthService(db).forgot_password(email=payload.email, lang=lang)
     log_auth_event("forgot_password", email=payload.email, ip=ip)
     # Always return success to prevent email enumeration
-    body: dict = {"message": "If this email is registered, you will receive a password reset email"}
+    body: dict = {"code": "RESET_EMAIL_SENT", "message": "If this email is registered, you will receive a password reset email"}
     if dev_token is not None:
         body["_dev_reset_token"] = dev_token
     return JSONResponse(content=body)
@@ -291,4 +295,4 @@ async def reset_password(
         token=payload.token, new_password=payload.password
     )
     log_auth_event("password_reset", email=user.email, user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "Password reset successfully, please log in again"})
+    return JSONResponse(content={"code": "PASSWORD_RESET_SUCCESS", "message": "Password reset successfully, please log in again"})

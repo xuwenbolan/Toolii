@@ -4,6 +4,10 @@ import io
 
 from PIL import Image, ImageOps
 
+# Limit decompressed image size to prevent decompression bomb attacks.
+# 25 million pixels (~5000x5000) is generous for ID photos and image tools.
+Image.MAX_IMAGE_PIXELS = 25_000_000
+
 try:
     import pillow_heif
 

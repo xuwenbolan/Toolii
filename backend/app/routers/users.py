@@ -16,6 +16,7 @@ from app.models.user import User
 from app.schemas.common import Message
 from app.schemas.user import ChangePasswordRequest, DeleteAccountRequest, UpdateProfileRequest, UserPublic
 from app.services.email.factory import get_email_service
+from app.services.email.lang import parse_lang
 
 router = APIRouter(prefix=f"{settings.api_prefix}/users", tags=["users"])
 
@@ -51,7 +52,7 @@ async def change_password(
     from slowapi.util import get_remote_address
     ip = get_remote_address(request)
     log_auth_event("password_changed", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "Password changed successfully"})
+    return JSONResponse(content={"code": "PASSWORD_CHANGED", "message": "Password changed successfully"})
 
 
 @router.put("/profile")
@@ -73,6 +74,20 @@ async def update_profile(
     if payload.email is not None:
         new_email = payload.email.strip().lower()
         if new_email != user.email:
+            # Require password verification for email change
+            if user.hashed_password:
+                if not payload.current_password:
+                    raise AppError(
+                        code="PASSWORD_REQUIRED",
+                        message="Password is required to change email",
+                        status_code=400,
+                    )
+                if not verify_password(payload.current_password, user.hashed_password):
+                    raise AppError(
+                        code="WRONG_PASSWORD",
+                        message="Current password is incorrect",
+                        status_code=400,
+                    )
             # Check uniqueness
             result = await db.execute(select(User).where(User.email == new_email))
             if result.scalar_one_or_none() is not None:
@@ -87,6 +102,7 @@ async def update_profile(
     # Send verification email for new address
     if email_changed:
         from app.services.auth_service import AuthService
+        lang = parse_lang(request.headers.get("accept-language"))
         svc = AuthService(db)
         raw_token = await svc._create_verification_token(user.id)
         await db.commit()
@@ -95,6 +111,7 @@ async def update_profile(
             to_email=user.email,
             token=raw_token,
             base_url=settings.frontend_base_url,
+            lang=lang,
         )
         if settings.env == "dev":
             dev_token = raw_token
@@ -102,6 +119,7 @@ async def update_profile(
     log_auth_event("profile_updated", user_id=user.id, ip=ip)
 
     body: dict = {
+        "code": "PROFILE_UPDATED_VERIFY_EMAIL" if email_changed else "PROFILE_UPDATED",
         "message": "Profile updated" + (", please verify new email" if email_changed else ""),
         "user": UserPublic.model_validate(user).model_dump(),
     }
@@ -121,7 +139,7 @@ async def delete_me(
     from datetime import datetime, timezone
     from slowapi.util import get_remote_address
 
-    # Require password for accounts that have one
+    # Require identity verification before deletion
     if user.hashed_password:
         if not payload.password:
             raise AppError(
@@ -135,6 +153,14 @@ async def delete_me(
                 message="Wrong password",
                 status_code=400,
             )
+    else:
+        # Google-only accounts: require email confirmation
+        if not payload.confirm_email or payload.confirm_email.strip().lower() != user.email:
+            raise AppError(
+                code="EMAIL_CONFIRMATION_REQUIRED",
+                message="Please enter your email address to confirm deletion",
+                status_code=400,
+            )
 
     now = datetime.now(timezone.utc)
     user.is_active = False
@@ -144,7 +170,7 @@ async def delete_me(
 
     ip = get_remote_address(request)
     log_auth_event("account_deleted", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "Account marked for deletion, recoverable within 7 days by logging in"})
+    return JSONResponse(content={"code": "ACCOUNT_MARKED_DELETION", "message": "Account marked for deletion, recoverable within 7 days by logging in"})
 
 
 @router.post("/recover")
@@ -164,17 +190,21 @@ async def recover_account(
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
+    _generic_recover_error = AppError(
+        code="RECOVER_FAILED", message="Unable to recover account", status_code=400,
+    )
+
     if user is None or not user.deleted_at:
-        raise AppError(code="NOT_FOUND", message="No recoverable account found", status_code=404)
+        raise _generic_recover_error
 
     # Check 7-day recovery window
     now = datetime.now(timezone.utc)
     if now - user.deleted_at > timedelta(days=7):
-        raise AppError(code="EXPIRED", message="Recovery period expired, account permanently deleted", status_code=410)
+        raise _generic_recover_error
 
     # Verify password
     if not user.hashed_password or not verify_password(payload.password, user.hashed_password):
-        raise AppError(code="WRONG_PASSWORD", message="Wrong password", status_code=401)
+        raise _generic_recover_error
 
     user.is_active = True
     user.deleted_at = None
@@ -183,7 +213,7 @@ async def recover_account(
 
     ip = get_remote_address(request)
     log_auth_event("account_recovered", user_id=user.id, email=user.email, ip=ip)
-    return JSONResponse(content={"message": "Account recovered, please log in again"})
+    return JSONResponse(content={"code": "ACCOUNT_RECOVERED", "message": "Account recovered, please log in again"})
 
 
 @router.get("/sessions")
@@ -211,7 +241,6 @@ async def list_sessions(
             "id": entry.id,
             "ip": entry.ip,
             "user_agent": entry.user_agent,
-            "refresh_jti": entry.refresh_jti,
             "created_at": entry.created_at.isoformat() if entry.created_at else None,
         })
 
@@ -251,4 +280,4 @@ async def revoke_session(
 
     ip = get_remote_address(request)
     log_auth_event("session_revoked", user_id=user.id, ip=ip)
-    return JSONResponse(content={"message": "Session terminated"})
+    return JSONResponse(content={"code": "SESSION_TERMINATED", "message": "Session terminated"})

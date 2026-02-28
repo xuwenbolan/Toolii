@@ -44,12 +44,13 @@ class TokenBlacklistService:
         if jti in self._cache:
             return True
         result = await db.execute(
-            select(TokenBlacklistEntry.id)
+            select(TokenBlacklistEntry.jti, TokenBlacklistEntry.expires_at)
             .where(TokenBlacklistEntry.jti == jti)
             .limit(1)
         )
-        if result.scalar_one_or_none() is not None:
-            self._cache[jti] = 0
+        row = result.one_or_none()
+        if row is not None:
+            self._cache[jti] = int(row.expires_at.timestamp())
             return True
         return False
 
@@ -62,7 +63,7 @@ class TokenBlacklistService:
         await db.commit()
         now_ts = int(time.time())
         self._cache = {
-            jti: exp for jti, exp in self._cache.items() if exp > now_ts or exp == 0
+            jti: exp for jti, exp in self._cache.items() if exp > now_ts
         }
 
     async def load_cache(self, db: AsyncSession) -> None:

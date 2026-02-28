@@ -55,7 +55,12 @@ class Settings(BaseSettings):
 
     file_storage_dir: str = Field(default="../data/files", alias="FILE_STORAGE_DIR")
     file_retention_hours: int = Field(default=24, alias="FILE_RETENTION_HOURS")
-    download_url_ttl_seconds: int = Field(default=3600, alias="DOWNLOAD_URL_TTL_SECONDS")
+
+    # File transfer settings
+    transfer_storage_dir: str = Field(default="../data/transfers", alias="TRANSFER_STORAGE_DIR")
+    max_transfer_files: int = Field(default=20, alias="MAX_TRANSFER_FILES")
+    max_transfer_file_mb: int = Field(default=100, alias="MAX_TRANSFER_FILE_MB")
+    max_transfer_total_mb: int = Field(default=500, alias="MAX_TRANSFER_TOTAL_MB")
 
     # Email settings
     email_provider: str = Field(default="dev", alias="EMAIL_PROVIDER")
@@ -64,6 +69,9 @@ class Settings(BaseSettings):
     email_verification_expire_hours: int = Field(default=24, alias="EMAIL_VERIFICATION_EXPIRE_HOURS")
     password_reset_expire_minutes: int = Field(default=30, alias="PASSWORD_RESET_EXPIRE_MINUTES")
     frontend_base_url: str = Field(default="http://localhost:5173", alias="FRONTEND_BASE_URL")
+
+    # Cortex GPU inference service
+    cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
 
     model_config = SettingsConfigDict(
         env_file=(_repo_root() / ".env"),

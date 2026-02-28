@@ -219,6 +219,50 @@ def _crop_with_padding(image: Image.Image, box: tuple[int, int, int, int]) -> Im
     return canvas
 
 
+def _apply_adjustment(
+    crop_box: tuple[int, int, int, int],
+    *,
+    adjust: dict[str, Any] | None,
+    target_w: int,
+    target_h: int,
+    img_w: int,
+    img_h: int,
+) -> tuple[tuple[int, int, int, int], dict[str, float]]:
+    if not adjust:
+        return crop_box, {"offset_x": 0.0, "offset_y": 0.0, "scale": 1.0}
+
+    x, y, w, h = crop_box
+    offset_x = float(adjust.get("offset_x", 0.0))
+    offset_y = float(adjust.get("offset_y", 0.0))
+    scale = float(adjust.get("scale", 1.0))
+
+    offset_x = max(-0.45, min(0.45, offset_x))
+    offset_y = max(-0.45, min(0.45, offset_y))
+    scale = max(0.75, min(2.4, scale))
+
+    center_x = x + w / 2 + offset_x * w
+    center_y = y + h / 2 + offset_y * h
+
+    next_w = max(32, int(round(w / scale)))
+    ratio = target_w / max(1, target_h)
+    next_h = max(32, int(round(next_w / ratio)))
+
+    next_w = min(next_w, max(img_w * 3, target_w))
+    next_h = min(next_h, max(img_h * 3, target_h))
+
+    center_x = max(-next_w * 0.5, min(center_x, img_w + next_w * 0.5))
+    center_y = max(-next_h * 0.5, min(center_y, img_h + next_h * 0.5))
+
+    next_x = int(round(center_x - next_w / 2))
+    next_y = int(round(center_y - next_h / 2))
+    applied = {
+        "offset_x": round(offset_x, 4),
+        "offset_y": round(offset_y, 4),
+        "scale": round(scale, 4),
+    }
+    return (next_x, next_y, next_w, next_h), applied
+
+
 def crop_id_photo(
     image_bytes: bytes,
     *,
@@ -226,6 +270,7 @@ def crop_id_photo(
     face: dict[str, Any] | None = None,
     cutout_png_bytes: bytes | None = None,
     background_color: str = "#FFFFFF",
+    adjust: dict[str, float] | None = None,
 ) -> tuple[bytes, dict[str, Any]]:
     source = open_image(image_bytes).convert("RGBA")
     subject = open_image(cutout_png_bytes).convert("RGBA") if cutout_png_bytes else source.copy()
@@ -237,7 +282,7 @@ def crop_id_photo(
     face_height_ratio = float(standard.get("face_height_ratio", 0.68))
     top_margin_ratio = float(standard.get("top_margin_ratio", 0.12))
 
-    crop_box = _expand_crop(
+    auto_crop_box = _expand_crop(
         img_w=source.width,
         img_h=source.height,
         face=face,
@@ -246,6 +291,14 @@ def crop_id_photo(
         target_h=target_h,
         face_height_ratio=face_height_ratio,
         top_margin_ratio=top_margin_ratio,
+    )
+    crop_box, applied_adjust = _apply_adjustment(
+        auto_crop_box,
+        adjust=adjust,
+        target_w=target_w,
+        target_h=target_h,
+        img_w=source.width,
+        img_h=source.height,
     )
 
     cropped_subject = _crop_with_padding(subject, crop_box)
@@ -268,6 +321,13 @@ def crop_id_photo(
     head_height_est = max(1.0, float(head_est["chin_y"]) - float(head_est["head_top_y"]))
     meta = {
         "crop_box": {"x": x, "y": y, "w": w, "h": h},
+        "auto_crop_box": {
+            "x": int(auto_crop_box[0]),
+            "y": int(auto_crop_box[1]),
+            "w": int(auto_crop_box[2]),
+            "h": int(auto_crop_box[3]),
+        },
+        "applied_adjust": applied_adjust,
         "subject_box": subject_box,
         "head_estimate": {
             "center_x": round(float(head_est["center_x"]), 2),

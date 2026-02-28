@@ -114,7 +114,7 @@ async def test_api_photo_upload_endpoint(
 ) -> None:
     from app.services.photo_service import PhotoService
 
-    async def _fake_upload_and_detect(self, *, image_bytes: bytes, filename: str, content_type: str):  # noqa: ARG001
+    async def _fake_upload_and_prepare(self, *, image_bytes: bytes, filename: str, content_type: str):  # noqa: ARG001
         return PhotoUploadResponse(
             upload_id="test-upload-id",
             filename=filename,
@@ -122,9 +122,10 @@ async def test_api_photo_upload_endpoint(
             height=1000,
             faces=[{"x": 260, "y": 140, "w": 280, "h": 360, "confidence": 0.9}],
             detection_engine="test-engine",
+            compliance={"passed": True, "score": 90, "checks": []},
         )
 
-    monkeypatch.setattr(PhotoService, "upload_and_detect", _fake_upload_and_detect)
+    monkeypatch.setattr(PhotoService, "upload_and_prepare", _fake_upload_and_prepare)
 
     res = await async_client.post(
         "/api/photo/upload",

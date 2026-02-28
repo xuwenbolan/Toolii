@@ -118,7 +118,7 @@ def sample_pdf_bytes() -> bytes:
 
 @pytest_asyncio.fixture()
 async def create_user(session_factory) -> AsyncIterator[Callable[..., object]]:
-    async def _create_user(*, email: str, balance: int = 0, password: str = "password123", email_verified: bool = False) -> User:
+    async def _create_user(*, email: str, balance: int = 0, password: str = "password123", email_verified: bool = True) -> User:
         async with session_factory() as db:
             user = User(email=email, hashed_password=hash_password(password), is_active=True, email_verified=email_verified)
             db.add(user)

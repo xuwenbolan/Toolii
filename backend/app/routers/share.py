@@ -81,6 +81,7 @@ async def claim_share(
 ) -> ShareClaimResponse:
     result = await ShareService(db).claim(token=token, user_id=user.id)
     return ShareClaimResponse(
+        code="SHARE_CLAIMED",
         message="Claimed successfully",
         amount=result.amount,
         balance=result.balance_after,
@@ -130,4 +131,4 @@ async def cancel_share(
     db=Depends(get_db),
 ) -> ShareCancelResponse:
     result = await ShareService(db).cancel(link_id=link_id, user_id=user.id)
-    return ShareCancelResponse(message=result.message, balance=result.balance_after)
+    return ShareCancelResponse(code=result.code, message=result.message, balance=result.balance_after)

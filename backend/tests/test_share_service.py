@@ -45,7 +45,7 @@ async def test_share_service_cancel_and_expire_refund(session_factory, create_us
         service = ShareService(db)
         created = await service.create_share_link(user_id=sender.id, amount=2)
         cancelled = await service.cancel(link_id=created.link.id, user_id=sender.id)
-        assert "退回" in cancelled.message
+        assert "refunded" in cancelled.message
         assert cancelled.balance_after == 5
 
     assert await _balance(session_factory, sender.id) == 5

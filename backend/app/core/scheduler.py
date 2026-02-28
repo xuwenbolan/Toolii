@@ -8,6 +8,7 @@ from app.core.token_blacklist import token_blacklist
 from app.services.file_service import FileService
 from app.services.photo_service import cleanup_expired_sessions
 from app.services.share_service import ShareService
+from app.services.transfer_service import TransferService
 
 
 scheduler = AsyncIOScheduler(timezone="UTC")
@@ -66,6 +67,19 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         misfire_grace_time=60,
     )
 
+    async def _expire_transfers() -> None:
+        async with SessionLocal() as db:
+            await TransferService(db).expire_transfers()
+
+    scheduler.add_job(
+        _expire_transfers,
+        "interval",
+        minutes=15,
+        id="expire_transfers",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
     async def _anonymize_deleted_accounts() -> None:
         import logging
         import uuid
@@ -115,6 +129,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
 
         from app.models.credit_transaction import CreditTransaction
         from app.models.email_verification import EmailVerificationToken
+        from app.models.file_transfer import FileTransfer
         from app.models.login_history import LoginHistory
         from app.models.password_reset import PasswordResetToken
         from app.models.processing_history import ProcessingHistory
@@ -155,6 +170,10 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
                 update(ProcessingHistory)
                 .where(ProcessingHistory.user_id.in_(user_ids))
                 .values(user_id=None)
+            )
+            # CASCADE on transfer_files handles child rows
+            await db.execute(
+                delete(FileTransfer).where(FileTransfer.user_id.in_(user_ids))
             )
             await db.execute(
                 delete(ShareLink).where(ShareLink.from_user_id.in_(user_ids))

@@ -13,6 +13,7 @@ from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
+from app.utils.time_utils import utcnow
 
 
 def hash_password(password: str) -> str:
@@ -40,10 +41,6 @@ class DecodedToken:
     raw: dict[str, Any]
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def create_jwt_token(
     *,
     subject: str,
@@ -51,7 +48,7 @@ def create_jwt_token(
     expires_delta: timedelta,
     extra: dict[str, Any] | None = None,
 ) -> str:
-    now = _utcnow()
+    now = utcnow()
     exp = now + expires_delta
     payload: dict[str, Any] = {
         "sub": subject,

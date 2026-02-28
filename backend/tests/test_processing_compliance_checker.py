@@ -63,4 +63,4 @@ def test_compliance_checker_accepts_face_payload_and_cutout() -> None:
 
     assert len(result["checks"]) == 13
     background_check = next(item for item in result["checks"] if item["id"] == "background")
-    assert "抠图质量" in background_check["message"]
+    assert "Cutout quality" in background_check["message"]

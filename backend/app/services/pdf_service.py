@@ -26,7 +26,7 @@ class PdfService:
             size=stored.size,
             content_type=stored.content_type,
             download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
-            expires_in=settings.download_url_ttl_seconds,
+            expires_in=settings.file_retention_hours * 3600,
         )
 
     @staticmethod

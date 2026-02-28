@@ -41,10 +41,15 @@ from app.core.security_headers import RequestSizeLimitMiddleware, SecurityHeader
 from app.core.database import SessionLocal
 from app.core.scheduler import scheduler, setup_scheduler
 from app.core.token_blacklist import token_blacklist
+import logging
+
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
-from app.routers import auth, credits, download, history, image, pdf, photo, share, users
+from app.routers import auth, credits, download, feedback, history, image, pdf, photo, share, transfer, users
 from app.routers.admin import router as admin_router
+from app.services import cortex_client
+
+logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -54,8 +59,8 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Accept-Language"],
     )
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(RequestSizeLimitMiddleware)
@@ -73,6 +78,8 @@ def create_app() -> FastAPI:
     app.include_router(pdf.router)
     app.include_router(download.router)
     app.include_router(history.router)
+    app.include_router(feedback.router)
+    app.include_router(transfer.router)
     app.include_router(admin_router)
 
     @app.get(f"{settings.api_prefix}/health")
@@ -81,9 +88,16 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
+        # Local fallback models (kept warm in case Cortex is unavailable)
         with _suppress_native_stderr():
-            prewarm_background_models(["silueta", "u2net_human_seg"])
+            prewarm_background_models(["silueta"])
             prewarm_face_landmarker()
+        # Cortex GPU service connectivity check
+        try:
+            health = await cortex_client.health_check()
+            logger.info("Cortex GPU service connected: %s", health.get("status"))
+        except Exception:
+            logger.warning("Cortex GPU service not available, will use local fallback models")
         async with SessionLocal() as db:
             await token_blacklist.load_cache(db)
         setup_scheduler(scheduler)
@@ -91,6 +105,7 @@ def create_app() -> FastAPI:
 
     @app.on_event("shutdown")
     async def _shutdown() -> None:
+        await cortex_client.close()
         if scheduler.running:
             scheduler.shutdown(wait=False)
 

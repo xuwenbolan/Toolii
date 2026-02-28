@@ -13,11 +13,12 @@ _SECURITY_HEADERS: dict[str, str] = {
     "X-XSS-Protection": "0",
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' https://www.googletagmanager.com; "
+        "script-src 'self' https://www.googletagmanager.com https://accounts.google.com https://apis.google.com; "
         "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob: https://www.google-analytics.com; "
+        "img-src 'self' data: blob: https://www.google-analytics.com https://www.gstatic.com; "
         "font-src 'self'; "
-        "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://*.analytics.google.com; "
+        "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://*.analytics.google.com https://accounts.google.com https://*.googleapis.com; "
+        "frame-src 'self' https://accounts.google.com https://*.google.com; "
         "frame-ancestors 'none'"
     ),
 }
@@ -36,7 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     """Reject requests whose Content-Length exceeds *max_bytes*."""
 
-    def __init__(self, app: object, max_bytes: int = 110 * 1024 * 1024) -> None:
+    def __init__(self, app: object, max_bytes: int = 550 * 1024 * 1024) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self._max_bytes = max_bytes
 

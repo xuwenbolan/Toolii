@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
+from app.utils.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
 from app.models.share_link import ShareLink
@@ -17,10 +18,6 @@ from app.services.credit_service import CreditAddResult, CreditService
 
 
 SHARE_LINK_TTL_HOURS = 24
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
@@ -34,7 +31,7 @@ def _as_utc(value: datetime | None) -> datetime | None:
 def _is_expired(value: datetime | None) -> bool:
     if value is None:
         return False
-    return _as_utc(value) <= _utcnow()
+    return _as_utc(value) <= utcnow()
 
 
 def _share_path(token: str) -> str:
@@ -58,6 +55,7 @@ class ShareClaimResult:
 class ShareCancelResult:
     link: ShareLink
     balance_after: int
+    code: str
     message: str
 
 
@@ -127,7 +125,7 @@ class ShareService:
 
         try:
             token = await self._generate_unique_token()
-            now = _utcnow()
+            now = utcnow()
             link = ShareLink(
                 token=token,
                 from_user_id=user_id,
@@ -206,7 +204,7 @@ class ShareService:
             )
             link.status = "claimed"
             link.to_user_id = user_id
-            link.claimed_at = _utcnow()
+            link.claimed_at = utcnow()
             await self._db.commit()
 
             return ShareClaimResult(link=link, amount=int(link.amount), balance_after=add_result.balance_after)
@@ -235,17 +233,17 @@ class ShareService:
                     description="Share link expired refund",
                 )
                 await self._db.commit()
-                return ShareCancelResult(link=link, balance_after=refund.balance_after, message="Share expired, credits refunded")
+                return ShareCancelResult(link=link, balance_after=refund.balance_after, code="SHARE_EXPIRED_REFUND", message="Share expired, credits refunded")
 
             link.status = "canceled"
-            link.canceled_at = _utcnow()
+            link.canceled_at = utcnow()
             refund = await self._refund_to_sender(
                 link=link,
                 tx_type="share_cancel_refund",
                 description="Share link canceled refund",
             )
             await self._db.commit()
-            return ShareCancelResult(link=link, balance_after=refund.balance_after, message="Share link canceled, credits refunded")
+            return ShareCancelResult(link=link, balance_after=refund.balance_after, code="SHARE_CANCELED_REFUND", message="Share link canceled, credits refunded")
         except AppError:
             await self._db.rollback()
             raise
@@ -255,7 +253,7 @@ class ShareService:
             raise AppError(code="SHARE_CANCEL_FAILED", message="Failed to cancel share", status_code=500) from exc
 
     async def expire_pending_links(self, *, limit: int = 500) -> int:
-        now = _utcnow()
+        now = utcnow()
         try:
             result = await self._db.execute(
                 select(ShareLink)

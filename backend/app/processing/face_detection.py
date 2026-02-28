@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import threading
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -34,7 +33,7 @@ def _ensure_model_file() -> Path | None:
     try:
         import httpx
     except ImportError:
-        logger.warning("httpx not available for model download, will use Haar fallback")
+        logger.warning("httpx not available for model download")
         return None
 
     try:
@@ -48,7 +47,7 @@ def _ensure_model_file() -> Path | None:
         logger.info("Downloaded face_landmarker.task (%d bytes)", len(resp.content))
         return _MODEL_PATH
     except (httpx.HTTPError, OSError):
-        logger.warning("Failed to download face_landmarker.task, will use Haar fallback", exc_info=True)
+        logger.warning("Failed to download face_landmarker.task", exc_info=True)
         return None
 
 
@@ -79,7 +78,7 @@ def _get_landmarker() -> Any:
                 FaceLandmarkerOptions,
             )
         except ImportError:
-            logger.warning("mediapipe.tasks not available, will use Haar fallback")
+            logger.warning("mediapipe.tasks not available")
             return None
 
         try:
@@ -95,10 +94,7 @@ def _get_landmarker() -> Any:
             logger.info("MediaPipe FaceLandmarker initialized successfully")
             return _landmarker_instance
         except (RuntimeError, OSError, ValueError):
-            logger.warning(
-                "Failed to initialize FaceLandmarker, will use Haar fallback",
-                exc_info=True,
-            )
+            logger.warning("Failed to initialize FaceLandmarker", exc_info=True)
             return None
 
 
@@ -116,7 +112,7 @@ def prewarm_face_landmarker() -> bool:
 _MP_RIGHT_IRIS_CENTER = 473  # Image-left eye (subject's right eye)
 _MP_LEFT_IRIS_CENTER = 468   # Image-right eye (subject's left eye)
 
-# Eye contour indices for fallback / bounding box synthesis
+# Eye contour indices for bounding box synthesis
 _MP_RIGHT_EYE_CONTOUR = [33, 7, 163, 144, 145, 153, 154, 155, 133, 246, 161, 160, 159, 158, 157, 173]
 _MP_LEFT_EYE_CONTOUR = [263, 249, 390, 373, 374, 380, 381, 382, 362, 466, 388, 387, 386, 385, 384, 398]
 
@@ -219,14 +215,12 @@ def _mediapipe_face_to_payload(
     blink_left = bs_map.get(_BS_BLINK_LEFT, 0.0)
     blink_right = bs_map.get(_BS_BLINK_RIGHT, 0.0)
     avg_blink = (blink_left + blink_right) / 2.0
-    # Map to match Haar eye_openness scale (~0.14-0.5 range)
-    eye_openness = (1.0 - avg_blink) * 0.5
+    eye_openness = (1.0 - avg_blink) * 0.5  # noqa: F841
 
     smile_left = bs_map.get(_BS_SMILE_LEFT, 0.0)
     smile_right = bs_map.get(_BS_SMILE_RIGHT, 0.0)
     smile_detected = (smile_left + smile_right) / 2.0 > 0.3
 
-    # Build landmarks dict (matching Haar output format)
     landmarks: dict[str, Any] = {
         "eyes_detected": 2,
         "smile_detected": smile_detected,
@@ -242,7 +236,6 @@ def _mediapipe_face_to_payload(
     # Synthesize eye bounding boxes from contour landmarks
     eye_l_box = _eye_box_from_contour(lms, _MP_RIGHT_EYE_CONTOUR, width, height)
     eye_r_box = _eye_box_from_contour(lms, _MP_LEFT_EYE_CONTOUR, width, height)
-    # Sort by x to match left/right ordering
     if eye_l_box["x"] > eye_r_box["x"]:
         eye_l_box, eye_r_box = eye_r_box, eye_l_box
 
@@ -274,7 +267,7 @@ def _detect_with_mediapipe(img: np.ndarray) -> dict[str, object] | None:
     try:
         from mediapipe import Image as MpImage, ImageFormat
     except ImportError:
-        logger.warning("mediapipe not importable, falling back to Haar")
+        logger.warning("mediapipe not importable")
         return None
 
     try:
@@ -282,7 +275,7 @@ def _detect_with_mediapipe(img: np.ndarray) -> dict[str, object] | None:
         with _landmarker_lock:
             result = landmarker.detect(mp_image)
     except (RuntimeError, OSError, ValueError):
-        logger.warning("MediaPipe detection failed, falling back to Haar", exc_info=True)
+        logger.warning("MediaPipe detection failed", exc_info=True)
         return None
 
     if not result.face_landmarks:
@@ -303,7 +296,7 @@ def _detect_with_mediapipe(img: np.ndarray) -> dict[str, object] | None:
 
 
 # ---------------------------------------------------------------------------
-# OpenCV Haar cascade fallback (original implementation)
+# Heuristic fallback (when MediaPipe is unavailable or finds no face)
 # ---------------------------------------------------------------------------
 
 
@@ -323,261 +316,6 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
     return img
 
 
-@lru_cache(maxsize=8)
-def _get_cascade(filename: str) -> cv2.CascadeClassifier | None:
-    path = cv2.data.haarcascades + filename
-    classifier = cv2.CascadeClassifier(path)
-    if classifier.empty():
-        return None
-    return classifier
-
-
-def _detect_with_cascade(
-    gray: np.ndarray,
-    *,
-    filename: str,
-    scale_factor: float,
-    min_neighbors: int,
-    min_size: tuple[int, int],
-) -> list[tuple[int, int, int, int]]:
-    classifier = _get_cascade(filename)
-    if classifier is None:
-        return []
-    detections = classifier.detectMultiScale(
-        gray,
-        scaleFactor=scale_factor,
-        minNeighbors=min_neighbors,
-        minSize=min_size,
-    )
-    return [(int(x), int(y), int(w), int(h)) for x, y, w, h in detections]
-
-
-def _detect_frontal_faces(gray: np.ndarray) -> list[FaceBox]:
-    detections = _detect_with_cascade(
-        gray,
-        filename="haarcascade_frontalface_default.xml",
-        scale_factor=1.1,
-        min_neighbors=5,
-        min_size=(40, 40),
-    )
-    return [{"x": x, "y": y, "w": w, "h": h, "confidence": 0.85} for x, y, w, h in detections]
-
-
-def _detect_profile_faces(gray: np.ndarray) -> list[FaceBox]:
-    faces: list[FaceBox] = []
-    width = gray.shape[1]
-    detections = _detect_with_cascade(
-        gray,
-        filename="haarcascade_profileface.xml",
-        scale_factor=1.1,
-        min_neighbors=5,
-        min_size=(40, 40),
-    )
-    for x, y, w, h in detections:
-        faces.append({"x": x, "y": y, "w": w, "h": h, "confidence": 0.72})
-
-    flipped = cv2.flip(gray, 1)
-    detections_flipped = _detect_with_cascade(
-        flipped,
-        filename="haarcascade_profileface.xml",
-        scale_factor=1.1,
-        min_neighbors=5,
-        min_size=(40, 40),
-    )
-    for x, y, w, h in detections_flipped:
-        orig_x = width - (x + w)
-        faces.append({"x": orig_x, "y": y, "w": w, "h": h, "confidence": 0.72})
-
-    return faces
-
-
-def _dedupe_face_boxes(faces: list[FaceBox]) -> list[FaceBox]:
-    deduped: list[FaceBox] = []
-    for face in sorted(faces, key=lambda item: item["w"] * item["h"], reverse=True):
-        cx = face["x"] + face["w"] / 2
-        cy = face["y"] + face["h"] / 2
-        keep = True
-        for existing in deduped:
-            ex = existing["x"] + existing["w"] / 2
-            ey = existing["y"] + existing["h"] / 2
-            dist = ((cx - ex) ** 2 + (cy - ey) ** 2) ** 0.5
-            threshold = min(face["w"], face["h"], existing["w"], existing["h"]) * 0.35
-            if dist < threshold:
-                keep = False
-                break
-        if keep:
-            deduped.append(face)
-    return deduped
-
-
-def _detect_eyes(gray: np.ndarray, face: FaceBox) -> list[dict[str, int]]:
-    x, y, w, h = int(face["x"]), int(face["y"]), int(face["w"]), int(face["h"])
-    top_h = max(1, int(h * 0.62))
-    roi = gray[y : y + top_h, x : x + w]
-    if roi.size == 0:
-        return []
-
-    detections: list[tuple[int, int, int, int]] = []
-    for filename in ("haarcascade_eye_tree_eyeglasses.xml", "haarcascade_eye.xml"):
-        detections.extend(
-            _detect_with_cascade(
-                roi,
-                filename=filename,
-                scale_factor=1.08,
-                min_neighbors=4,
-                min_size=(max(12, w // 12), max(8, h // 14)),
-            )
-        )
-
-    eyes: list[dict[str, int]] = []
-    for ex, ey, ew, eh in detections:
-        if ew <= 0 or eh <= 0:
-            continue
-        ratio = ew / max(eh, 1)
-        if ratio < 1.1 or ratio > 6.0:
-            continue
-        if ey > top_h * 0.75:
-            continue
-        eyes.append(
-            {
-                "x": x + ex,
-                "y": y + ey,
-                "w": ew,
-                "h": eh,
-            }
-        )
-
-    # Deduplicate overlapping detections.
-    deduped: list[dict[str, int]] = []
-    for eye in sorted(eyes, key=lambda item: item["w"] * item["h"], reverse=True):
-        ecx = eye["x"] + eye["w"] / 2
-        ecy = eye["y"] + eye["h"] / 2
-        keep = True
-        for existing in deduped:
-            x_overlap = min(eye["x"] + eye["w"], existing["x"] + existing["w"]) - max(eye["x"], existing["x"])
-            y_overlap = min(eye["y"] + eye["h"], existing["y"] + existing["h"]) - max(eye["y"], existing["y"])
-            if x_overlap > 0 and y_overlap > 0:
-                keep = False
-                break
-            dist = ((ecx - (existing["x"] + existing["w"] / 2)) ** 2 + (ecy - (existing["y"] + existing["h"] / 2)) ** 2) ** 0.5
-            if dist < min(eye["w"], existing["w"]) * 0.6:
-                keep = False
-                break
-        if keep:
-            deduped.append(eye)
-
-    # Prefer one left + one right eye with largest separation.
-    if len(deduped) <= 2:
-        return sorted(deduped, key=lambda item: item["x"])
-
-    best_pair: tuple[dict[str, int], dict[str, int]] | None = None
-    best_score = -1.0
-    for i in range(len(deduped)):
-        for j in range(i + 1, len(deduped)):
-            a = deduped[i]
-            b = deduped[j]
-            acx = a["x"] + a["w"] / 2
-            bcx = b["x"] + b["w"] / 2
-            if abs(acx - bcx) < w * 0.12:
-                continue
-            ay = a["y"] + a["h"] / 2
-            by = b["y"] + b["h"] / 2
-            vertical_penalty = abs(ay - by)
-            separation = abs(acx - bcx)
-            score = separation - vertical_penalty * 1.2
-            if score > best_score:
-                best_score = score
-                best_pair = (a, b)
-
-    if best_pair is None:
-        return sorted(deduped[:2], key=lambda item: item["x"])
-    return sorted([best_pair[0], best_pair[1]], key=lambda item: item["x"])
-
-
-def _detect_smiles(gray: np.ndarray, face: FaceBox) -> list[dict[str, int]]:
-    x, y, w, h = int(face["x"]), int(face["y"]), int(face["w"]), int(face["h"])
-    start_y = y + int(h * 0.42)
-    roi = gray[start_y : y + h, x : x + w]
-    if roi.size == 0:
-        return []
-
-    detections = _detect_with_cascade(
-        roi,
-        filename="haarcascade_smile.xml",
-        scale_factor=1.15,
-        min_neighbors=18,
-        min_size=(max(22, w // 5), max(10, h // 10)),
-    )
-
-    smiles: list[dict[str, int]] = []
-    for sx, sy, sw, sh in detections:
-        ratio = sw / max(sh, 1)
-        if ratio < 1.3 or ratio > 8.0:
-            continue
-        smiles.append({"x": x + sx, "y": start_y + sy, "w": sw, "h": sh})
-    smiles.sort(key=lambda item: item["w"] * item["h"], reverse=True)
-    return smiles[:2]
-
-
-def _center_of(box: dict[str, int]) -> tuple[float, float]:
-    return (box["x"] + box["w"] / 2, box["y"] + box["h"] / 2)
-
-
-def _build_face_features(face: FaceBox, gray: np.ndarray) -> dict[str, Any]:
-    x, y, w, h = int(face["x"]), int(face["y"]), int(face["w"]), int(face["h"])
-    eyes = _detect_eyes(gray, face)
-    smiles = _detect_smiles(gray, face)
-
-    landmarks: dict[str, list[float] | float | int | bool] = {
-        "eyes_detected": len(eyes),
-        "smile_detected": bool(smiles),
-    }
-
-    if len(eyes) >= 2:
-        left_eye, right_eye = eyes[0], eyes[1]
-        left_center = _center_of(left_eye)
-        right_center = _center_of(right_eye)
-        eye_dx = right_center[0] - left_center[0]
-        eye_dy = right_center[1] - left_center[1]
-        eye_dist = float((eye_dx**2 + eye_dy**2) ** 0.5)
-        eye_angle_deg = float(np.degrees(np.arctan2(eye_dy, eye_dx))) if eye_dist > 0 else 0.0
-        landmarks["left_eye"] = [float(left_center[0]), float(left_center[1])]
-        landmarks["right_eye"] = [float(right_center[0]), float(right_center[1])]
-        landmarks["eye_distance"] = eye_dist
-        landmarks["eye_angle_deg"] = eye_angle_deg
-    else:
-        # Estimated eyes for downstream crop/compliance fallback.
-        landmarks["left_eye"] = [float(x + w * 0.33), float(y + h * 0.4)]
-        landmarks["right_eye"] = [float(x + w * 0.67), float(y + h * 0.4)]
-        landmarks["eye_distance"] = float(w * 0.34)
-        landmarks["eye_angle_deg"] = 0.0
-
-    if smiles:
-        smile_center = _center_of(smiles[0])
-        landmarks["mouth"] = [float(smile_center[0]), float(smile_center[1] + smiles[0]["h"] * 0.15)]
-        landmarks["smile_box"] = [int(smiles[0]["x"]), int(smiles[0]["y"]), int(smiles[0]["w"]), int(smiles[0]["h"])]
-    else:
-        landmarks["mouth"] = [float(x + w * 0.5), float(y + h * 0.75)]
-
-    landmarks["chin"] = [float(x + w * 0.5), float(y + h * 1.02)]
-    landmarks["head_top_guess"] = [float(x + w * 0.5), float(y - h * 0.18)]
-
-    eye_boxes = []
-    for eye in eyes:
-        eye_boxes.append({k: int(v) for k, v in eye.items()})
-    smile_boxes = []
-    for smile in smiles:
-        smile_boxes.append({k: int(v) for k, v in smile.items()})
-
-    return {
-        "landmarks": landmarks,
-        "features": {
-            "eyes": eye_boxes,
-            "smiles": smile_boxes,
-        },
-    }
-
-
 def _fallback_face_box(width: int, height: int) -> FaceBox:
     box_w = max(1, int(width * 0.42))
     box_h = max(1, int(height * 0.52))
@@ -588,45 +326,42 @@ def _fallback_face_box(width: int, height: int) -> FaceBox:
     return {"x": x, "y": y, "w": box_w, "h": box_h, "confidence": 0.2}
 
 
-def _normalize_face_payload(face: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(face)
-    normalized["x"] = int(face["x"])
-    normalized["y"] = int(face["y"])
-    normalized["w"] = int(face["w"])
-    normalized["h"] = int(face["h"])
-    normalized["confidence"] = float(face.get("confidence", 0.0))
-    return normalized
+def _fallback_landmarks(face: FaceBox) -> dict[str, Any]:
+    """Build heuristic landmarks from a fallback face box."""
+    x, y, w, h = int(face["x"]), int(face["y"]), int(face["w"]), int(face["h"])
+    return {
+        "landmarks": {
+            "eyes_detected": 0,
+            "smile_detected": False,
+            "left_eye": [float(x + w * 0.33), float(y + h * 0.4)],
+            "right_eye": [float(x + w * 0.67), float(y + h * 0.4)],
+            "eye_distance": float(w * 0.34),
+            "eye_angle_deg": 0.0,
+            "mouth": [float(x + w * 0.5), float(y + h * 0.75)],
+            "chin": [float(x + w * 0.5), float(y + h * 1.02)],
+            "head_top_guess": [float(x + w * 0.5), float(y - h * 0.18)],
+        },
+        "features": {"eyes": [], "smiles": []},
+    }
 
 
-def _detect_with_haar(img: np.ndarray) -> dict[str, object]:
-    """Haar cascade detection path (fallback)."""
+def _detect_fallback(img: np.ndarray) -> dict[str, Any]:
+    """Return a heuristic center-estimated face when MediaPipe is unavailable."""
     height, width = img.shape[:2]
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    faces = _detect_frontal_faces(gray)
-    engine = "opencv-haar-frontal"
-
-    if not faces:
-        faces = _detect_profile_faces(gray)
-        engine = "opencv-haar-profile" if faces else engine
-
-    if not faces:
-        face = _fallback_face_box(width, height)
-        faces = [face]
-        engine = "fallback-center"
-
-    enriched: list[dict[str, Any]] = []
-    for face in _dedupe_face_boxes(faces):
-        payload = _normalize_face_payload(face)
-        payload.update(_build_face_features(payload, gray))
-        enriched.append(payload)
-
-    enriched.sort(key=lambda item: item["w"] * item["h"], reverse=True)
+    face = _fallback_face_box(width, height)
+    payload: dict[str, Any] = {
+        "x": face["x"],
+        "y": face["y"],
+        "w": face["w"],
+        "h": face["h"],
+        "confidence": face["confidence"],
+    }
+    payload.update(_fallback_landmarks(face))
     return {
         "width": int(width),
         "height": int(height),
-        "faces": enriched,
-        "engine": engine,
+        "faces": [payload],
+        "engine": "fallback-center",
     }
 
 
@@ -638,13 +373,11 @@ def _detect_with_haar(img: np.ndarray) -> dict[str, object]:
 def detect_faces(image_bytes: bytes) -> dict[str, Any]:
     img = _decode_image(image_bytes)
 
-    # Try MediaPipe first
     mp_result = _detect_with_mediapipe(img)
     if mp_result is not None:
         return mp_result
 
-    # Fall back to Haar cascades
-    return _detect_with_haar(img)
+    return _detect_fallback(img)
 
 
 def select_primary_face(faces: list[FaceBox] | list[dict[str, object]] | None) -> dict[str, Any] | None:

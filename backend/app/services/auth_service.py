@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -24,11 +26,26 @@ from app.models.user import User
 from app.models.user_credit import UserCredit
 from app.services.email.factory import get_email_service
 
+logger = logging.getLogger("app.services.auth")
+
+
+def _fire_and_forget_email(coro):  # noqa: ANN001
+    """Schedule an email coroutine as a background task with error logging."""
+    async def _wrapper():
+        try:
+            await coro
+        except Exception:
+            logger.exception("Background email sending failed")
+    asyncio.create_task(_wrapper())
+
+
 class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
-    async def register(self, *, email: str, password: str, name: str | None = None) -> tuple[User, str | None]:
+    async def register(
+        self, *, email: str, password: str, name: str | None = None, lang: str = "zh"
+    ) -> tuple[User, str | None]:
         """Register a new user. Returns (user, dev_token) where dev_token is
         the raw verification token only in dev mode (for testing convenience)."""
         email = email.strip().lower()
@@ -51,10 +68,13 @@ class AuthService:
 
         # Send verification email (fire-and-forget, don't block registration)
         email_svc = get_email_service()
-        await email_svc.send_verification_email(
-            to_email=user.email,
-            token=raw_token,
-            base_url=settings.frontend_base_url,
+        _fire_and_forget_email(
+            email_svc.send_verification_email(
+                to_email=user.email,
+                token=raw_token,
+                base_url=settings.frontend_base_url,
+                lang=lang,
+            )
         )
 
         dev_token = raw_token if settings.env == "dev" else None
@@ -239,7 +259,7 @@ class AuthService:
         await self._db.refresh(user)
         return user
 
-    async def resend_verification(self, *, user_id: int) -> str | None:
+    async def resend_verification(self, *, user_id: int, lang: str = "zh") -> str | None:
         """Resend verification email. Returns raw token in dev mode."""
         result = await self._db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
@@ -252,10 +272,13 @@ class AuthService:
         await self._db.commit()
 
         email_svc = get_email_service()
-        await email_svc.send_verification_email(
-            to_email=user.email,
-            token=raw_token,
-            base_url=settings.frontend_base_url,
+        _fire_and_forget_email(
+            email_svc.send_verification_email(
+                to_email=user.email,
+                token=raw_token,
+                base_url=settings.frontend_base_url,
+                lang=lang,
+            )
         )
 
         return raw_token if settings.env == "dev" else None
@@ -275,7 +298,7 @@ class AuthService:
         self._db.add(record)
         return raw_token
 
-    async def forgot_password(self, *, email: str) -> str | None:
+    async def forgot_password(self, *, email: str, lang: str = "zh") -> str | None:
         """Create password reset token and send email.
         Always returns successfully to avoid email enumeration.
         Returns raw token in dev mode if user exists."""
@@ -301,10 +324,13 @@ class AuthService:
         await self._db.commit()
 
         email_svc = get_email_service()
-        await email_svc.send_password_reset_email(
-            to_email=user.email,
-            token=raw_token,
-            base_url=settings.frontend_base_url,
+        _fire_and_forget_email(
+            email_svc.send_password_reset_email(
+                to_email=user.email,
+                token=raw_token,
+                base_url=settings.frontend_base_url,
+                lang=lang,
+            )
         )
 
         return raw_token if settings.env == "dev" else None

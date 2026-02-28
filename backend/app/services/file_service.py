@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
@@ -12,6 +13,8 @@ from urllib.parse import urlencode
 from app.core.config import settings
 from app.core.security import sign_download
 from app.utils.file_utils import ensure_dir
+
+_FILE_ID_RE = re.compile(r"^[a-f0-9]{32}$")
 
 
 @dataclass(frozen=True)
@@ -26,15 +29,30 @@ class StoredFile:
 
 def _safe_filename(filename: str) -> str:
     name = os.path.basename(filename or "download")
-    return name.replace("\x00", "").strip() or "download"
+    # Strip null bytes, newlines (header injection), quotes, and control chars
+    name = re.sub(r'[\x00-\x1f\x7f"\\]', "", name).strip()
+    # Limit length to prevent oversized headers
+    if len(name) > 200:
+        stem, dot, ext = name.rpartition(".")
+        if dot and len(ext) <= 10:
+            name = stem[: 200 - len(ext) - 1] + "." + ext
+        else:
+            name = name[:200]
+    return name or "download"
 
 
 class FileService:
-    def __init__(self) -> None:
-        self._storage_dir = Path(settings.file_storage_dir)
+    def __init__(self, storage_dir: str | None = None) -> None:
+        self._storage_dir = Path(storage_dir or settings.file_storage_dir)
         ensure_dir(self._storage_dir)
 
+    @staticmethod
+    def _validate_file_id(file_id: str) -> None:
+        if not _FILE_ID_RE.match(file_id):
+            raise FileNotFoundError(file_id)
+
     def _file_path(self, file_id: str) -> Path:
+        self._validate_file_id(file_id)
         return self._storage_dir / file_id[:2] / file_id[2:4] / file_id
 
     def _meta_path(self, file_id: str) -> Path:
@@ -99,7 +117,7 @@ class FileService:
         )
 
     def build_download_url(self, *, file_id: str, filename: str, ttl_seconds: int | None = None) -> str:
-        ttl = ttl_seconds if ttl_seconds is not None else settings.download_url_ttl_seconds
+        ttl = ttl_seconds if ttl_seconds is not None else settings.file_retention_hours * 3600
         exp = int(time.time()) + int(ttl)
         safe_name = _safe_filename(filename)
         sig = sign_download(file_id=file_id, filename=safe_name, exp=exp)

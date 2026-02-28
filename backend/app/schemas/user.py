@@ -23,7 +23,9 @@ class ChangePasswordRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
+    current_password: str | None = None  # Required when changing email
 
 
 class DeleteAccountRequest(BaseModel):
     password: str | None = None
+    confirm_email: str | None = None  # Required for Google-only accounts

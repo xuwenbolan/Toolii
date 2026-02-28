@@ -41,6 +41,7 @@ class ShareInfoResponse(BaseModel):
 
 
 class ShareClaimResponse(BaseModel):
+    code: str = ""
     message: str
     amount: int
     balance: int
@@ -52,5 +53,6 @@ class ShareLinksResponse(BaseModel):
 
 
 class ShareCancelResponse(BaseModel):
+    code: str = ""
     message: str
     balance: int

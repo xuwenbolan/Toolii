@@ -11,7 +11,7 @@ from app.processing.image_io import open_image
 
 
 _sessions: dict[str, Any] = {}
-_MODEL_PRIORITY = ["silueta", "u2net_human_seg", "birefnet-portrait"]
+_MODEL_PRIORITY = ["silueta", "u2net_human_seg"]
 
 
 def warmup_background_model(model_name: str) -> bool:
