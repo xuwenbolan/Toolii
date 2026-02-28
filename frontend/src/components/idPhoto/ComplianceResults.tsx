@@ -41,6 +41,18 @@ function SummaryMetric({
   )
 }
 
+function checkLabel(t: (key: string) => string, id: string, fallback: string): string {
+  const key = `compliance.checks.${id}.label`
+  const val = t(key)
+  return val === key ? fallback : val
+}
+
+function checkMessage(t: (key: string) => string, id: string, passed: boolean, fallback: string): string {
+  const key = `compliance.checks.${id}.${passed ? 'pass' : 'fail'}`
+  const val = t(key)
+  return val === key ? fallback : val
+}
+
 export function ComplianceResults({ result }: Props) {
   const { t } = useTranslation('idPhoto')
   const score = Math.max(0, Math.min(100, Math.round(result.score)))
@@ -81,10 +93,10 @@ export function ComplianceResults({ result }: Props) {
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span
-            className={[
+            className={cn(
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium',
               result.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
-            ].join(' ')}
+            )}
           >
             {result.passed ? <ShieldCheck className="h-3 w-3" aria-hidden /> : <ShieldAlert className="h-3 w-3" aria-hidden />}
             {result.passed ? t('compliance.pass') : t('compliance.needReview')}
@@ -141,7 +153,7 @@ export function ComplianceResults({ result }: Props) {
                   ) : (
                     <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" aria-hidden />
                   )}
-                  {check.label}
+                  {checkLabel(t, check.id, check.label)}
                 </p>
                 <div className="flex items-center gap-1.5">
                   {!check.passed ? (
@@ -157,18 +169,18 @@ export function ComplianceResults({ result }: Props) {
                     </span>
                   ) : null}
                   <span
-                    className={[
+                    className={cn(
                       'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
                       check.passed
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
                         : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
-                    ].join(' ')}
+                    )}
                   >
                     {check.passed ? t('compliance.status.pass') : t('compliance.status.check')}
                   </span>
                 </div>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{check.message}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{checkMessage(t, check.id, check.passed, check.message)}</p>
             </div>
           )
         })}
@@ -187,7 +199,7 @@ export function ComplianceResults({ result }: Props) {
             <div className="mt-1.5 space-y-1">
               {failedChecks.slice(0, 2).map((check) => (
                 <p key={`advice-${check.id}`} className="text-xs text-slate-700 dark:text-slate-200">
-                  - {check.label}
+                  - {checkLabel(t, check.id, check.label)}
                 </p>
               ))}
             </div>

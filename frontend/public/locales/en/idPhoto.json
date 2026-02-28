@@ -6,7 +6,7 @@
     "keywords": "id photo,passport photo,background removal,compliance check"
   },
   "exportAction": "Export Watermark-Free Photo",
-  "workflow": "Upload & Process -> Adjust Size/Color -> Export (1 Credit each)",
+  "workflow": "Upload & Process -> Adjust Size/Color -> Export (1 Credit for both)",
   "steps": {
     "upload": "Upload",
     "adjust": "Adjust",
@@ -18,7 +18,8 @@
     "failed": "Upload failed. Please try again later.",
     "detecting": "Processing...",
     "processing": "Analyzing photo & removing background...",
-    "button": "Upload & Process"
+    "button": "Upload & Process",
+    "changePhoto": "Change Photo"
   },
   "uploadQuality": {
     "title": "Upload Quality Gate",
@@ -53,6 +54,15 @@
       "pending": "pending"
     },
     "warningCount": "{{count}} warnings detected",
+    "warnings": {
+      "no_face": "No face detected, please upload a front-facing, well-lit photo",
+      "side_face": "Side face detected, ID photos require facing the camera",
+      "multiple_faces": "{{count}} faces detected, ID photos require only one person",
+      "low_resolution": "Image resolution {{width}}x{{height}} is low, at least 600x600 pixels recommended",
+      "low_confidence": "Low face detection confidence, may affect processing quality",
+      "face_too_small": "Face too small in the frame, consider cropping or moving closer",
+      "face_too_large": "Face too large in the frame, consider moving further away"
+    },
     "tipsTitle": "Capture tips",
     "tips": {
       "front": "Face the camera with level eyes",
@@ -67,7 +77,13 @@
   },
   "export": {
     "title": "Export & Print Layout",
-    "hint": "Both watermark-free export and 6x4 print layout require login and cost 1 Credit each.",
+    "hint": "Export requires login. 1 Credit covers both single photo and print layout.",
+    "creditHint": "1 credit for single + layout",
+    "exported": "Exported",
+    "exportSingle": "Export Single",
+    "exportLayout": "Export Layout",
+    "downloadSingle": "Download Single",
+    "downloadLayout": "Download Layout",
     "exportPhoto": "Export Watermark-Free Photo",
     "insufficientCredits": "Insufficient credits for export.",
     "loginRequired": "Export failed. Please log in and try again.",
@@ -83,8 +99,18 @@
   "preview": {
     "watermarkAlt": "Preview (watermarked)",
     "title": "ID Photo Preview",
+    "tabSingle": "Single",
+    "tabLayout": "Layout",
     "failed": "Preview generation failed. Please try again.",
     "refreshing": "Updating preview..."
+  },
+  "adjust": {
+    "title": "Position & Scale",
+    "hint": "Drag inside the preview frame to reposition. Use mouse wheel or sliders to zoom and fine-tune.",
+    "scale": "Scale",
+    "horizontal": "Horizontal offset",
+    "vertical": "Vertical offset",
+    "reset": "Reset position"
   },
   "compliance": {
     "title": "Compliance Check Results",
@@ -120,7 +146,74 @@
       "fixIntro": "Address these checks first to improve pass confidence:",
       "moreIssues": "{{count}} more checks can still be improved."
     },
-    "noChecks": "No checks were returned yet. Please retry shortly."
+    "noChecks": "No checks were returned yet. Please retry shortly.",
+    "checks": {
+      "face_detected": {
+        "label": "Face detected",
+        "pass": "At least one face detected",
+        "fail": "No face detected in the photo"
+      },
+      "single_face": {
+        "label": "Single face",
+        "pass": "Photo contains exactly one person",
+        "fail": "Multiple or no faces detected"
+      },
+      "resolution": {
+        "label": "Resolution",
+        "pass": "Image resolution meets requirements",
+        "fail": "Resolution too low, at least 600x600px recommended"
+      },
+      "brightness": {
+        "label": "Brightness",
+        "pass": "Brightness and lighting are even",
+        "fail": "Brightness or lighting is uneven"
+      },
+      "contrast": {
+        "label": "Contrast",
+        "pass": "Contrast meets requirements",
+        "fail": "Contrast too low, try improving lighting"
+      },
+      "sharpness": {
+        "label": "Sharpness",
+        "pass": "Image is sharp enough",
+        "fail": "Image is blurry, reshoot recommended"
+      },
+      "centered": {
+        "label": "Face centered",
+        "pass": "Face is well centered",
+        "fail": "Face is off-center, adjust composition"
+      },
+      "face_ratio": {
+        "label": "Head ratio",
+        "pass": "Head size ratio meets standard",
+        "fail": "Head too large or too small in the frame"
+      },
+      "head_tilt": {
+        "label": "Head tilt",
+        "pass": "Head is level",
+        "fail": "Head is tilted, keep eyes level"
+      },
+      "eyes_open": {
+        "label": "Eyes open",
+        "pass": "Both eyes clearly open",
+        "fail": "Eyes not clearly detected or appear closed"
+      },
+      "mouth_closed": {
+        "label": "Mouth closed",
+        "pass": "Mouth closed, no smile detected",
+        "fail": "Smile or open mouth detected, keep mouth closed"
+      },
+      "expression": {
+        "label": "Expression",
+        "pass": "Neutral expression, meets requirements",
+        "fail": "Maintain neutral expression, look directly at camera"
+      },
+      "background": {
+        "label": "Background",
+        "pass": "Background quality suitable for replacement",
+        "fail": "Background removal quality is poor"
+      }
+    }
   },
   "sizeStandard": {
     "title": "Photo Size",
@@ -150,9 +243,12 @@
     "tipContrast": "Keep clear contrast around hair edges and shoulders.",
     "invalidHex": "Enter a valid HEX color (for example #4C8BF5)."
   },
+  "layoutSim": {
+    "info": "{{paper}} · {{rows}}x{{cols}} = {{total}} photos"
+  },
   "paywall": {
     "title": "Log in to Export",
-    "description": "Both watermark-free export and 6x4 print layout require login and cost 1 Credit each.",
+    "description": "Log in to export. 1 Credit covers both single photo and print layout.",
     "login": "Log In",
     "register": "Sign Up"
   },

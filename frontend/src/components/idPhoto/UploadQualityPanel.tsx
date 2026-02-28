@@ -2,6 +2,7 @@ import { AlertTriangle, Camera, CheckCircle2, CircleDashed, ImageIcon, Lightbulb
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
+import type { UploadWarning } from '@/services/idPhotoApi'
 
 type ImageMeta = {
   width: number
@@ -22,7 +23,7 @@ type Props = {
   file: File | null
   imageMeta: ImageMeta | null
   facesDetected: number | null
-  warnings: string[]
+  warnings: UploadWarning[]
 }
 
 const MIN_SIZE_BYTES = 100 * 1024
@@ -217,9 +218,9 @@ export function UploadQualityPanel({
 
       {warnings.length > 0 ? (
         <div className="space-y-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
-          {warnings.map((message, idx) => (
-            <p key={`${message}-${idx}`} className="text-xs text-amber-800 dark:text-amber-100">
-              {message}
+          {warnings.map((w, idx) => (
+            <p key={`${w.id}-${idx}`} className="text-xs text-amber-800 dark:text-amber-100">
+              {t(`uploadQuality.warnings.${w.id}`, w.params)}
             </p>
           ))}
         </div>

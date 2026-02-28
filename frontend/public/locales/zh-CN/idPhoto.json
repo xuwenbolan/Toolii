@@ -6,7 +6,7 @@
     "keywords": "证件照,证件照制作,去背景,合规检测"
   },
   "exportAction": "导出无水印证件照",
-  "workflow": "上传处理 -> 调整规格/底色 -> 导出（各消耗 1 Credit）",
+  "workflow": "上传处理 -> 调整规格/底色 -> 导出（1 Credit 含单张+排版）",
   "steps": {
     "upload": "上传",
     "adjust": "调整",
@@ -18,7 +18,8 @@
     "failed": "上传失败，请稍后再试。",
     "detecting": "处理中…",
     "processing": "正在分析照片并去除背景…",
-    "button": "上传并处理"
+    "button": "上传并处理",
+    "changePhoto": "更换照片"
   },
   "uploadQuality": {
     "title": "上传质量门槛",
@@ -53,6 +54,15 @@
       "pending": "待检测"
     },
     "warningCount": "检测到 {{count}} 条预警",
+    "warnings": {
+      "no_face": "未检测到人脸，请上传正面、光线均匀的照片",
+      "side_face": "检测到侧脸，证件照需正面面对镜头",
+      "multiple_faces": "检测到 {{count}} 张人脸，证件照需仅包含一人",
+      "low_resolution": "图像分辨率 {{width}}x{{height}} 偏低，建议至少 600x600 像素",
+      "low_confidence": "人脸检测置信度较低，可能影响处理质量",
+      "face_too_small": "人脸在画面中太小，建议裁剪或靠近拍摄",
+      "face_too_large": "人脸在画面中太大，建议适当后退"
+    },
     "tipsTitle": "拍摄建议",
     "tips": {
       "front": "正对镜头，眼睛平视",
@@ -67,7 +77,13 @@
   },
   "export": {
     "title": "导出与打印排版",
-    "hint": "导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。",
+    "hint": "导出需登录，1 Credit 同时包含单张和排版。",
+    "creditHint": "消耗 1 credit · 含单张+排版",
+    "exported": "已导出",
+    "exportSingle": "导出单张",
+    "exportLayout": "导出排版",
+    "downloadSingle": "下载单张",
+    "downloadLayout": "下载排版",
     "exportPhoto": "导出无水印证件照",
     "insufficientCredits": "Credits 余额不足，无法导出。",
     "loginRequired": "导出失败，请先登录后重试。",
@@ -83,8 +99,18 @@
   "preview": {
     "watermarkAlt": "预览图（含水印）",
     "title": "证件照预览",
+    "tabSingle": "单张",
+    "tabLayout": "排版",
     "failed": "预览生成失败，请稍后再试。",
     "refreshing": "更新预览中…"
+  },
+  "adjust": {
+    "title": "位置与缩放",
+    "hint": "在预览框内拖拽可调整位置，滚轮或滑杆可缩放并微调。",
+    "scale": "缩放",
+    "horizontal": "水平偏移",
+    "vertical": "垂直偏移",
+    "reset": "重置位置"
   },
   "compliance": {
     "title": "合规检测结果",
@@ -120,7 +146,74 @@
       "fixIntro": "建议优先处理以下项以提升通过率：",
       "moreIssues": "另外还有 {{count}} 项可继续优化。"
     },
-    "noChecks": "暂未返回检测项，请稍后重试。"
+    "noChecks": "暂未返回检测项，请稍后重试。",
+    "checks": {
+      "face_detected": {
+        "label": "人脸检测",
+        "pass": "已检测到人脸",
+        "fail": "未检测到人脸"
+      },
+      "single_face": {
+        "label": "单人检测",
+        "pass": "照片中仅有一人",
+        "fail": "检测到多人或无人脸"
+      },
+      "resolution": {
+        "label": "分辨率",
+        "pass": "图像分辨率符合要求",
+        "fail": "分辨率过低，建议至少 600x600px"
+      },
+      "brightness": {
+        "label": "亮度",
+        "pass": "亮度与光线均匀",
+        "fail": "亮度或光线不均匀"
+      },
+      "contrast": {
+        "label": "对比度",
+        "pass": "对比度符合要求",
+        "fail": "对比度过低，请改善光线条件"
+      },
+      "sharpness": {
+        "label": "清晰度",
+        "pass": "图像清晰度良好",
+        "fail": "图像模糊，建议重新拍摄"
+      },
+      "centered": {
+        "label": "面部居中",
+        "pass": "面部居中良好",
+        "fail": "面部偏移，建议调整构图"
+      },
+      "face_ratio": {
+        "label": "头部比例",
+        "pass": "头部比例符合标准",
+        "fail": "头部过大或过小"
+      },
+      "head_tilt": {
+        "label": "头部倾斜",
+        "pass": "头部端正",
+        "fail": "头部倾斜，请保持眼睛水平"
+      },
+      "eyes_open": {
+        "label": "睁眼检测",
+        "pass": "双眼睁开清晰",
+        "fail": "眼睛未清晰检测到或疑似闭眼"
+      },
+      "mouth_closed": {
+        "label": "闭嘴检测",
+        "pass": "嘴巴闭合，无微笑",
+        "fail": "检测到微笑或张嘴，请闭合嘴巴"
+      },
+      "expression": {
+        "label": "表情检测",
+        "pass": "表情自然，符合要求",
+        "fail": "请保持自然表情，正视镜头"
+      },
+      "background": {
+        "label": "背景质量",
+        "pass": "背景质量适合换色",
+        "fail": "背景去除质量较差"
+      }
+    }
   },
   "sizeStandard": {
     "title": "证件照规格",
@@ -150,9 +243,12 @@
     "tipContrast": "发丝边缘需保持清晰对比，避免贴边发光。",
     "invalidHex": "请输入有效的 HEX 颜色（如 #4C8BF5）。"
   },
+  "layoutSim": {
+    "info": "{{paper}} · {{rows}}x{{cols}} = 共{{total}}张"
+  },
   "paywall": {
-    "title": "登录后导出无水印",
-    "description": "导出无水印与 6x4 排版均需登录，且各消耗 1 Credit。",
+    "title": "登录后导出",
+    "description": "登录后可导出，1 Credit 同时包含单张和排版。",
     "login": "去登录",
     "register": "注册"
   },

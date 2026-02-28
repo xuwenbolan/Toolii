@@ -37,6 +37,11 @@ export type ComplianceResult = {
   checks: ComplianceCheckItem[]
 }
 
+export type UploadWarning = {
+  id: string
+  params: Record<string, string | number>
+}
+
 export type PhotoUploadResponse = {
   upload_id: string
   filename: string
@@ -44,7 +49,7 @@ export type PhotoUploadResponse = {
   height: number
   faces: PhotoFaceBox[]
   detection_engine: string
-  warnings: string[]
+  warnings: UploadWarning[]
   compliance: ComplianceResult
 }
 
@@ -55,6 +60,7 @@ export type PhotoPreviewResponse = {
   preview_data_url: string
   compliance: ComplianceResult
   crop_box: { x: number; y: number; w: number; h: number }
+  applied_adjust: { offset_x: number; offset_y: number; scale: number }
   output_width: number
   output_height: number
 }
@@ -86,6 +92,7 @@ export async function previewIdPhoto(payload: {
   upload_id: string
   standard: string
   background_color: string
+  adjust?: { offset_x: number; offset_y: number; scale: number }
 }) {
   const res = await api.post<PhotoPreviewResponse>('/api/photo/preview', payload)
   return res.data
