@@ -1,5 +1,6 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
+import i18n from '@/config/i18n'
 import { useAuthStore } from '@/stores/authStore'
 
 type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
@@ -22,10 +23,12 @@ const refreshClient = axios.create({
 
 api.interceptors.request.use((config) => {
   const { accessToken } = useAuthStore.getState()
+  config.headers = config.headers ?? {}
   if (accessToken) {
-    config.headers = config.headers ?? {}
     config.headers.Authorization = `Bearer ${accessToken}`
   }
+  // Send current UI language to backend for email localization
+  config.headers['Accept-Language'] = i18n.language || 'zh-CN'
   // Let the browser set the correct Content-Type with boundary for FormData
   if (config.data instanceof FormData) {
     delete config.headers['Content-Type']

@@ -28,7 +28,143 @@ svg {
   height: auto;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes bar-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-6px);
+  }
+  30% {
+    transform: translateX(5px);
+  }
+  45% {
+    transform: translateX(-4px);
+  }
+  60% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+
+@keyframes icon-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  60% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(14 165 233 / 0%);
+  }
+  50% {
+    box-shadow: 0 0 12px 3px rgb(14 165 233 / 35%);
+  }
+}
+
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @theme inline {
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-fade-in-delay-1: fade-in 0.4s ease-out 0.15s both;
+  --animate-card-in: card-in 0.35s ease-out both;
+  --animate-rise-in: rise-in 0.55s var(--ease-out) both;
+  --animate-bar-enter: bar-enter 0.4s var(--ease-out) both;
+  --animate-section-in: section-in 0.4s var(--ease-out) both;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -70,6 +206,11 @@ svg {
 }
 
 :root {
+  --duration-fast: 170ms;
+  --duration-normal: 280ms;
+  --duration-slow: 450ms;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -102,6 +243,83 @@ svg {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+}
+
+.animate-rise-in {
+  opacity: 0;
+  animation: rise-in 0.55s var(--ease-out) both;
+}
+
+.tool-section-stagger > * {
+  opacity: 0;
+  animation: section-in 0.4s var(--ease-out) both;
+}
+
+.tool-section-stagger > *:nth-child(1) {
+  animation-delay: 0.06s;
+}
+
+.tool-section-stagger > *:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.tool-section-stagger > *:nth-child(3) {
+  animation-delay: 0.18s;
+}
+
+.tool-section-stagger > *:nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+.tool-section-stagger > *:nth-child(5) {
+  animation-delay: 0.3s;
+}
+
+.tool-section-stagger > *:nth-child(n + 6) {
+  animation-delay: 0.34s;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 40%) 50%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 1.5s var(--ease-in-out) infinite;
+}
+
+.dark .shimmer::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 8%) 50%,
+    transparent 100%
+  );
+}
+
+.success-check svg {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 0.4s var(--ease-out) 0.15s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .dark {

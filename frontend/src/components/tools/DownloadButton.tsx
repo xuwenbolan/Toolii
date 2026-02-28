@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, type ButtonProps } from '@/components/ui/button'
@@ -20,13 +21,14 @@ export function DownloadButton({ url, label, variant, size, className }: Props) 
   return (
     <Button
       type="button"
-      className={cn('w-full', className)}
+      className={cn('group w-full', className)}
       variant={variant}
       size={size}
       onClick={() => {
         download(url)
       }}
     >
+      <Download className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:translate-y-0.5" />
       {resolvedLabel}
     </Button>
   )

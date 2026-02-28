@@ -39,7 +39,7 @@ export function BeforeAfterPreview({
                 <img
                   src={beforeUrl}
                   alt={beforeFilename}
-                  className="max-h-[58vh] w-full rounded-md object-contain bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)] [background-size:12px_12px]"
+                  className="max-h-[58vh] w-full rounded-md object-contain bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)] [background-size:12px_12px] motion-safe:animate-fade-in"
                   loading="lazy"
                 />
               ) : (
@@ -60,7 +60,7 @@ export function BeforeAfterPreview({
                 <img
                   src={afterUrl}
                   alt={afterFilename}
-                  className="max-h-[58vh] w-full rounded-md object-contain bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)] [background-size:12px_12px]"
+                  className="max-h-[58vh] w-full rounded-md object-contain bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)] [background-size:12px_12px] motion-safe:animate-fade-in"
                   loading="lazy"
                 />
               ) : (

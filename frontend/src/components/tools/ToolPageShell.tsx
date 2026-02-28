@@ -37,7 +37,7 @@ const GRID_CLASS_MAP: Record<Exclude<ToolPageLayout, 'compact'>, string> = {
 export function ToolPageShell({
   title,
   description,
-  backTo = '/image-tools',
+  backTo = '/',
   layout = 'compact',
   width = 'content',
   sidebar,
@@ -51,36 +51,36 @@ export function ToolPageShell({
 
   return (
     <div className={cn('mx-auto w-full space-y-5', WIDTH_CLASS_MAP[width], className)}>
-      <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/40 px-4 py-4 sm:px-6 sm:py-5">
+      <div className="relative overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-card via-card to-muted/40 px-4 py-4 sm:px-6 sm:py-5 motion-safe:animate-fade-in">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-60 [background:radial-gradient(circle_at_top_right,rgba(80,120,170,0.15),transparent_55%)]"
         />
         <div className="relative space-y-3">
-          <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
+          <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5 motion-safe:animate-fade-in">
             <Link to={backTo} className="inline-flex items-center gap-1.5">
               <ArrowLeft className="h-4 w-4" />
               <span>{t('actions.back')}</span>
             </Link>
           </Button>
           <div className="space-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-            {description ? <p className="max-w-3xl text-sm text-muted-foreground">{description}</p> : null}
+            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl motion-safe:animate-fade-in-delay-1">{title}</h1>
+            {description ? <p className="max-w-3xl text-sm text-muted-foreground motion-safe:animate-[fade-in_0.4s_ease-out_0.25s_both]">{description}</p> : null}
           </div>
         </div>
       </div>
 
       {useSidebar ? (
         <div className={cn('grid items-start gap-4 xl:gap-5', GRID_CLASS_MAP[layout])}>
-          <Card className="border-border/70 shadow-sm">
+          <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">
             <CardContent className={cn('px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5', contentClassName)}>
               {children}
             </CardContent>
           </Card>
-          <div className={cn('space-y-4', sidebarClassName)}>{sidebar}</div>
+          <div className={cn('space-y-4 motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.25s_both]', sidebarClassName)}>{sidebar}</div>
         </div>
       ) : (
-        <Card className="border-border/70 shadow-sm">
+        <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">
           <CardContent className={cn('px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5', contentClassName)}>
             {children}
           </CardContent>

@@ -55,9 +55,16 @@ export async function convertImage(
   return res.data
 }
 
+export type MosaicRegion = {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export async function mosaicImage(
   file: File,
-  opts: { pixelSize?: number; regions?: unknown } = {},
+  opts: { pixelSize?: number; regions?: MosaicRegion[] } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
@@ -88,14 +95,140 @@ export async function enhanceScan(
 
 export async function removeBackground(
   file: File,
-  opts: { modelName?: string } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
-  if (opts.modelName) fd.append('model_name', opts.modelName)
 
   const res = await api.post<FileResult>('/api/image/remove-bg', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export async function upscaleImage(
+  file: File,
+  opts: { scale?: number } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (opts.scale != null) fd.append('scale', String(opts.scale))
+
+  const res = await api.post<FileResult>('/api/image/upscale', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export async function restoreFace(
+  file: File,
+  opts: { w?: number } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (opts.w != null) fd.append('w', String(opts.w))
+
+  const res = await api.post<FileResult>('/api/image/restore-face', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export async function denoiseImage(
+  file: File,
+  opts: { strength?: number } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (opts.strength != null) fd.append('strength', String(opts.strength))
+
+  const res = await api.post<FileResult>('/api/image/denoise', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export async function colorizeImage(
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+
+  const res = await api.post<FileResult>('/api/image/colorize', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export async function inpaintImage(
+  file: File,
+  mask: Blob,
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('mask', mask, 'mask.png')
+
+  const res = await api.post<FileResult>('/api/image/inpaint', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export type OcrLine = {
+  text: string
+  score: number
+  box: number[][]
+}
+
+export type OcrLang = 'ch' | 'en' | 'ch_en'
+
+export type OcrResult = {
+  engine: string
+  lang: string
+  width: number
+  height: number
+  lines: OcrLine[]
+  full_text: string
+}
+
+export async function ocrImage(
+  file: File,
+  opts: { lang?: OcrLang } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (opts.lang) fd.append('lang', opts.lang)
+
+  const res = await api.post<OcrResult>('/api/image/ocr', fd, {
+    onUploadProgress: getProgressHandler(onProgress, file.size),
+  })
+  return res.data
+}
+
+export type SegmentResult = {
+  mask_b64: string
+  score: number
+  width: number
+  height: number
+}
+
+export async function segmentImage(
+  file: File,
+  opts: { points?: number[][]; boxes?: number[][] } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const fd = new FormData()
+  fd.append('file', file)
+  if (opts.points) fd.append('points', JSON.stringify(opts.points))
+  if (opts.boxes) fd.append('boxes', JSON.stringify(opts.boxes))
+
+  const res = await api.post<SegmentResult>('/api/image/segment', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),
   })
   return res.data
