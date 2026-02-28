@@ -12,22 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 from app.core.exceptions import AppError
+from app.utils.time_utils import utcnow
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
 from app.models.user_credit import UserCredit
 from app.utils.hash_utils import sha256_hex
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
 def _is_expired(value: datetime | None) -> bool:
     if value is None:
         return False
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc) <= _utcnow()
-    return value <= _utcnow()
+        return value.replace(tzinfo=timezone.utc) <= utcnow()
+    return value <= utcnow()
 
 
 @dataclass(slots=True)
@@ -161,6 +158,18 @@ class CreditService:
             return 0
         return int(wallet.balance)
 
+    async def has_transaction(self, *, user_id: int, reference_id: str) -> bool:
+        """Check if a transaction with the given reference_id exists for this user."""
+        result = await self._db.execute(
+            select(func.count())
+            .select_from(CreditTransaction)
+            .where(
+                CreditTransaction.user_id == user_id,
+                CreditTransaction.reference_id == reference_id,
+            )
+        )
+        return int(result.scalar_one() or 0) > 0
+
     async def list_transactions(
         self,
         *,
@@ -293,7 +302,7 @@ class CreditService:
 
             card.status = "redeemed"
             card.redeemed_by_user_id = user_id
-            card.redeemed_at = _utcnow()
+            card.redeemed_at = utcnow()
 
             added = await self.add(
                 user_id=user_id,

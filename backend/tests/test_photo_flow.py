@@ -45,6 +45,7 @@ def face_image_bytes():
 @pytest.fixture()
 def _mock_processing(monkeypatch):
     """Mock heavy processing functions so tests don't need ML models."""
+    import app.services.cortex_client as cortex
     import app.services.photo_service as photo_svc
 
     face_result = {
@@ -55,11 +56,11 @@ def _mock_processing(monkeypatch):
     }
     cutout = _make_cutout_png()
 
-    def _fake_detect(image_bytes):
+    async def _fake_detect(image_bytes):
         return face_result
 
-    def _fake_remove(image_bytes, *, model_name="silueta"):
-        return cutout, {"model": model_name, "engine": "test-mock"}
+    async def _fake_remove(image_bytes):
+        return cutout, {"model": "ben2", "engine": "test-mock"}
 
     def _fake_compliance(image_bytes, *, faces=None, cutout_png_bytes=None, detection_engine=None):
         return {
@@ -70,10 +71,10 @@ def _mock_processing(monkeypatch):
             ],
         }
 
-    # Patch at the import site in photo_service (not the source module),
-    # because `from X import Y` creates a local binding.
-    monkeypatch.setattr(photo_svc, "detect_faces", _fake_detect)
-    monkeypatch.setattr(photo_svc, "remove_background", _fake_remove)
+    # cortex_client functions are imported inside the method, patch at source
+    monkeypatch.setattr(cortex, "detect_faces", _fake_detect)
+    monkeypatch.setattr(cortex, "remove_background", _fake_remove)
+    # check_photo_compliance is imported at module level in photo_service
     monkeypatch.setattr(photo_svc, "check_photo_compliance", _fake_compliance)
 
 
@@ -169,6 +170,20 @@ async def test_photo_export_requires_credits(
     assert export_data["download_url"]
     assert export_data["file_id"]
 
+    # Second export of the same processed_id should be free (no double charge)
+    balance_res = await async_client.get("/api/credits/balance", headers=headers2)
+    balance_after_first = balance_res.json()["balance"]
+
+    export_res3 = await async_client.post(
+        "/api/photo/export",
+        json={"processed_id": processed_id},
+        headers=headers2,
+    )
+    assert export_res3.status_code == 200
+
+    balance_res2 = await async_client.get("/api/credits/balance", headers=headers2)
+    assert balance_res2.json()["balance"] == balance_after_first
+
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("_mock_processing")
@@ -178,14 +193,14 @@ async def test_photo_layout_export(
     create_user,
     face_image_bytes,
 ) -> None:
-    """Layout export produces a downloadable file and deducts credits."""
+    """Layout export charges 1 credit and shares payment with export."""
     user = await create_user(
         email=f"photo-layout-{int(time.time() * 1000)}@example.com", balance=10
     )
     token, _ = create_access_token(user_id=user.id)
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Upload → preview
+    # Upload -> preview
     upload_res = await async_client.post(
         "/api/photo/upload",
         files={"file": ("portrait.jpg", face_image_bytes, "image/jpeg")},
@@ -200,7 +215,7 @@ async def test_photo_layout_export(
     )
     processed_id = preview_res.json()["processed_id"]
 
-    # Layout
+    # Layout (first call) should charge 1 credit
     layout_res = await async_client.post(
         "/api/photo/layout",
         json={"processed_id": processed_id, "copies": 4},
@@ -211,6 +226,109 @@ async def test_photo_layout_export(
     assert layout_data["file_id"]
     assert layout_data["download_url"]
     assert "layout" in layout_data["filename"]
+
+    balance_res = await async_client.get("/api/credits/balance", headers=headers)
+    assert balance_res.json()["balance"] == 9  # 10 - 1
+
+    # Export same processed_id should be FREE (already paid via layout)
+    export_res = await async_client.post(
+        "/api/photo/export",
+        json={"processed_id": processed_id},
+        headers=headers,
+    )
+    assert export_res.status_code == 200
+
+    balance_res2 = await async_client.get("/api/credits/balance", headers=headers)
+    assert balance_res2.json()["balance"] == 9  # still 9
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_processing")
+async def test_photo_export_then_layout_free(
+    async_client,
+    session_factory,
+    create_user,
+    face_image_bytes,
+) -> None:
+    """Export first charges 1 credit, then layout for the same photo is free."""
+    user = await create_user(
+        email=f"photo-cross-{int(time.time() * 1000)}@example.com", balance=5
+    )
+    token, _ = create_access_token(user_id=user.id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload_res = await async_client.post(
+        "/api/photo/upload",
+        files={"file": ("portrait.jpg", face_image_bytes, "image/jpeg")},
+    )
+    preview_res = await async_client.post(
+        "/api/photo/preview",
+        json={
+            "upload_id": upload_res.json()["upload_id"],
+            "standard": "cn-passport",
+            "background_color": "#FFFFFF",
+        },
+    )
+    processed_id = preview_res.json()["processed_id"]
+
+    # Export first - charges 1 credit
+    export_res = await async_client.post(
+        "/api/photo/export",
+        json={"processed_id": processed_id},
+        headers=headers,
+    )
+    assert export_res.status_code == 200
+
+    balance_res = await async_client.get("/api/credits/balance", headers=headers)
+    assert balance_res.json()["balance"] == 4  # 5 - 1
+
+    # Layout same processed_id - should be free
+    layout_res = await async_client.post(
+        "/api/photo/layout",
+        json={"processed_id": processed_id, "copies": 4},
+        headers=headers,
+    )
+    assert layout_res.status_code == 200
+
+    balance_res2 = await async_client.get("/api/credits/balance", headers=headers)
+    assert balance_res2.json()["balance"] == 4  # still 4
+
+
+@pytest.mark.asyncio
+@pytest.mark.usefixtures("_mock_processing")
+async def test_photo_layout_requires_credits(
+    async_client,
+    session_factory,
+    create_user,
+    face_image_bytes,
+) -> None:
+    """Layout should fail with 402 when user has no credits and no prior payment."""
+    user = await create_user(
+        email=f"photo-layout-nocredit-{int(time.time() * 1000)}@example.com", balance=0
+    )
+    token, _ = create_access_token(user_id=user.id)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    upload_res = await async_client.post(
+        "/api/photo/upload",
+        files={"file": ("portrait.jpg", face_image_bytes, "image/jpeg")},
+    )
+    preview_res = await async_client.post(
+        "/api/photo/preview",
+        json={
+            "upload_id": upload_res.json()["upload_id"],
+            "standard": "cn-passport",
+            "background_color": "#FFFFFF",
+        },
+    )
+    processed_id = preview_res.json()["processed_id"]
+
+    layout_res = await async_client.post(
+        "/api/photo/layout",
+        json={"processed_id": processed_id},
+        headers=headers,
+    )
+    assert layout_res.status_code == 402
 
 
 @pytest.mark.asyncio

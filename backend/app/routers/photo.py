@@ -4,7 +4,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi import Depends
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db, get_verified_user
+from app.core.dependencies import get_db, get_verified_user
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, dynamic_rate_limit_heavy, limiter
 from app.core.task_limiter import acquire_task_slot
@@ -60,6 +60,7 @@ async def preview(
             upload_id=payload.upload_id,
             standard_code=payload.standard,
             background_color=payload.background_color,
+            adjust=payload.adjust.model_dump() if payload.adjust is not None else None,
         )
     finally:
         sem.release()
@@ -92,9 +93,9 @@ async def layout(
     try:
         return await PhotoService().layout(
             processed_id=payload.processed_id,
+            copies=payload.copies,
             user_id=user.id,
             db=db,
-            copies=payload.copies,
         )
     finally:
         sem.release()

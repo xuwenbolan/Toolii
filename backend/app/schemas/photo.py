@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class FaceBox(BaseModel):
@@ -23,6 +25,11 @@ class PhotoStandard(BaseModel):
     layout_default_copies: int = 8
 
 
+class UploadWarning(BaseModel):
+    id: str
+    params: dict[str, str | int | float] = {}
+
+
 class PhotoUploadResponse(BaseModel):
     upload_id: str
     filename: str
@@ -30,7 +37,7 @@ class PhotoUploadResponse(BaseModel):
     height: int
     faces: list[FaceBox]
     detection_engine: str
-    warnings: list[str] = []
+    warnings: list[UploadWarning] = []
     compliance: ComplianceResult
 
 
@@ -55,10 +62,27 @@ class CropBox(BaseModel):
     h: int
 
 
+class PhotoAdjust(BaseModel):
+    offset_x: float = Field(default=0.0, ge=-0.45, le=0.45)
+    offset_y: float = Field(default=0.0, ge=-0.45, le=0.45)
+    scale: float = Field(default=1.0, ge=0.75, le=2.4)
+
+
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
 class PhotoPreviewRequest(BaseModel):
     upload_id: str
     standard: str
     background_color: str = Field(default="#FFFFFF")
+    adjust: PhotoAdjust | None = None
+
+    @field_validator("background_color")
+    @classmethod
+    def _validate_color(cls, v: str) -> str:
+        if not _HEX_COLOR_RE.match(v):
+            raise ValueError("background_color must be a hex color like #RRGGBB")
+        return v.upper()
 
 
 class PhotoPreviewResponse(BaseModel):
@@ -68,6 +92,7 @@ class PhotoPreviewResponse(BaseModel):
     preview_data_url: str
     compliance: ComplianceResult
     crop_box: CropBox
+    applied_adjust: PhotoAdjust
     output_width: int
     output_height: int
 

@@ -16,13 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.processing.background_removal import remove_background
 from app.processing.compliance_checker import check_photo_compliance
-from app.processing.face_detection import detect_faces, select_primary_face
+from app.processing.face_detection import select_primary_face
 from app.processing.photo_cropper import crop_id_photo
 from app.processing.photo_layout import create_print_layout
 from app.schemas.image import FileResult
-from app.schemas.photo import ComplianceResult, CropBox, FaceBox, PhotoPreviewResponse, PhotoStandard, PhotoUploadResponse
+from app.schemas.photo import ComplianceResult, CropBox, FaceBox, PhotoAdjust, PhotoPreviewResponse, PhotoStandard, PhotoUploadResponse, UploadWarning
 from app.services.credit_service import CreditService
 from app.services.file_service import FileService, StoredFile
 
@@ -39,7 +38,7 @@ class UploadSession:
     cutout_file_id: str
     bg_removal_model: str
     compliance: dict[str, Any]
-    warnings: list[str]
+    warnings: list[UploadWarning]
     created_at: float
 
 
@@ -135,7 +134,7 @@ class PhotoService:
             size=stored.size,
             content_type=stored.content_type,
             download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
-            expires_in=settings.download_url_ttl_seconds,
+            expires_in=settings.file_retention_hours * 3600,
         )
 
     async def _store_upload_session(self, session: UploadSession) -> None:
@@ -165,35 +164,34 @@ class PhotoService:
         detection: dict[str, Any],
         width: int,
         height: int,
-    ) -> list[str]:
-        warnings: list[str] = []
+    ) -> list[UploadWarning]:
+        warnings: list[UploadWarning] = []
         engine = str(detection.get("engine", ""))
         faces = list(detection.get("faces", []))
         face_count = len(faces)
 
         if engine == "fallback-center" or face_count == 0:
-            warnings.append("No face detected, please upload a front-facing, well-lit photo")
+            warnings.append(UploadWarning(id="no_face"))
         elif "profile" in engine:
-            warnings.append("Side face detected, ID photos require facing the camera")
+            warnings.append(UploadWarning(id="side_face"))
         elif face_count > 1:
-            warnings.append(f"{face_count} faces detected, ID photos require only one person")
+            warnings.append(UploadWarning(id="multiple_faces", params={"count": face_count}))
 
         if width < 600 or height < 600:
-            warnings.append(f"Image resolution {width}x{height} is low, at least 600x600 pixels recommended")
+            warnings.append(UploadWarning(id="low_resolution", params={"width": width, "height": height}))
 
         if face_count == 1 and faces:
             face = faces[0] if isinstance(faces[0], dict) else {}
             conf = float(face.get("confidence", 1.0))
             if conf < 0.5:
-                warnings.append("Low face detection confidence, may affect processing quality")
-            fw = int(face.get("w", 0))
+                warnings.append(UploadWarning(id="low_confidence"))
             fh = int(face.get("h", 0))
             if height > 0 and fh > 0:
                 ratio = fh / height
                 if ratio < 0.15:
-                    warnings.append("Face too small in the frame, consider cropping or moving closer")
+                    warnings.append(UploadWarning(id="face_too_small"))
                 elif ratio > 0.85:
-                    warnings.append("Face too large in the frame, consider moving further away")
+                    warnings.append(UploadWarning(id="face_too_large"))
 
         return warnings
 
@@ -205,10 +203,14 @@ class PhotoService:
         content_type: str,
     ) -> PhotoUploadResponse:
         """Phase 1 (heavy): face detection + background removal + compliance check."""
-        loop = asyncio.get_running_loop()
+        from app.services.cortex_client import detect_faces as cortex_detect_faces
+        from app.services.cortex_client import remove_background as cortex_remove_bg
+
         try:
-            detection = await loop.run_in_executor(None, partial(detect_faces, image_bytes))
-        except (OSError, ValueError, RuntimeError) as exc:
+            detection = await cortex_detect_faces(image_bytes)
+        except AppError:
+            raise
+        except Exception as exc:
             raise AppError(code="PHOTO_DETECT_FAILED", message="Face detection failed, please upload a valid image", status_code=400) from exc
 
         width = int(detection["width"])
@@ -219,14 +221,14 @@ class PhotoService:
 
         # Background removal (the expensive step)
         try:
-            cutout_png, bg_meta = await loop.run_in_executor(
-                None,
-                partial(remove_background, image_bytes, model_name="silueta"),
-            )
-        except (OSError, ValueError, RuntimeError) as exc:
+            cutout_png, bg_meta = await cortex_remove_bg(image_bytes)
+        except AppError:
+            raise
+        except Exception as exc:
             raise AppError(code="PHOTO_BG_REMOVE_FAILED", message="Background removal failed", status_code=400) from exc
 
-        # Compliance check
+        # Compliance check (pure CPU heuristics, run in executor)
+        loop = asyncio.get_running_loop()
         try:
             compliance = await loop.run_in_executor(
                 None,
@@ -281,6 +283,7 @@ class PhotoService:
         upload_id: str,
         standard_code: str,
         background_color: str,
+        adjust: dict[str, float] | None = None,
     ) -> PhotoPreviewResponse:
         """Phase 2 (light): crop + composite + watermark using cached cutout PNG."""
         upload = await self._get_upload_session(upload_id)
@@ -303,6 +306,7 @@ class PhotoService:
                     face=face,
                     cutout_png_bytes=cutout_png,
                     background_color=background_color,
+                    adjust=adjust,
                 ),
             )
             preview_png = await loop.run_in_executor(None, partial(_watermark_preview, processed_png))
@@ -335,6 +339,7 @@ class PhotoService:
             preview_data_url=preview_data_url,
             compliance=ComplianceResult.model_validate(upload.compliance),
             crop_box=CropBox.model_validate(crop_box),
+            applied_adjust=PhotoAdjust.model_validate(crop_meta.get("applied_adjust") or {}),
             output_width=int(crop_meta["output_width"]),
             output_height=int(crop_meta["output_height"]),
         )
@@ -344,25 +349,40 @@ class PhotoService:
         stored = self._files.get(processed.file_id)
         filename = f"{processed.standard_code}-id-photo.png"
 
-        await CreditService(db).consume(
-            user_id=user_id,
-            amount=1,
-            tx_type="photo_export",
-            description=f"ID photo export ({processed.standard_code})",
-            reference_id=f"photo-export:{processed_id}",
-        )
+        ref_id = f"photo:{processed_id}"
+        credit_svc = CreditService(db)
+        if not await credit_svc.has_transaction(user_id=user_id, reference_id=ref_id):
+            await credit_svc.consume(
+                user_id=user_id,
+                amount=1,
+                tx_type="photo_export",
+                description=f"ID photo ({processed.standard_code})",
+                reference_id=ref_id,
+            )
         return self._to_file_result(stored, filename=filename)
 
     async def layout(
         self,
         *,
         processed_id: str,
+        copies: int | None = None,
         user_id: int,
         db: AsyncSession,
-        copies: int | None = None,
     ) -> FileResult:
         processed = await self._get_processed_session(processed_id)
         standard = self._get_standard(processed.standard_code)
+
+        # Charge 1 credit if not already paid for this processed_id
+        ref_id = f"photo:{processed_id}"
+        credit_svc = CreditService(db)
+        if not await credit_svc.has_transaction(user_id=user_id, reference_id=ref_id):
+            await credit_svc.consume(
+                user_id=user_id,
+                amount=1,
+                tx_type="photo_layout",
+                description=f"ID photo ({processed.standard_code})",
+                reference_id=ref_id,
+            )
         stored_photo = self._files.get(processed.file_id)
         photo_bytes = stored_photo.path.read_bytes()
 
@@ -386,11 +406,4 @@ class PhotoService:
             content_type="image/jpeg",
         )
 
-        await CreditService(db).consume(
-            user_id=user_id,
-            amount=1,
-            tx_type="photo_layout",
-            description=f"ID photo layout export ({processed.standard_code})",
-            reference_id=f"photo-layout:{processed_id}:{count}",
-        )
         return self._to_file_result(layout_stored, filename=filename)
