@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 
@@ -40,10 +41,10 @@ class LoginGuard:
             return
         now = time.monotonic()
         if rec.locked_until > now:
-            remaining = int(rec.locked_until - now)
+            remaining_minutes = math.ceil((rec.locked_until - now) / 60)
             raise AppError(
                 code="ACCOUNT_LOCKED",
-                message=f"Too many failed attempts. Try again in {remaining}s.",
+                message=f"Too many failed attempts. Try again in {remaining_minutes} minute(s).",
                 status_code=429,
             )
         # Reset if window expired

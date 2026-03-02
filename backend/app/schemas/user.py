@@ -13,6 +13,7 @@ class UserPublic(BaseModel):
     is_active: bool = True
     email_verified: bool = False
     is_admin: bool = False
+    has_password: bool = False
 
 
 class ChangePasswordRequest(BaseModel):
@@ -29,3 +30,9 @@ class UpdateProfileRequest(BaseModel):
 class DeleteAccountRequest(BaseModel):
     password: str | None = None
     confirm_email: str | None = None  # Required for Google-only accounts
+
+
+class RecoverAccountRequest(BaseModel):
+    email: EmailStr
+    password: str | None = None
+    confirm_email: str | None = None  # For Google-only accounts

@@ -9,10 +9,11 @@ from app.core.config import settings
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
+from app.core.tool_recording import ToolRecordingRoute
 from app.schemas.image import FileResult, OcrResult, SegmentResult
 from app.services.image_service import ImageService
 
-router = APIRouter(prefix=f"{settings.api_prefix}/image", tags=["image"])
+router = APIRouter(prefix=f"{settings.api_prefix}/image", tags=["image"], route_class=ToolRecordingRoute)
 
 
 def _max_image_bytes() -> int:

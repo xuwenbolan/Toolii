@@ -9,10 +9,11 @@ from app.core.config import settings
 from app.core.file_validation import validate_image_bytes, validate_pdf_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
+from app.core.tool_recording import ToolRecordingRoute
 from app.schemas.pdf import FileResult, PdfPagesOperation
 from app.services.pdf_service import PdfService
 
-router = APIRouter(prefix=f"{settings.api_prefix}/pdf", tags=["pdf"])
+router = APIRouter(prefix=f"{settings.api_prefix}/pdf", tags=["pdf"], route_class=ToolRecordingRoute)
 
 
 def _max_pdf_bytes() -> int:

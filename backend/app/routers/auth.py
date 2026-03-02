@@ -38,7 +38,9 @@ router = APIRouter(prefix=f"{settings.api_prefix}/auth", tags=["auth"])
 
 
 def _to_user_public(user: User) -> UserPublic:
-    return UserPublic.model_validate(user)
+    pub = UserPublic.model_validate(user)
+    pub.has_password = user.hashed_password is not None
+    return pub
 
 
 def _build_auth_response(

@@ -18,6 +18,7 @@ from app.schemas.photo import (
     PhotoStandard,
     PhotoUploadResponse,
 )
+from app.services.history_service import HistoryService
 from app.services.photo_service import PhotoService
 
 router = APIRouter(prefix=f"{settings.api_prefix}/photo", tags=["photo"])
@@ -76,7 +77,9 @@ async def export(
 ) -> FileResult:
     sem = await acquire_task_slot(request)
     try:
-        return await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
+        result = await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
+        await HistoryService(db).record(user_id=user.id, tool_name="photo/export")
+        return result
     finally:
         sem.release()
 
@@ -91,12 +94,14 @@ async def layout(
 ) -> FileResult:
     sem = await acquire_task_slot(request)
     try:
-        return await PhotoService().layout(
+        result = await PhotoService().layout(
             processed_id=payload.processed_id,
             copies=payload.copies,
             user_id=user.id,
             db=db,
         )
+        await HistoryService(db).record(user_id=user.id, tool_name="photo/layout")
+        return result
     finally:
         sem.release()
 

@@ -29,6 +29,9 @@ from app.services.email.factory import get_email_service
 logger = logging.getLogger("app.services.auth")
 
 
+_background_tasks: set[asyncio.Task] = set()  # prevent GC of fire-and-forget tasks
+
+
 def _fire_and_forget_email(coro):  # noqa: ANN001
     """Schedule an email coroutine as a background task with error logging."""
     async def _wrapper():
@@ -36,7 +39,9 @@ def _fire_and_forget_email(coro):  # noqa: ANN001
             await coro
         except Exception:
             logger.exception("Background email sending failed")
-    asyncio.create_task(_wrapper())
+    task = asyncio.create_task(_wrapper())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 class AuthService:
@@ -228,10 +233,12 @@ class AuthService:
         return user
 
     async def verify_email(self, *, token: str) -> User:
-        """Verify email using raw token string. Returns the user on success."""
+        """Verify email using raw token string. Returns the user on success.
+        Idempotent: if the token was already used but the user is verified, return success."""
         token_hash = hashlib.sha256(token.encode()).hexdigest()
         now = datetime.now(timezone.utc)
 
+        # First try: unused, non-expired token
         result = await self._db.execute(
             select(EmailVerificationToken).where(
                 EmailVerificationToken.token_hash == token_hash,
@@ -240,24 +247,37 @@ class AuthService:
             )
         )
         record = result.scalar_one_or_none()
-        if record is None:
-            raise AppError(
-                code="INVALID_VERIFICATION_TOKEN",
-                message="Verification link invalid or expired",
-                status_code=400,
+
+        if record is not None:
+            record.used_at = now
+            result = await self._db.execute(select(User).where(User.id == record.user_id))
+            user = result.scalar_one_or_none()
+            if user is None:
+                raise AppError(code="USER_NOT_FOUND", message="User not found", status_code=404)
+            user.email_verified = True
+            await self._db.commit()
+            await self._db.refresh(user)
+            return user
+
+        # Idempotent retry: token exists and was already used
+        result = await self._db.execute(
+            select(EmailVerificationToken).where(
+                EmailVerificationToken.token_hash == token_hash,
+                EmailVerificationToken.used_at.is_not(None),
             )
+        )
+        used_record = result.scalar_one_or_none()
+        if used_record is not None:
+            result = await self._db.execute(select(User).where(User.id == used_record.user_id))
+            user = result.scalar_one_or_none()
+            if user is not None and user.email_verified:
+                return user
 
-        record.used_at = now
-
-        result = await self._db.execute(select(User).where(User.id == record.user_id))
-        user = result.scalar_one_or_none()
-        if user is None:
-            raise AppError(code="USER_NOT_FOUND", message="User not found", status_code=404)
-
-        user.email_verified = True
-        await self._db.commit()
-        await self._db.refresh(user)
-        return user
+        raise AppError(
+            code="INVALID_VERIFICATION_TOKEN",
+            message="Verification link invalid or expired",
+            status_code=400,
+        )
 
     async def resend_verification(self, *, user_id: int, lang: str = "zh") -> str | None:
         """Resend verification email. Returns raw token in dev mode."""

@@ -14,17 +14,29 @@ from app.core.token_blacklist import token_blacklist
 from app.models.login_history import LoginHistory
 from app.models.user import User
 from app.schemas.common import Message
-from app.schemas.user import ChangePasswordRequest, DeleteAccountRequest, UpdateProfileRequest, UserPublic
+from app.schemas.user import (
+    ChangePasswordRequest,
+    DeleteAccountRequest,
+    RecoverAccountRequest,
+    UpdateProfileRequest,
+    UserPublic,
+)
 from app.services.email.factory import get_email_service
 from app.services.email.lang import parse_lang
 
 router = APIRouter(prefix=f"{settings.api_prefix}/users", tags=["users"])
 
 
+def _to_user_public(user: User) -> UserPublic:
+    pub = UserPublic.model_validate(user)
+    pub.has_password = user.hashed_password is not None
+    return pub
+
+
 @router.get("/profile", response_model=UserPublic)
 @limiter.limit(settings.rate_limit_auth)
 async def profile(request: Request, user: User = Depends(get_current_user)) -> UserPublic:  # noqa: ARG001
-    return UserPublic.model_validate(user)
+    return _to_user_public(user)
 
 
 @router.put("/password")
@@ -121,7 +133,7 @@ async def update_profile(
     body: dict = {
         "code": "PROFILE_UPDATED_VERIFY_EMAIL" if email_changed else "PROFILE_UPDATED",
         "message": "Profile updated" + (", please verify new email" if email_changed else ""),
-        "user": UserPublic.model_validate(user).model_dump(),
+        "user": _to_user_public(user).model_dump(),
     }
     if dev_token is not None:
         body["_dev_verification_token"] = dev_token
@@ -177,14 +189,11 @@ async def delete_me(
 @limiter.limit(settings.rate_limit_anon)
 async def recover_account(
     request: Request,
+    payload: RecoverAccountRequest,
     db=Depends(get_db),
 ) -> JSONResponse:
     from datetime import datetime, timedelta, timezone
     from slowapi.util import get_remote_address
-
-    from app.schemas.auth import LoginRequest
-    body = await request.json()
-    payload = LoginRequest(**body)
 
     email = payload.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -202,9 +211,13 @@ async def recover_account(
     if now - user.deleted_at > timedelta(days=7):
         raise _generic_recover_error
 
-    # Verify password
-    if not user.hashed_password or not verify_password(payload.password, user.hashed_password):
-        raise _generic_recover_error
+    # Verify identity: password for password accounts, email confirmation for Google-only
+    if user.hashed_password:
+        if not payload.password or not verify_password(payload.password, user.hashed_password):
+            raise _generic_recover_error
+    else:
+        if not payload.confirm_email or payload.confirm_email.strip().lower() != user.email:
+            raise _generic_recover_error
 
     user.is_active = True
     user.deleted_at = None
