@@ -104,52 +104,44 @@ async def create_from_result(
 async def transfer_info(
     token: str,
     request: Request,  # noqa: ARG001
+    code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ) -> TransferInfoResponse:
     service = TransferService(db)
     transfer = await service.get_info(token=token)
+
+    # Only reveal file list and message after extract code is verified
+    code_required = transfer.extract_code is not None
+    code_verified = not code_required
+
+    if code_required and code is not None:
+        await service.check_extract_code(transfer, extract_code=code)
+        code_verified = True
+
+    files = [
+        TransferFileItem(
+            id=f.id,
+            original_filename=f.original_filename,
+            size=f.size,
+            content_type=f.content_type,
+        )
+        for f in transfer.files
+    ] if code_verified else []
+
     return TransferInfoResponse(
         token=transfer.token,
-        message=transfer.message,
+        message=transfer.message if code_verified else None,
         expires_at=transfer.expires_at,
         file_count=transfer.file_count,
         total_size=transfer.total_size,
-        has_extract_code=transfer.extract_code is not None,
+        has_extract_code=code_required,
         download_count=transfer.download_count,
         max_downloads=transfer.max_downloads,
         burn_after_read=transfer.burn_after_read,
         status=transfer.status,
-        files=[
-            TransferFileItem(
-                id=f.id,
-                original_filename=f.original_filename,
-                size=f.size,
-                content_type=f.content_type,
-            )
-            for f in transfer.files
-        ],
+        files=files,
         created_at=transfer.created_at,
     )
-
-
-@router.head("/download/{token}/{file_id}", response_model=None)
-@limiter.limit("30/minute")
-async def head_single_file(
-    token: str,
-    file_id: int,
-    request: Request,  # noqa: ARG001
-    code: str | None = Query(None),
-    db: AsyncSession = Depends(get_db),
-) -> Response:
-    """Verify extract code without counting as a download."""
-    service = TransferService(db)
-    await service.download_single(
-        token=token,
-        file_id=file_id,
-        extract_code=code,
-        count_download=False,
-    )
-    return Response(status_code=200, headers={"Cache-Control": "private, max-age=0"})
 
 
 @router.get("/download/{token}/{file_id}")
@@ -162,16 +154,16 @@ async def download_single_file(
     db: AsyncSession = Depends(get_db),
 ) -> FileResponse:
     service = TransferService(db)
-    path, filename, content_type, burn, transfer_id = await service.download_single(
+    result = await service.download_single(
         token=token,
         file_id=file_id,
         extract_code=code,
     )
-    bg = BackgroundTask(TransferService.burn_transfer_bg, transfer_id) if burn else None
+    bg = BackgroundTask(TransferService.burn_transfer_bg, result.transfer_id) if result.burn_after_read else None
     return FileResponse(
-        path,
-        media_type=content_type,
-        filename=filename,
+        result.path,
+        media_type=result.content_type,
+        filename=result.filename,
         background=bg,
         headers={"Cache-Control": "private, max-age=0"},
     )
@@ -186,16 +178,14 @@ async def download_zip(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     service = TransferService(db)
-    zip_bytes, zip_name, burn, transfer_id = await service.download_zip(
-        token=token, extract_code=code
-    )
-    bg = BackgroundTask(TransferService.burn_transfer_bg, transfer_id) if burn else None
+    result = await service.download_zip(token=token, extract_code=code)
+    bg = BackgroundTask(TransferService.burn_transfer_bg, result.transfer_id) if result.burn_after_read else None
     return Response(
-        content=zip_bytes,
+        content=result.data,
         media_type="application/zip",
         background=bg,
         headers={
-            "Content-Disposition": f'attachment; filename="{zip_name}"',
+            "Content-Disposition": f'attachment; filename="{result.filename}"',
             "Cache-Control": "private, max-age=0",
         },
     )

@@ -116,6 +116,12 @@ class FileService:
             created_at=created_at,
         )
 
+    def delete(self, file_id: str) -> None:
+        """Delete a stored file and its metadata."""
+        self._validate_file_id(file_id)
+        self._file_path(file_id).unlink(missing_ok=True)
+        self._meta_path(file_id).unlink(missing_ok=True)
+
     def build_download_url(self, *, file_id: str, filename: str, ttl_seconds: int | None = None) -> str:
         ttl = ttl_seconds if ttl_seconds is not None else settings.file_retention_hours * 3600
         exp = int(time.time()) + int(ttl)

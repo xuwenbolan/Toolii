@@ -16,7 +16,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
-from app.models.file_transfer import FileTransfer, TransferFile
+from app.models.file_transfer import FileTransfer, TransferFile, TransferStatus
 from app.services.file_service import FileService
 from app.utils.time_utils import utcnow
 
@@ -45,6 +45,23 @@ def _generate_extract_code() -> str:
 class TransferCreateResult:
     transfer: FileTransfer
     transfer_path: str
+
+
+@dataclass(slots=True)
+class SingleDownloadResult:
+    path: str
+    filename: str
+    content_type: str
+    burn_after_read: bool
+    transfer_id: int
+
+
+@dataclass(slots=True)
+class ZipDownloadResult:
+    data: bytes
+    filename: str
+    burn_after_read: bool
+    transfer_id: int
 
 
 class TransferService:
@@ -95,6 +112,12 @@ class TransferService:
                 message=f"Maximum {settings.max_transfer_files} files",
                 status_code=400,
             )
+        if burn_after_read and len(file_data_list) > 1:
+            raise AppError(
+                code="BURN_SINGLE_FILE_ONLY",
+                message="Burn after read only supports single file",
+                status_code=400,
+            )
         if max_downloads is not None and max_downloads < 1:
             raise AppError(
                 code="INVALID_MAX_DOWNLOADS",
@@ -124,7 +147,7 @@ class TransferService:
                 expires_at=now + RETENTION_MAP[retention],
                 max_downloads=1 if burn_after_read else max_downloads,
                 burn_after_read=burn_after_read,
-                status="active",
+                status=TransferStatus.ACTIVE,
                 total_size=total_size,
                 file_count=len(file_data_list),
                 message=message[:500] if message else None,
@@ -209,7 +232,7 @@ class TransferService:
                 expires_at=now + RETENTION_MAP[retention],
                 max_downloads=1 if burn_after_read else None,
                 burn_after_read=burn_after_read,
-                status="active",
+                status=TransferStatus.ACTIVE,
                 total_size=transfer_stored.size,
                 file_count=1,
             )
@@ -253,10 +276,39 @@ class TransferService:
             raise NotFoundError("Transfer not found")
         return transfer
 
+    async def check_extract_code(
+        self, transfer: FileTransfer, *, extract_code: str | None
+    ) -> None:
+        """Verify extract code. Raises 403/429 on failure."""
+        if not transfer.extract_code:
+            return
+        if transfer.failed_code_attempts >= _MAX_CODE_ATTEMPTS:
+            raise AppError(
+                code="EXTRACT_CODE_LOCKED",
+                message="Too many failed attempts. Transfer locked.",
+                status_code=429,
+            )
+        if not extract_code or not hmac.compare_digest(
+            extract_code.encode(), transfer.extract_code.encode()
+        ):
+            await self._db.execute(
+                update(FileTransfer)
+                .where(FileTransfer.id == transfer.id)
+                .values(
+                    failed_code_attempts=FileTransfer.failed_code_attempts + 1
+                )
+            )
+            await self._db.commit()
+            raise AppError(
+                code="INVALID_EXTRACT_CODE",
+                message="Invalid or missing extract code",
+                status_code=403,
+            )
+
     async def check_access(
         self, transfer: FileTransfer, *, extract_code: str | None
     ) -> None:
-        if transfer.status != "active":
+        if transfer.status != TransferStatus.ACTIVE:
             raise AppError(
                 code="TRANSFER_NOT_ACTIVE",
                 message="This transfer is no longer active",
@@ -281,29 +333,7 @@ class TransferService:
                 status_code=410,
             )
 
-        if transfer.extract_code:
-            if transfer.failed_code_attempts >= _MAX_CODE_ATTEMPTS:
-                raise AppError(
-                    code="EXTRACT_CODE_LOCKED",
-                    message="Too many failed attempts. Transfer locked.",
-                    status_code=429,
-                )
-            if not extract_code or not hmac.compare_digest(
-                extract_code.encode(), transfer.extract_code.encode()
-            ):
-                await self._db.execute(
-                    update(FileTransfer)
-                    .where(FileTransfer.id == transfer.id)
-                    .values(
-                        failed_code_attempts=FileTransfer.failed_code_attempts + 1
-                    )
-                )
-                await self._db.commit()
-                raise AppError(
-                    code="INVALID_EXTRACT_CODE",
-                    message="Invalid or missing extract code",
-                    status_code=403,
-                )
+        await self.check_extract_code(transfer, extract_code=extract_code)
 
     async def _atomic_increment_download(self, transfer_id: int) -> None:
         """Atomically increment download_count, respecting max_downloads."""
@@ -330,9 +360,7 @@ class TransferService:
 
     async def download_single(
         self, *, token: str, file_id: int, extract_code: str | None,
-        count_download: bool = True,
-    ) -> tuple[str, str, str, bool, int]:
-        """Return (file_path, filename, content_type, burn_after_read, transfer_id)."""
+    ) -> SingleDownloadResult:
         transfer = await self.get_info(token=token)
         await self.check_access(transfer, extract_code=extract_code)
 
@@ -345,24 +373,28 @@ class TransferService:
             raise NotFoundError("File not found in transfer")
 
         stored = self._files.get(target.file_id)
+        await self._atomic_increment_download(transfer.id)
 
-        if count_download:
-            await self._atomic_increment_download(transfer.id)
-
-        return (
-            str(stored.path),
-            target.original_filename,
-            target.content_type,
-            transfer.burn_after_read,
-            transfer.id,
+        return SingleDownloadResult(
+            path=str(stored.path),
+            filename=target.original_filename,
+            content_type=target.content_type,
+            burn_after_read=transfer.burn_after_read,
+            transfer_id=transfer.id,
         )
 
     async def download_zip(
         self, *, token: str, extract_code: str | None
-    ) -> tuple[bytes, str, bool, int]:
-        """Return (zip_bytes, zip_filename, burn_after_read, transfer_id)."""
+    ) -> ZipDownloadResult:
         transfer = await self.get_info(token=token)
         await self.check_access(transfer, extract_code=extract_code)
+
+        if transfer.burn_after_read:
+            raise AppError(
+                code="BURN_NO_ZIP",
+                message="Zip download not available for burn-after-read transfers",
+                status_code=400,
+            )
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -383,7 +415,12 @@ class TransferService:
 
         await self._atomic_increment_download(transfer.id)
 
-        return buf.getvalue(), f"transfer-{token}.zip", transfer.burn_after_read, transfer.id
+        return ZipDownloadResult(
+            data=buf.getvalue(),
+            filename=f"transfer-{token}.zip",
+            burn_after_read=transfer.burn_after_read,
+            transfer_id=transfer.id,
+        )
 
     @staticmethod
     async def burn_transfer_bg(transfer_id: int) -> None:
@@ -398,18 +435,13 @@ class TransferService:
                 .where(FileTransfer.id == transfer_id)
             )
             transfer = result.scalar_one_or_none()
-            if transfer is None or transfer.status != "active":
+            if transfer is None or transfer.status != TransferStatus.ACTIVE:
                 return
 
             for f in transfer.files:
-                try:
-                    stored = fs.get(f.file_id)
-                    stored.path.unlink(missing_ok=True)
-                    fs._meta_path(f.file_id).unlink(missing_ok=True)
-                except FileNotFoundError:
-                    pass
+                fs.delete(f.file_id)
 
-            transfer.status = "burned"
+            transfer.status = TransferStatus.BURNED
             await db.commit()
             logger.info("Burned transfer %d", transfer_id)
 
@@ -450,12 +482,7 @@ class TransferService:
             raise ForbiddenError("Not authorized to delete this transfer")
 
         for f in transfer.files:
-            try:
-                stored = self._files.get(f.file_id)
-                stored.path.unlink(missing_ok=True)
-                self._files._meta_path(f.file_id).unlink(missing_ok=True)
-            except FileNotFoundError:
-                pass
+            self._files.delete(f.file_id)
 
         await self._db.delete(transfer)
         await self._db.commit()
@@ -467,7 +494,7 @@ class TransferService:
             select(FileTransfer)
             .options(selectinload(FileTransfer.files))
             .where(
-                FileTransfer.status == "active",
+                FileTransfer.status == TransferStatus.ACTIVE,
                 FileTransfer.expires_at <= now,
             )
             .limit(limit)
@@ -475,14 +502,9 @@ class TransferService:
         transfers = list(result.scalars().all())
         count = 0
         for t in transfers:
-            t.status = "expired"
+            t.status = TransferStatus.EXPIRED
             for f in t.files:
-                try:
-                    stored = self._files.get(f.file_id)
-                    stored.path.unlink(missing_ok=True)
-                    self._files._meta_path(f.file_id).unlink(missing_ok=True)
-                except FileNotFoundError:
-                    pass
+                self._files.delete(f.file_id)
             count += 1
         if count > 0:
             await self._db.commit()

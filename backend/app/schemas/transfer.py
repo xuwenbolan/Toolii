@@ -33,7 +33,7 @@ class TransferInfoResponse(BaseModel):
     max_downloads: int | None = None
     burn_after_read: bool = False
     status: str
-    files: list[TransferFileItem]
+    files: list[TransferFileItem] = []
     created_at: datetime
 
 
