@@ -119,6 +119,8 @@
       "type": "Type",
       "user": "User",
       "amount": "Amount",
+      "balanceBefore": "Before",
+      "balanceAfter": "After",
       "description": "Description",
       "time": "Time"
     },
@@ -128,6 +130,9 @@
       "to": "To",
       "amount": "Amount",
       "status": "Status",
+      "expiresAt": "Expires At",
+      "claimedAt": "Claimed At",
+      "createdAt": "Created At",
       "time": "Time"
     },
     "revenue": {
@@ -171,6 +176,11 @@
     "noData": "No data",
     "previous": "Previous",
     "next": "Next",
-    "close": "Close"
+    "close": "Close",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "success": "Operation successful",
+    "error": "Operation failed",
+    "confirmAction": "Confirm Action"
   }
 }

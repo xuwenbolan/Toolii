@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import {
   BarChart,
   Bar,
@@ -13,6 +14,10 @@ import {
   Legend,
 } from 'recharts'
 
+import { AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/admin'
+import type { Column } from '@/components/admin'
+import { Input } from '@/components/ui/input'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   fetchToolUsage,
   fetchGlobalTransactions,
@@ -21,529 +26,346 @@ import {
 } from '@/services/adminApi'
 import type {
   ToolUsageItem,
-  GlobalTransactionListResponse,
   GlobalTransactionItem,
-  AdminShareLinkListResponse,
   AdminShareLinkItem,
-  RevenueResponse,
   RevenueItem,
 } from '@/services/adminApi'
 
-type Tab = 'toolUsage' | 'transactions' | 'shareLinks' | 'revenue'
-
 const PAGE_SIZE = 20
 
-// ── Tab 1: Tool Usage ──────────────────────────────────────
+// -- Tab 1: Tool Usage -------------------------------------------------------
 
 function ToolUsageTab() {
   const { t } = useTranslation('admin')
   const [days, setDays] = useState(30)
   const [toolName, setToolName] = useState('')
-  const [data, setData] = useState<ToolUsageItem[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let active = true
-    const params: { days?: number; tool_name?: string } = { days }
-    if (toolName) params.tool_name = toolName
-    fetchToolUsage(params)
-      .then((res) => {
-        if (active) setData(res.items)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [days, toolName])
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'tool-usage', { days, toolName }],
+    queryFn: () => {
+      const params: { days?: number; tool_name?: string } = { days }
+      if (toolName) params.tool_name = toolName
+      return fetchToolUsage(params)
+    },
+  })
 
-  // Extract unique tool names for the dropdown
+  const items = data?.items ?? []
+
   const toolNames = useMemo(() => {
-    const names = new Set(data.map((d) => d.tool_name))
+    const names = new Set(items.map((d) => d.tool_name))
     return Array.from(names).sort()
-  }, [data])
+  }, [items])
 
-  // Aggregate by date for the stacked bar chart
   const chartData = useMemo(() => {
     const map = new Map<string, { date: string; success: number; fail: number }>()
-    for (const item of data) {
+    for (const item of items) {
       const existing = map.get(item.date)
       if (existing) {
         existing.success += item.success_count
         existing.fail += item.fail_count
       } else {
-        map.set(item.date, {
-          date: item.date,
-          success: item.success_count,
-          fail: item.fail_count,
-        })
+        map.set(item.date, { date: item.date, success: item.success_count, fail: item.fail_count })
       }
     }
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
-  }, [data])
+  }, [items])
+
+  const toolFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('operations.toolUsage.allTools') },
+      ...toolNames.map((n) => ({ value: n, label: n })),
+    ],
+    [t, toolNames],
+  )
+
+  const columns: Column<ToolUsageItem>[] = useMemo(
+    () => [
+      { key: 'tool', header: t('operations.toolUsage.tool'), render: (i) => i.tool_name },
+      { key: 'date', header: t('operations.toolUsage.date'), render: (i) => i.date },
+      { key: 'total', header: t('operations.toolUsage.total'), align: 'right', render: (i) => i.count },
+      {
+        key: 'success',
+        header: t('operations.toolUsage.success'),
+        align: 'right',
+        render: (i) => <span className="text-success">{i.success_count}</span>,
+      },
+      {
+        key: 'fail',
+        header: t('operations.toolUsage.fail'),
+        align: 'right',
+        render: (i) => <span className="text-destructive">{i.fail_count}</span>,
+      },
+    ],
+    [t],
+  )
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           {t('operations.toolUsage.days')}
-          <input
+          <Input
             type="number"
             min={1}
             max={365}
             value={days}
-            onChange={(e) => {
-              setLoading(true)
-              setDays(Number(e.target.value) || 30)
-            }}
-            className="w-20 rounded-md border bg-background px-2 py-1 text-sm"
+            onChange={(e) => setDays(Number(e.target.value) || 30)}
+            className="w-20"
           />
         </label>
-        <select
-          value={toolName}
-          onChange={(e) => {
-            setLoading(true)
-            setToolName(e.target.value)
-          }}
-          className="rounded-md border bg-background px-2 py-1 text-sm"
-        >
-          <option value="">{t('operations.toolUsage.allTools')}</option>
-          {toolNames.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
+        <AdminFilter
+          value={toolName || 'all'}
+          options={toolFilterOptions}
+          onChange={(v) => setToolName(v === 'all' ? '' : v)}
+        />
       </div>
 
-      {loading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.loading')}
+      {!isLoading && items.length > 0 && (
+        <div className="rounded-xl border bg-card p-4">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="success" stackId="a" fill="#22c55e" name={t('operations.toolUsage.success')} />
+              <Bar dataKey="fail" stackId="a" fill="#ef4444" name={t('operations.toolUsage.fail')} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-      ) : data.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.noData')}
-        </div>
-      ) : (
-        <>
-          {/* Bar chart */}
-          <div className="rounded-xl border bg-card p-4">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar
-                  dataKey="success"
-                  stackId="a"
-                  fill="#22c55e"
-                  name={t('operations.toolUsage.success')}
-                />
-                <Bar
-                  dataKey="fail"
-                  stackId="a"
-                  fill="#ef4444"
-                  name={t('operations.toolUsage.fail')}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Data table */}
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.toolUsage.tool')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.toolUsage.date')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.toolUsage.total')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.toolUsage.success')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.toolUsage.fail')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((item, i) => (
-                  <tr key={`${item.tool_name}-${item.date}`} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
-                    <td className="px-3 py-2">{item.tool_name}</td>
-                    <td className="px-3 py-2">{item.date}</td>
-                    <td className="px-3 py-2 text-right">{item.count}</td>
-                    <td className="px-3 py-2 text-right text-green-600">{item.success_count}</td>
-                    <td className="px-3 py-2 text-right text-red-500">{item.fail_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
       )}
+
+      <DataTable
+        columns={columns}
+        data={items}
+        rowKey={(i) => `${i.tool_name}-${i.date}`}
+        loading={isLoading}
+      />
     </div>
   )
 }
 
-// ── Tab 2: Transactions ────────────────────────────────────
+// -- Tab 2: Transactions -----------------------------------------------------
 
 const TX_TYPES = ['redeem', 'consume', 'admin_adjust', 'share_send', 'share_receive']
 
 function TransactionsTab() {
   const { t } = useTranslation('admin')
-  const [txType, setTxType] = useState('')
+  const [txType, setTxType] = useState('all')
   const [offset, setOffset] = useState(0)
-  const [data, setData] = useState<GlobalTransactionListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let active = true
-    const params: { limit: number; offset: number; tx_type?: string } = {
-      limit: PAGE_SIZE,
-      offset,
-    }
-    if (txType) params.tx_type = txType
-    fetchGlobalTransactions(params)
-      .then((res) => {
-        if (active) setData(res)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [txType, offset])
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'transactions', { txType, offset }],
+    queryFn: () => {
+      const params: { limit: number; offset: number; tx_type?: string } = { limit: PAGE_SIZE, offset }
+      if (txType !== 'all') params.tx_type = txType
+      return fetchGlobalTransactions(params)
+    },
+  })
 
-  const items: GlobalTransactionItem[] = data?.items ?? []
+  const items = data?.items ?? []
   const total = data?.total ?? 0
+
+  const filterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('operations.transactions.allTypes') },
+      ...TX_TYPES.map((tp) => ({ value: tp, label: tp })),
+    ],
+    [t],
+  )
+
+  const columns: Column<GlobalTransactionItem>[] = useMemo(
+    () => [
+      { key: 'id', header: 'ID', render: (i) => i.id },
+      { key: 'user', header: t('operations.transactions.user'), render: (i) => i.user_email ?? '-' },
+      {
+        key: 'type',
+        header: t('operations.transactions.type'),
+        render: (i) => <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{i.tx_type}</span>,
+      },
+      {
+        key: 'amount',
+        header: t('operations.transactions.amount'),
+        align: 'right',
+        render: (i) => (
+          <span className={i.amount >= 0 ? 'text-success' : 'text-destructive'}>
+            {i.amount >= 0 ? '+' : ''}{i.amount}
+          </span>
+        ),
+      },
+      {
+        key: 'before',
+        header: t('operations.transactions.balanceBefore'),
+        align: 'right',
+        render: (i) => i.balance_before,
+      },
+      {
+        key: 'after',
+        header: t('operations.transactions.balanceAfter'),
+        align: 'right',
+        render: (i) => i.balance_after,
+      },
+      {
+        key: 'desc',
+        header: t('operations.transactions.description'),
+        className: 'max-w-[200px] truncate',
+        render: (i) => i.description ?? '-',
+      },
+      {
+        key: 'time',
+        header: t('operations.transactions.time'),
+        className: 'whitespace-nowrap',
+        render: (i) => new Date(i.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
 
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <select
-          value={txType}
-          onChange={(e) => {
-            setLoading(true)
-            setOffset(0)
-            setTxType(e.target.value)
-          }}
-          className="rounded-md border bg-background px-2 py-1 text-sm"
-        >
-          <option value="">{t('operations.transactions.allTypes')}</option>
-          {TX_TYPES.map((tp) => (
-            <option key={tp} value={tp}>
-              {tp}
-            </option>
-          ))}
-        </select>
-      </div>
+      <AdminFilter
+        value={txType}
+        options={filterOptions}
+        onChange={(v) => { setTxType(v); setOffset(0) }}
+      />
 
-      {loading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.loading')}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.noData')}
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">ID</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.transactions.user')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.transactions.type')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.transactions.amount')}</th>
-                  <th className="px-3 py-2 text-right font-medium">Balance Before</th>
-                  <th className="px-3 py-2 text-right font-medium">Balance After</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.transactions.description')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.transactions.time')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={item.id} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
-                    <td className="px-3 py-2">{item.id}</td>
-                    <td className="px-3 py-2">{item.user_email ?? '-'}</td>
-                    <td className="px-3 py-2">
-                      <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{item.tx_type}</span>
-                    </td>
-                    <td className={`px-3 py-2 text-right ${item.amount >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                      {item.amount >= 0 ? '+' : ''}{item.amount}
-                    </td>
-                    <td className="px-3 py-2 text-right">{item.balance_before}</td>
-                    <td className="px-3 py-2 text-right">{item.balance_after}</td>
-                    <td className="max-w-[200px] truncate px-3 py-2">{item.description ?? '-'}</td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      {new Date(item.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={offset === 0}
-                onClick={() => {
-                  setLoading(true)
-                  setOffset((prev) => Math.max(0, prev - PAGE_SIZE))
-                }}
-                className="rounded-md border px-3 py-1 text-sm disabled:opacity-40"
-              >
-                {t('common.previous')}
-              </button>
-              <button
-                type="button"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() => {
-                  setLoading(true)
-                  setOffset((prev) => prev + PAGE_SIZE)
-                }}
-                className="rounded-md border px-3 py-1 text-sm disabled:opacity-40"
-              >
-                {t('common.next')}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <DataTable columns={columns} data={items} rowKey={(i) => i.id} loading={isLoading} />
+      <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
     </div>
   )
 }
 
-// ── Tab 3: Share Links ─────────────────────────────────────
+// -- Tab 3: Share Links ------------------------------------------------------
 
 const SHARE_STATUSES = ['pending', 'claimed', 'canceled']
 
 function ShareLinksTab() {
   const { t } = useTranslation('admin')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState('all')
   const [offset, setOffset] = useState(0)
-  const [data, setData] = useState<AdminShareLinkListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let active = true
-    const params: { limit: number; offset: number; status?: string } = {
-      limit: PAGE_SIZE,
-      offset,
-    }
-    if (status) params.status = status
-    fetchAdminShareLinks(params)
-      .then((res) => {
-        if (active) setData(res)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [status, offset])
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'share-links', { status, offset }],
+    queryFn: () => {
+      const params: { limit: number; offset: number; status?: string } = { limit: PAGE_SIZE, offset }
+      if (status !== 'all') params.status = status
+      return fetchAdminShareLinks(params)
+    },
+  })
 
-  const items: AdminShareLinkItem[] = data?.items ?? []
+  const items = data?.items ?? []
   const total = data?.total ?? 0
 
-  const statusBadge = (s: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      claimed: 'bg-green-100 text-green-800',
-      canceled: 'bg-gray-100 text-gray-600',
-    }
-    return (
-      <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${colors[s] ?? 'bg-muted'}`}>
-        {s}
-      </span>
-    )
-  }
+  const filterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('operations.shareLinks.allStatus') },
+      ...SHARE_STATUSES.map((s) => ({ value: s, label: s })),
+    ],
+    [t],
+  )
+
+  const columns: Column<AdminShareLinkItem>[] = useMemo(
+    () => [
+      { key: 'id', header: 'ID', render: (i) => i.id },
+      { key: 'from', header: t('operations.shareLinks.from'), render: (i) => i.from_user_email ?? '-' },
+      { key: 'to', header: t('operations.shareLinks.to'), render: (i) => i.to_user_email ?? '-' },
+      { key: 'amount', header: t('operations.shareLinks.amount'), align: 'right', render: (i) => i.amount },
+      {
+        key: 'status',
+        header: t('operations.shareLinks.status'),
+        render: (i) => <StatusBadge status={i.status} />,
+      },
+      {
+        key: 'expiresAt',
+        header: t('operations.shareLinks.expiresAt'),
+        className: 'whitespace-nowrap',
+        render: (i) => i.expires_at ? new Date(i.expires_at).toLocaleString() : '-',
+      },
+      {
+        key: 'claimedAt',
+        header: t('operations.shareLinks.claimedAt'),
+        className: 'whitespace-nowrap',
+        render: (i) => i.claimed_at ? new Date(i.claimed_at).toLocaleString() : '-',
+      },
+      {
+        key: 'createdAt',
+        header: t('operations.shareLinks.createdAt'),
+        className: 'whitespace-nowrap',
+        render: (i) => new Date(i.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
 
   return (
     <div className="space-y-4">
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <select
-          value={status}
-          onChange={(e) => {
-            setLoading(true)
-            setOffset(0)
-            setStatus(e.target.value)
-          }}
-          className="rounded-md border bg-background px-2 py-1 text-sm"
-        >
-          <option value="">{t('operations.shareLinks.allStatus')}</option>
-          {SHARE_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
+      <AdminFilter
+        value={status}
+        options={filterOptions}
+        onChange={(v) => { setStatus(v); setOffset(0) }}
+      />
 
-      {loading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.loading')}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.noData')}
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">ID</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.shareLinks.from')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.shareLinks.to')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.shareLinks.amount')}</th>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.shareLinks.status')}</th>
-                  <th className="px-3 py-2 text-left font-medium">Expires At</th>
-                  <th className="px-3 py-2 text-left font-medium">Claimed At</th>
-                  <th className="px-3 py-2 text-left font-medium">Created At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={item.id} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
-                    <td className="px-3 py-2">{item.id}</td>
-                    <td className="px-3 py-2">{item.from_user_email ?? '-'}</td>
-                    <td className="px-3 py-2">{item.to_user_email ?? '-'}</td>
-                    <td className="px-3 py-2 text-right">{item.amount}</td>
-                    <td className="px-3 py-2">{statusBadge(item.status)}</td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      {item.expires_at ? new Date(item.expires_at).toLocaleString() : '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      {item.claimed_at ? new Date(item.claimed_at).toLocaleString() : '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2">
-                      {new Date(item.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={offset === 0}
-                onClick={() => {
-                  setLoading(true)
-                  setOffset((prev) => Math.max(0, prev - PAGE_SIZE))
-                }}
-                className="rounded-md border px-3 py-1 text-sm disabled:opacity-40"
-              >
-                {t('common.previous')}
-              </button>
-              <button
-                type="button"
-                disabled={offset + PAGE_SIZE >= total}
-                onClick={() => {
-                  setLoading(true)
-                  setOffset((prev) => prev + PAGE_SIZE)
-                }}
-                className="rounded-md border px-3 py-1 text-sm disabled:opacity-40"
-              >
-                {t('common.next')}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+      <DataTable columns={columns} data={items} rowKey={(i) => i.id} loading={isLoading} />
+      <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
     </div>
   )
 }
 
-// ── Tab 4: Revenue ─────────────────────────────────────────
+// -- Tab 4: Revenue ----------------------------------------------------------
 
 function RevenueTab() {
   const { t } = useTranslation('admin')
   const [granularity, setGranularity] = useState('day')
   const [days, setDays] = useState(30)
-  const [data, setData] = useState<RevenueResponse | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    let active = true
-    fetchRevenue({ granularity, days })
-      .then((res) => {
-        if (active) setData(res)
-      })
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [granularity, days])
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'revenue', { granularity, days }],
+    queryFn: () => fetchRevenue({ granularity, days }),
+  })
 
-  const items: RevenueItem[] = data?.items ?? []
+  const items = data?.items ?? []
+
+  const granularityOptions = useMemo(
+    () => [
+      { value: 'day', label: t('operations.revenue.day') },
+      { value: 'week', label: t('operations.revenue.week') },
+      { value: 'month', label: t('operations.revenue.month') },
+    ],
+    [t],
+  )
+
+  const columns: Column<RevenueItem>[] = useMemo(
+    () => [
+      { key: 'period', header: t('operations.revenue.period'), render: (i) => i.period },
+      { key: 'credits', header: t('operations.revenue.credits'), align: 'right', render: (i) => i.total_credits },
+      { key: 'transactions', header: t('operations.revenue.transactions'), align: 'right', render: (i) => i.transaction_count },
+    ],
+    [t],
+  )
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           {t('operations.revenue.granularity')}
-          <select
-            value={granularity}
-            onChange={(e) => {
-              setLoading(true)
-              setGranularity(e.target.value)
-            }}
-            className="rounded-md border bg-background px-2 py-1 text-sm"
-          >
-            <option value="day">{t('operations.revenue.day')}</option>
-            <option value="week">{t('operations.revenue.week')}</option>
-            <option value="month">{t('operations.revenue.month')}</option>
-          </select>
+          <AdminFilter value={granularity} options={granularityOptions} onChange={setGranularity} className="w-[100px]" />
         </label>
         <label className="flex items-center gap-2 text-sm">
           {t('operations.toolUsage.days')}
-          <input
+          <Input
             type="number"
             min={1}
             max={365}
             value={days}
-            onChange={(e) => {
-              setLoading(true)
-              setDays(Number(e.target.value) || 30)
-            }}
-            className="w-20 rounded-md border bg-background px-2 py-1 text-sm"
+            onChange={(e) => setDays(Number(e.target.value) || 30)}
+            className="w-20"
           />
         </label>
       </div>
 
-      {loading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.loading')}
-        </div>
-      ) : !data || items.length === 0 ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">
-          {t('common.noData')}
-        </div>
-      ) : (
+      {!isLoading && data && items.length > 0 && (
         <>
-          {/* Line chart */}
           <div className="rounded-xl border bg-card p-4">
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={items}>
@@ -564,89 +386,46 @@ function RevenueTab() {
             </ResponsiveContainer>
           </div>
 
-          {/* Summary cards */}
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-xl border bg-card p-4">
               <div className="text-2xl font-bold">{data.total_credits.toLocaleString()}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {t('operations.revenue.totalCredits')}
-              </div>
+              <div className="mt-1 text-sm text-muted-foreground">{t('operations.revenue.totalCredits')}</div>
             </div>
             <div className="rounded-xl border bg-card p-4">
               <div className="text-2xl font-bold">{data.total_transactions.toLocaleString()}</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                {t('operations.revenue.totalTransactions')}
-              </div>
+              <div className="mt-1 text-sm text-muted-foreground">{t('operations.revenue.totalTransactions')}</div>
             </div>
-          </div>
-
-          {/* Data table */}
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-medium">{t('operations.revenue.period')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.revenue.credits')}</th>
-                  <th className="px-3 py-2 text-right font-medium">{t('operations.revenue.transactions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={item.period} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
-                    <td className="px-3 py-2">{item.period}</td>
-                    <td className="px-3 py-2 text-right">{item.total_credits}</td>
-                    <td className="px-3 py-2 text-right">{item.transaction_count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </>
       )}
+
+      <DataTable columns={columns} data={items} rowKey={(i) => i.period} loading={isLoading} />
     </div>
   )
 }
 
-// ── Main Page Component ────────────────────────────────────
+// -- Main Page Component -----------------------------------------------------
 
 export function AdminOperationsPage() {
   const { t } = useTranslation('admin')
-  const [activeTab, setActiveTab] = useState<Tab>('toolUsage')
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'toolUsage', label: t('operations.tabs.toolUsage') },
-    { key: 'transactions', label: t('operations.tabs.transactions') },
-    { key: 'shareLinks', label: t('operations.tabs.shareLinks') },
-    { key: 'revenue', label: t('operations.tabs.revenue') },
-  ]
 
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-bold">{t('operations.title')}</h2>
 
-      {/* Tab buttons */}
-      <div className="flex gap-1 rounded-lg border bg-muted/30 p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tabs defaultValue="toolUsage">
+        <TabsList>
+          <TabsTrigger value="toolUsage">{t('operations.tabs.toolUsage')}</TabsTrigger>
+          <TabsTrigger value="transactions">{t('operations.tabs.transactions')}</TabsTrigger>
+          <TabsTrigger value="shareLinks">{t('operations.tabs.shareLinks')}</TabsTrigger>
+          <TabsTrigger value="revenue">{t('operations.tabs.revenue')}</TabsTrigger>
+        </TabsList>
 
-      {/* Tab content */}
-      {activeTab === 'toolUsage' && <ToolUsageTab />}
-      {activeTab === 'transactions' && <TransactionsTab />}
-      {activeTab === 'shareLinks' && <ShareLinksTab />}
-      {activeTab === 'revenue' && <RevenueTab />}
+        <TabsContent value="toolUsage"><ToolUsageTab /></TabsContent>
+        <TabsContent value="transactions"><TransactionsTab /></TabsContent>
+        <TabsContent value="shareLinks"><ShareLinksTab /></TabsContent>
+        <TabsContent value="revenue"><RevenueTab /></TabsContent>
+      </Tabs>
     </div>
   )
 }

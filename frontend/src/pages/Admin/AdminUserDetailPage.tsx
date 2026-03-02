@@ -1,73 +1,149 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
+import { ConfirmDialog, DataTable, StatusBadge } from '@/components/admin'
+import type { Column } from '@/components/admin'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import {
   adjustUserCredits,
   fetchAdminUserDetail,
   updateUserStatus,
 } from '@/services/adminApi'
-import type { AdminUserDetail } from '@/services/adminApi'
+import type {
+  AdminLoginHistoryItem,
+  AdminProcessingHistoryItem,
+  AdminTransactionItem,
+} from '@/services/adminApi'
 
 export function AdminUserDetailPage() {
   const { t } = useTranslation('admin')
   const { id } = useParams<{ id: string }>()
+  const queryClient = useQueryClient()
 
-  const [user, setUser] = useState<AdminUserDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [statusToggling, setStatusToggling] = useState(false)
-
-  // Adjust credits form state
   const [creditAmount, setCreditAmount] = useState('')
   const [creditDesc, setCreditDesc] = useState('')
-  const [adjusting, setAdjusting] = useState(false)
-  const [adjustMsg, setAdjustMsg] = useState('')
+  const [showConfirm, setShowConfirm] = useState(false)
 
-  const loadUser = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    try {
-      const res = await fetchAdminUserDetail(Number(id))
-      setUser(res)
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
+  const queryKey = ['admin', 'user-detail', id]
+  const { data: user, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => fetchAdminUserDetail(Number(id)),
+    enabled: !!id,
+  })
 
-  useEffect(() => {
-    void loadUser()
-  }, [loadUser])
+  const toggleMutation = useMutation({
+    mutationFn: () => updateUserStatus(user!.id, !user!.is_active),
+    onSuccess: () => {
+      toast.success(t('common.success'))
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user-detail', id] })
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      setShowConfirm(false)
+    },
+    onError: (err) => {
+      toast.error(getTranslatedApiError(err, t('common.error')))
+      setShowConfirm(false)
+    },
+  })
 
-  const handleToggleStatus = async () => {
-    if (!user || statusToggling) return
-    setStatusToggling(true)
-    try {
-      await updateUserStatus(user.id, !user.is_active)
-      void loadUser()
-    } finally {
-      setStatusToggling(false)
-    }
-  }
-
-  const handleAdjustCredits = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!user || adjusting) return
-    const amount = Number(creditAmount)
-    if (!amount || !creditDesc.trim()) return
-    setAdjusting(true)
-    setAdjustMsg('')
-    try {
-      await adjustUserCredits(user.id, amount, creditDesc.trim())
-      setAdjustMsg(t('users.detail.adjustSuccess'))
+  const adjustMutation = useMutation({
+    mutationFn: (args: { amount: number; description: string }) =>
+      adjustUserCredits(user!.id, args.amount, args.description),
+    onSuccess: () => {
+      toast.success(t('users.detail.adjustSuccess'))
       setCreditAmount('')
       setCreditDesc('')
-      void loadUser()
-    } finally {
-      setAdjusting(false)
-    }
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user-detail', id] })
+    },
+    onError: (err) => {
+      toast.error(getTranslatedApiError(err, t('common.error')))
+    },
+  })
+
+  const handleAdjustCredits = (e: React.FormEvent) => {
+    e.preventDefault()
+    const amount = Number(creditAmount)
+    if (!amount || !creditDesc.trim()) return
+    adjustMutation.mutate({ amount, description: creditDesc.trim() })
   }
 
-  if (loading) {
+  const loginColumns: Column<AdminLoginHistoryItem>[] = useMemo(
+    () => [
+      { key: 'ip', header: t('users.detail.loginIp'), render: (l) => l.ip ?? '-' },
+      {
+        key: 'ua',
+        header: t('users.detail.loginUserAgent'),
+        className: 'max-w-xs truncate',
+        render: (l) => (
+          <span title={l.user_agent ?? ''}>{l.user_agent ?? '-'}</span>
+        ),
+      },
+      {
+        key: 'time',
+        header: t('users.detail.loginTime'),
+        className: 'whitespace-nowrap',
+        render: (l) => new Date(l.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
+
+  const txColumns: Column<AdminTransactionItem>[] = useMemo(
+    () => [
+      { key: 'type', header: t('users.detail.txType'), render: (tx) => tx.tx_type },
+      {
+        key: 'amount',
+        header: t('users.detail.txAmount'),
+        render: (tx) => (
+          <span className={tx.amount >= 0 ? 'text-success' : 'text-destructive'}>
+            {tx.amount >= 0 ? '+' : ''}{tx.amount}
+          </span>
+        ),
+      },
+      { key: 'before', header: t('users.detail.txBalanceBefore'), render: (tx) => tx.balance_before },
+      { key: 'after', header: t('users.detail.txBalanceAfter'), render: (tx) => tx.balance_after },
+      {
+        key: 'desc',
+        header: t('users.detail.txDescription'),
+        className: 'max-w-xs truncate',
+        render: (tx) => (
+          <span title={tx.description ?? ''}>{tx.description ?? '-'}</span>
+        ),
+      },
+      {
+        key: 'time',
+        header: t('users.detail.txTime'),
+        className: 'whitespace-nowrap',
+        render: (tx) => new Date(tx.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
+
+  const procColumns: Column<AdminProcessingHistoryItem>[] = useMemo(
+    () => [
+      { key: 'tool', header: t('users.detail.procTool'), render: (p) => p.tool_name },
+      {
+        key: 'status',
+        header: t('users.detail.procStatus'),
+        render: (p) => <StatusBadge status={p.status} />,
+      },
+      {
+        key: 'time',
+        header: t('users.detail.procTime'),
+        className: 'whitespace-nowrap',
+        render: (p) => new Date(p.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
+
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
         {t('common.loading')}
@@ -85,241 +161,154 @@ export function AdminUserDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Back link */}
       <Link to="/admin/users" className="text-sm text-primary hover:underline">
         &larr; {t('users.detail.back')}
       </Link>
 
-      {/* Basic info card */}
-      <div className="rounded-xl border bg-card p-4">
-        <h2 className="mb-4 text-lg font-semibold">{t('users.detail.basicInfo')}</h2>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
-          <div>
-            <span className="text-muted-foreground">{t('users.email')}: </span>
-            <span className="font-medium">{user.email}</span>
+      {/* Basic info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.basicInfo')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+            <div>
+              <span className="text-muted-foreground">{t('users.email')}: </span>
+              <span className="font-medium">{user.email}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t('users.name')}: </span>
+              <span className="font-medium">{user.name ?? '-'}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t('users.balance')}: </span>
+              <span className="font-medium">{user.balance}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">{t('users.status')}: </span>
+              <StatusBadge
+                status={user.is_active ? 'active' : 'disabled'}
+                label={user.is_active ? t('users.active') : t('users.disabled')}
+              />
+              {!user.is_admin && (
+                <Button
+                  variant={user.is_active ? 'destructive' : 'default'}
+                  size="sm"
+                  onClick={() => setShowConfirm(true)}
+                >
+                  {user.is_active ? t('users.disable') : t('users.enable')}
+                </Button>
+              )}
+            </div>
+            <div>
+              <span className="text-muted-foreground">{t('users.createdAt')}: </span>
+              <span className="font-medium">{new Date(user.created_at).toLocaleString()}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {user.is_admin && (
+                <StatusBadge status="reviewed" label={t('users.detail.admin')} />
+              )}
+              {user.email_verified && (
+                <StatusBadge status="claimed" label={t('users.detail.emailVerified')} />
+              )}
+            </div>
           </div>
-          <div>
-            <span className="text-muted-foreground">{t('users.name')}: </span>
-            <span className="font-medium">{user.name ?? '-'}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">{t('users.balance')}: </span>
-            <span className="font-medium">{user.balance}</span>
-          </div>
-          <div>
-            <span className="text-muted-foreground">{t('users.status')}: </span>
-            <span
-              className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                user.is_active
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-              }`}
-            >
-              {user.is_active ? t('users.active') : t('users.disabled')}
-            </span>
-            {!user.is_admin && (
-              <button
-                type="button"
-                disabled={statusToggling}
-                onClick={() => void handleToggleStatus()}
-                className={`ml-2 rounded-md px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                  user.is_active
-                    ? 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50'
-                    : 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
-                }`}
-              >
-                {user.is_active ? t('users.disable') : t('users.enable')}
-              </button>
-            )}
-          </div>
-          <div>
-            <span className="text-muted-foreground">{t('users.createdAt')}: </span>
-            <span className="font-medium">{new Date(user.created_at).toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {user.is_admin && (
-              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                {t('users.detail.admin')}
-              </span>
-            )}
-            {user.email_verified && (
-              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                {t('users.detail.emailVerified')}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Adjust credits */}
-      <div className="rounded-xl border bg-card p-4">
-        <h2 className="mb-4 text-lg font-semibold">{t('users.detail.adjustCredits')}</h2>
-        <form onSubmit={(e) => void handleAdjustCredits(e)} className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="mb-1 block text-xs text-muted-foreground">
-              {t('users.detail.adjustAmount')}
-            </label>
-            <input
-              type="number"
-              value={creditAmount}
-              onChange={(e) => setCreditAmount(e.target.value)}
-              className="w-32 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
-          </div>
-          <div className="flex-1">
-            <label className="mb-1 block text-xs text-muted-foreground">
-              {t('users.detail.adjustDesc')}
-            </label>
-            <input
-              type="text"
-              value={creditDesc}
-              onChange={(e) => setCreditDesc(e.target.value)}
-              className="w-full min-w-[200px] rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={adjusting}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-          >
-            {t('users.detail.adjustSubmit')}
-          </button>
-        </form>
-        {adjustMsg && (
-          <p className="mt-2 text-sm text-green-600 dark:text-green-400">{adjustMsg}</p>
-        )}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.adjustCredits')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAdjustCredits} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('users.detail.adjustAmount')}
+              </label>
+              <Input
+                type="number"
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(e.target.value)}
+                className="w-32"
+                required
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('users.detail.adjustDesc')}
+              </label>
+              <Input
+                type="text"
+                value={creditDesc}
+                onChange={(e) => setCreditDesc(e.target.value)}
+                className="min-w-[200px]"
+                required
+              />
+            </div>
+            <Button type="submit" disabled={adjustMutation.isPending}>
+              {t('users.detail.adjustSubmit')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {/* Recent Logins */}
-      <div className="rounded-xl border bg-card p-4">
-        <h2 className="mb-4 text-lg font-semibold">{t('users.detail.recentLogins')}</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">{t('users.detail.loginIp')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.loginUserAgent')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.loginTime')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {user.recent_logins.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-4 py-10 text-center text-muted-foreground">
-                    {t('common.noData')}
-                  </td>
-                </tr>
-              ) : (
-                user.recent_logins.map((login) => (
-                  <tr key={login.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                    <td className="px-4 py-3">{login.ip ?? '-'}</td>
-                    <td className="max-w-xs truncate px-4 py-3" title={login.user_agent ?? ''}>
-                      {login.user_agent ?? '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {new Date(login.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.recentLogins')}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <DataTable
+            columns={loginColumns}
+            data={user.recent_logins}
+            rowKey={(l) => l.id}
+          />
+        </CardContent>
+      </Card>
 
       {/* Recent Transactions */}
-      <div className="rounded-xl border bg-card p-4">
-        <h2 className="mb-4 text-lg font-semibold">{t('users.detail.recentTransactions')}</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">{t('users.detail.txType')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.txAmount')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.txBalanceBefore')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.txBalanceAfter')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.txDescription')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.txTime')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {user.recent_transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                    {t('common.noData')}
-                  </td>
-                </tr>
-              ) : (
-                user.recent_transactions.map((tx) => (
-                  <tr key={tx.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                    <td className="px-4 py-3">{tx.tx_type}</td>
-                    <td className={`px-4 py-3 font-medium ${tx.amount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                      {tx.amount >= 0 ? '+' : ''}{tx.amount}
-                    </td>
-                    <td className="px-4 py-3">{tx.balance_before}</td>
-                    <td className="px-4 py-3">{tx.balance_after}</td>
-                    <td className="max-w-xs truncate px-4 py-3" title={tx.description ?? ''}>
-                      {tx.description ?? '-'}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {new Date(tx.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.recentTransactions')}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <DataTable
+            columns={txColumns}
+            data={user.recent_transactions}
+            rowKey={(tx) => tx.id}
+          />
+        </CardContent>
+      </Card>
 
       {/* Recent Processing */}
-      <div className="rounded-xl border bg-card p-4">
-        <h2 className="mb-4 text-lg font-semibold">{t('users.detail.recentProcessing')}</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b text-left text-muted-foreground">
-                <th className="px-4 py-3 font-medium">{t('users.detail.procTool')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.procStatus')}</th>
-                <th className="px-4 py-3 font-medium">{t('users.detail.procTime')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {user.recent_processing.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-4 py-10 text-center text-muted-foreground">
-                    {t('common.noData')}
-                  </td>
-                </tr>
-              ) : (
-                user.recent_processing.map((proc) => (
-                  <tr key={proc.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                    <td className="px-4 py-3">{proc.tool_name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-                          proc.status === 'done'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : proc.status === 'failed'
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                              : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-                        }`}
-                      >
-                        {proc.status}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {new Date(proc.created_at).toLocaleString()}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.recentProcessing')}</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <DataTable
+            columns={procColumns}
+            data={user.recent_processing}
+            rowKey={(p) => p.id}
+          />
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        title={t('common.confirmAction')}
+        description={
+          user.is_active
+            ? `${t('users.disable')} ${user.email}?`
+            : `${t('users.enable')} ${user.email}?`
+        }
+        variant={user.is_active ? 'destructive' : 'default'}
+        loading={toggleMutation.isPending}
+        onConfirm={() => toggleMutation.mutate()}
+      />
     </div>
   )
 }
