@@ -25,6 +25,10 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: web
+      args:
+        VITE_GA_MEASUREMENT_ID: G-HPXR8NRW33
+        VITE_GOOGLE_CLIENT_ID: 877608236921-quer9hbn6ged8bmpui8mht1pbjrd2vgj.apps.googleusercontent.com
+        VITE_SITE_URL: https://www.toolii.cc
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:

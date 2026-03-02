@@ -3,6 +3,12 @@ WORKDIR /app/frontend
 COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY frontend/ ./
+ARG VITE_GA_MEASUREMENT_ID
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_SITE_URL
+ENV VITE_GA_MEASUREMENT_ID=$VITE_GA_MEASUREMENT_ID \
+    VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    VITE_SITE_URL=$VITE_SITE_URL
 RUN pnpm build
 
 
