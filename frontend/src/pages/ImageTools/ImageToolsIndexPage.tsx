@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
+import { buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FORMAT_PAIRS } from '@/config/formatPairs'
@@ -28,7 +29,7 @@ export function ImageToolsIndexPage() {
 
   return (
     <>
-      <SEOHead title={t('seoTitle')} description={t('seoDescription')} keywords={t('seoKeywords')} canonicalPath="/image-tools" />
+      <SEOHead title={t('seoTitle')} description={t('seoDescription')} keywords={t('seoKeywords')} canonicalPath="/image-tools" jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }])} />
       <div className="space-y-5">
         <div className="animate-rise-in flex items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">

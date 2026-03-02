@@ -7,7 +7,7 @@ import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { ToolWorkspaceDropzone } from '@/components/tools/ToolWorkspaceDropzone'
 import { Button } from '@/components/ui/button'
@@ -220,7 +220,7 @@ export function CompressPage() {
 
   return (
     <>
-      <SEOHead title={t('compress.seoTitle')} description={t('compress.seoDescription')} keywords={t('compress.seoKeywords')} canonicalPath="/image-tools/compress" jsonLd={buildToolJsonLd({ name: t('compress.seoTitle'), description: t('compress.seoDescription'), url: '/image-tools/compress' })} />
+      <SEOHead title={t('compress.seoTitle')} description={t('compress.seoDescription')} keywords={t('compress.seoKeywords')} canonicalPath="/image-tools/compress" jsonLd={[buildToolJsonLd({ name: t('compress.seoTitle'), description: t('compress.seoDescription'), url: '/image-tools/compress' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('compress.title'), path: '/image-tools/compress' }])]} />
       <ToolPageShell
         title={t('compress.title')}
         description={t('compress.description')}

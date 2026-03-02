@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 
@@ -52,9 +52,8 @@ export function GoogleLinkPasswordDialog({ open, onConfirm, onCancel }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="link-password">{t('password')}</Label>
-            <Input
+            <PasswordInput
               id="link-password"
-              type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
@@ -59,7 +59,7 @@ export function RestoreFacePage() {
 
   return (
     <>
-      <SEOHead title={t('restoreFace.seoTitle')} description={t('restoreFace.seoDescription')} keywords={t('restoreFace.seoKeywords')} canonicalPath="/image-tools/restore-face" jsonLd={buildToolJsonLd({ name: t('restoreFace.seoTitle'), description: t('restoreFace.seoDescription'), url: '/image-tools/restore-face' })} />
+      <SEOHead title={t('restoreFace.seoTitle')} description={t('restoreFace.seoDescription')} keywords={t('restoreFace.seoKeywords')} canonicalPath="/image-tools/restore-face" jsonLd={[buildToolJsonLd({ name: t('restoreFace.seoTitle'), description: t('restoreFace.seoDescription'), url: '/image-tools/restore-face' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('restoreFace.title'), path: '/image-tools/restore-face' }])]} />
       <ToolPageShell title={t('restoreFace.title')} description={t('restoreFace.description')} backTo="/image-tools">
         <div className="space-y-5 tool-section-stagger">
           <FileDropzone

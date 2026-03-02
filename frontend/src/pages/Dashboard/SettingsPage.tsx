@@ -8,6 +8,7 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { api } from '@/services/api'
@@ -75,13 +76,13 @@ function ProfileSection() {
               <p className="text-sm text-destructive">{errors.email.message}</p>
             ) : null}
             {!user.email_verified && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-warning">
                 {t('settings.profile.emailNotVerified')}
               </p>
             )}
           </div>
           {msg ? (
-            <p className="text-sm text-green-700 dark:text-green-400">{msg}</p>
+            <p className="text-sm text-success">{msg}</p>
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" disabled={isSubmitting}>
@@ -99,7 +100,7 @@ type PasswordValues = { currentPassword: string; newPassword: string; confirmPas
 function PasswordSection() {
   const { t } = useTranslation('credits')
   const user = useAuthStore((s) => s.user)!
-  const hasPassword = !!user.email
+  const hasPassword = user.has_password
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -151,9 +152,8 @@ function PasswordSection() {
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">
             <Label htmlFor="currentPassword">{t('settings.password.currentPassword')}</Label>
-            <Input
+            <PasswordInput
               id="currentPassword"
-              type="password"
               autoComplete="current-password"
               {...register('currentPassword')}
             />
@@ -165,9 +165,8 @@ function PasswordSection() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="newPassword">{t('settings.password.newPassword')}</Label>
-            <Input
+            <PasswordInput
               id="newPassword"
-              type="password"
               autoComplete="new-password"
               {...register('newPassword')}
             />
@@ -179,9 +178,8 @@ function PasswordSection() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">{t('settings.password.confirmPassword')}</Label>
-            <Input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               autoComplete="new-password"
               {...register('confirmPassword')}
             />
@@ -192,7 +190,7 @@ function PasswordSection() {
             ) : null}
           </div>
           {msg ? (
-            <p className="text-sm text-green-700 dark:text-green-400">{msg}</p>
+            <p className="text-sm text-success">{msg}</p>
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" disabled={isSubmitting}>
@@ -258,7 +256,7 @@ function DeleteAccountSection() {
   const [deletePassword, setDeletePassword] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
-  const hasPassword = !!user.email
+  const hasPassword = user.has_password
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -298,9 +296,8 @@ function DeleteAccountSection() {
             {hasPassword && (
               <div className="space-y-1">
                 <Label htmlFor="delete-password">{t('settings.deleteAccount.passwordLabel')}</Label>
-                <Input
+                <PasswordInput
                   id="delete-password"
-                  type="password"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
                 />

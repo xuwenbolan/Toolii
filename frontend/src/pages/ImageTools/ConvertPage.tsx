@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { SEOHead } from '@/components/common/SEOHead'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FORMAT_PAIRS } from '@/config/formatPairs'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ConvertForm } from './ConvertForm'
 
 export function ConvertPage() {
@@ -17,7 +17,7 @@ export function ConvertPage() {
         description={t('convert.seoDescription')}
         keywords={t('convert.seoKeywords')}
         canonicalPath="/image-tools/convert"
-        jsonLd={buildToolJsonLd({ name: t('convert.seoTitle'), description: t('convert.seoDescription'), url: '/image-tools/convert' })}
+        jsonLd={[buildToolJsonLd({ name: t('convert.seoTitle'), description: t('convert.seoDescription'), url: '/image-tools/convert' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('convert.title'), path: '/image-tools/convert' }])]}
       />
       <ConvertForm title={t('convert.title')} description={t('convert.description')} />
 

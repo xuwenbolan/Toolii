@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Brush, Download, Eraser, RectangleHorizontal, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { ToolWorkspaceDropzone } from '@/components/tools/ToolWorkspaceDropzone'
 import { Button } from '@/components/ui/button'
@@ -453,7 +453,7 @@ export function MosaicPage() {
 
   return (
     <>
-      <SEOHead title={t('mosaic.seoTitle')} description={t('mosaic.seoDescription')} keywords={t('mosaic.seoKeywords')} canonicalPath="/image-tools/mosaic" jsonLd={buildToolJsonLd({ name: t('mosaic.seoTitle'), description: t('mosaic.seoDescription'), url: '/image-tools/mosaic' })} />
+      <SEOHead title={t('mosaic.seoTitle')} description={t('mosaic.seoDescription')} keywords={t('mosaic.seoKeywords')} canonicalPath="/image-tools/mosaic" jsonLd={[buildToolJsonLd({ name: t('mosaic.seoTitle'), description: t('mosaic.seoDescription'), url: '/image-tools/mosaic' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('mosaic.title'), path: '/image-tools/mosaic' }])]} />
       <ToolPageShell title={t('mosaic.title')} description={t('mosaic.description')} backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5 tool-section-stagger">
           <ToolWorkspaceDropzone

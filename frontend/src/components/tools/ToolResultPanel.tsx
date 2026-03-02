@@ -42,6 +42,7 @@ export function ToolResultPanel({ open, title, onClose, className, children }: P
         'transition-[background-color] duration-[var(--duration-normal)] ease-[var(--ease-out)]',
         visible ? 'bg-black/30' : 'bg-black/0',
       )}
+      style={{ paddingBottom: 'calc(0.75rem + var(--sai-bottom))' }}
       onClick={onClose}
       onTransitionEnd={handleTransitionEnd}
     >
@@ -59,7 +60,7 @@ export function ToolResultPanel({ open, title, onClose, className, children }: P
       >
         <header className="flex items-center justify-between border-b border-border/70 px-4 py-3 sm:px-5">
           <h2 className="text-sm font-semibold tracking-tight sm:text-base">{title}</h2>
-          <Button type="button" size="icon" variant="ghost" className="h-8 w-8" onClick={onClose} aria-label={t('actions.close')}>
+          <Button type="button" size="icon" variant="ghost" className="h-9 w-9" onClick={onClose} aria-label={t('actions.close')}>
             <X className="h-4 w-4" />
           </Button>
         </header>

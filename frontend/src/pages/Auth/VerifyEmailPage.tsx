@@ -21,24 +21,18 @@ export function VerifyEmailPage() {
   useEffect(() => {
     if (!token || verifiedRef.current) return
     verifiedRef.current = true
-
-    const controller = new AbortController()
     ;(async () => {
       try {
-        await api.post('/api/auth/verify-email', { token }, { signal: controller.signal })
+        await api.post('/api/auth/verify-email', { token })
         setState('success')
-        await fetchMe()
+        // Best-effort refresh of local user state; failure is not a verification error
+        try { await fetchMe() } catch { /* ignore */ }
       } catch (err: unknown) {
-        if (controller.signal.aborted) return
         setState('error')
         setErrorMsg(getTranslatedApiError(err, t('verifyEmail.failed')))
       }
     })()
-
-    return () => {
-      controller.abort()
-    }
-  }, [token, t])
+  }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!token) {
     return (
@@ -50,7 +44,7 @@ export function VerifyEmailPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <p className="text-red-600 dark:text-red-400">{t('verifyEmail.missingToken')}</p>
+              <p className="text-destructive">{t('verifyEmail.missingToken')}</p>
               <Link
                 to="/"
                 className="inline-block text-sm text-foreground underline underline-offset-4"
@@ -77,7 +71,7 @@ export function VerifyEmailPage() {
         )}
         {state === 'success' && (
           <div className="space-y-3">
-            <p className="text-green-700 dark:text-green-400">
+            <p className="text-success">
               {t('verifyEmail.success')}
             </p>
             <Link
@@ -90,7 +84,7 @@ export function VerifyEmailPage() {
         )}
         {state === 'error' && (
           <div className="space-y-3">
-            <p className="text-red-600 dark:text-red-400">{errorMsg}</p>
+            <p className="text-destructive">{errorMsg}</p>
             <Link
               to="/"
               className="inline-block text-sm text-foreground underline underline-offset-4"

@@ -69,7 +69,7 @@ export function SizeStandardPicker({ standards, value, onChange }: Props) {
               className={cn(
                 'group rounded-lg border p-3 text-left transition-all',
                 selectedItem
-                  ? 'border-teal-400/70 bg-teal-50/60 ring-1 ring-teal-300 dark:border-teal-700 dark:bg-teal-950/20'
+                  ? 'border-info/40 bg-info-light ring-1 ring-info/30'
                   : 'border-slate-200/80 bg-white/70 hover:border-slate-300 hover:bg-slate-50/90 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-slate-700',
               )}
               onClick={() => onChange(item.code)}
@@ -77,7 +77,7 @@ export function SizeStandardPicker({ standards, value, onChange }: Props) {
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm font-medium">{displayName}</p>
                 {selectedItem ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-300" aria-hidden />
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-info" aria-hidden />
                 ) : null}
               </div>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
@@ -92,7 +92,7 @@ export function SizeStandardPicker({ standards, value, onChange }: Props) {
                     aria-hidden
                   >
                     <div
-                      className="absolute left-1/2 w-4 -translate-x-1/2 rounded-sm border border-teal-500/80 bg-teal-500/20"
+                      className="absolute left-1/2 w-4 -translate-x-1/2 rounded-sm border border-info/80 bg-info/20"
                       style={{
                         top: `${topMargin}%`,
                         height: `${Math.max(12, faceHeight)}%`,

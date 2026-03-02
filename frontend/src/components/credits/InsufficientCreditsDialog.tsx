@@ -71,7 +71,7 @@ export function InsufficientCreditsDialog({
         <DialogDescription className="sr-only">{t('insufficient.hint')}</DialogDescription>
         <Card className="w-full border-0 shadow-none">
           <CardHeader className="space-y-2 pb-3">
-            <div className="inline-flex w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">
+            <div className="inline-flex w-fit rounded-full border border-warning/30 bg-warning/10 px-2 py-1 text-xs text-warning">
               {t('insufficient.badge')}
             </div>
             <CardTitle className="text-base">{t('insufficient.needCredits', { actionLabel: resolvedActionLabel })}</CardTitle>
@@ -115,7 +115,7 @@ export function InsufficientCreditsDialog({
                         <p className="text-muted-foreground">{formatTime(item.created_at, i18n.language)}</p>
                       </div>
                       <div className="text-right">
-                        <p className={item.amount < 0 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>
+                        <p className={item.amount < 0 ? 'text-warning' : 'text-success'}>
                           {item.amount > 0 ? `+${item.amount}` : item.amount}
                         </p>
                         <p className="text-muted-foreground">{t('insufficient.transactionBalance', { balance: item.balance_after })}</p>

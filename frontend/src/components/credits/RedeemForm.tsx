@@ -67,7 +67,7 @@ export function RedeemForm({ onRedeemed }: Props) {
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {success ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{success}</p> : null}
+      {success ? <p className="text-sm text-success">{success}</p> : null}
 
       <Button className="w-full" type="submit" disabled={pending}>
         {pending ? t('redeem.redeeming') : t('redeem.button')}

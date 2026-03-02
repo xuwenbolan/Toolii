@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { STANDARD_I18N_MAP } from '@/config/photoStandards'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
 
@@ -71,7 +71,6 @@ export function IdPhotoPage() {
     exportResult,
     layoutResult,
     exportPending,
-    layoutPending,
     actionError,
     resultPanelOpen,
     resultPanelKind,
@@ -113,7 +112,7 @@ export function IdPhotoPage() {
         description={t('seo.description')}
         keywords={t('seo.keywords')}
         canonicalPath="/id-photo"
-        jsonLd={buildToolJsonLd({ name: t('seo.title'), description: t('seo.description'), url: '/id-photo' })}
+        jsonLd={[buildToolJsonLd({ name: t('seo.title'), description: t('seo.description'), url: '/id-photo' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/id-photo' }])]}
       />
 
       <ToolPageShell title={t('title')} description={t('workflow')} backTo="/" width="wide">

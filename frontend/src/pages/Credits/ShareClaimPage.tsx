@@ -83,7 +83,7 @@ export function ShareClaimPage() {
             </div>
 
             {claimResult ? (
-              <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+              <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success">
                 {t('claimPage.claimSuccess', { amount: claimResult.amount, balance: claimResult.balance })}
               </div>
             ) : null}

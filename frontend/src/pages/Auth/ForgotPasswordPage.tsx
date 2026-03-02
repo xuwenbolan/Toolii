@@ -11,6 +11,7 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { api } from '@/services/api'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 
 type FormValues = { email: string }
 
@@ -41,8 +42,8 @@ export function ForgotPasswordPage() {
     try {
       await api.post('/api/auth/forgot-password', { email: values.email })
       setSubmitted(true)
-    } catch {
-      setError(t('forgotPassword.requestFailed'))
+    } catch (err: unknown) {
+      setError(getTranslatedApiError(err, t('forgotPassword.requestFailed')))
     }
   }
 

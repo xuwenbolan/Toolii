@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, ClipboardCopy, FileText } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
@@ -224,7 +224,7 @@ export function OcrPage() {
         description={t('ocr.seoDescription')}
         keywords={t('ocr.seoKeywords')}
         canonicalPath="/image-tools/ocr"
-        jsonLd={buildToolJsonLd({ name: t('ocr.seoTitle'), description: t('ocr.seoDescription'), url: '/image-tools/ocr' })}
+        jsonLd={[buildToolJsonLd({ name: t('ocr.seoTitle'), description: t('ocr.seoDescription'), url: '/image-tools/ocr' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('ocr.title'), path: '/image-tools/ocr' }])]}
       />
       <ToolPageShell title={t('ocr.title')} description={t('ocr.description')} backTo="/image-tools">
         <div className="space-y-5 tool-section-stagger">

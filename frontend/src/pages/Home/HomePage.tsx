@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 
 import { SEOHead } from '@/components/common/SEOHead'
+import { buildWebSiteJsonLd } from '@/lib/jsonLd'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const TOOL_CATEGORIES = [
@@ -30,6 +31,11 @@ const TOOL_CATEGORIES = [
     descKey: 'home.fileTransferDesc',
     to: '/transfer',
   },
+  {
+    titleKey: 'home.faceMap',
+    descKey: 'home.faceMapDesc',
+    to: '/facemap',
+  },
 ]
 
 const TRUST_KEYS = ['home.trustLocal', 'home.trustFree', 'home.trustNoSignup'] as const
@@ -44,6 +50,7 @@ export function HomePage() {
         description={t('home.seoDescription')}
         canonicalPath="/"
         keywords={t('home.seoKeywords')}
+        jsonLd={buildWebSiteJsonLd()}
       />
 
       {/* Hero */}

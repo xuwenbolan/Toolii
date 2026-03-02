@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Brush, Eraser, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
@@ -353,7 +353,7 @@ export function InpaintPage() {
         description={t('inpaint.seoDescription')}
         keywords={t('inpaint.seoKeywords')}
         canonicalPath="/image-tools/inpaint"
-        jsonLd={buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' })}
+        jsonLd={[buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('inpaint.title'), path: '/image-tools/inpaint' }])]}
       />
       <ToolPageShell title={t('inpaint.title')} description={t('inpaint.description')} backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5 tool-section-stagger">

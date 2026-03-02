@@ -12,6 +12,7 @@ const SITE_NAME = 'Toolii'
 const PUBLIC_ROUTES = [
   '/',
   '/id-photo',
+  '/facemap',
   '/image-tools',
   '/image-tools/compress',
   '/image-tools/heic-to-jpg',
@@ -60,12 +61,14 @@ function buildRouteMeta(): Record<string, SeoMeta> {
   const common = readLocaleJson('common.json')
   const tools = readLocaleJson('tools.json')
   const idPhoto = readLocaleJson('idPhoto.json')
+  const faceMap = readLocaleJson('faceMap.json')
   const textTools = readLocaleJson('textTools.json')
   const legal = readLocaleJson('legal.json')
 
   return {
     '/':          { title: g(common, 'home.seoTitle'), description: g(common, 'home.seoDescription'), keywords: g(common, 'home.seoKeywords') },
     '/id-photo':  { title: g(idPhoto, 'seo.title'), description: g(idPhoto, 'seo.description'), keywords: g(idPhoto, 'seo.keywords') },
+    '/facemap':   { title: g(faceMap, 'seo.title'), description: g(faceMap, 'seo.description'), keywords: g(faceMap, 'seo.keywords') },
 
     '/image-tools':              { title: g(tools, 'seoTitle'), description: g(tools, 'seoDescription'), keywords: g(tools, 'seoKeywords') },
     '/image-tools/compress':     { title: g(tools, 'compress.seoTitle'), description: g(tools, 'compress.seoDescription'), keywords: g(tools, 'compress.seoKeywords') },
@@ -103,8 +106,14 @@ function escHtml(s: string): string {
 function injectMeta(html: string, meta: SeoMeta, route: string): string {
   const fullTitle = `${meta.title} | ${SITE_NAME}`
   const url = `${SITE_URL}${route}`
+  const ogImage = `${SITE_URL}/og-image.png`
 
-  html = html.replace(/<title>[^<]*<\/title>/, `<title>${escHtml(fullTitle)}</title>`)
+  // Strip default meta/OG/twitter tags from base HTML to avoid duplicates
+  html = html
+    .replace(/<title>[^<]*<\/title>/, `<title>${escHtml(fullTitle)}</title>`)
+    .replace(/\s*<meta name="description"[^>]*\/>\s*/g, '\n')
+    .replace(/\s*<meta property="og:[^>]*\/>\s*/g, '\n')
+    .replace(/\s*<meta name="twitter:[^>]*\/>\s*/g, '\n')
 
   const tags = [
     `<meta name="description" content="${escHtml(meta.description)}" />`,
@@ -114,9 +123,11 @@ function injectMeta(html: string, meta: SeoMeta, route: string): string {
     `<meta property="og:title" content="${escHtml(fullTitle)}" />`,
     `<meta property="og:description" content="${escHtml(meta.description)}" />`,
     `<meta property="og:url" content="${url}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${ogImage}" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escHtml(fullTitle)}" />`,
     `<meta name="twitter:description" content="${escHtml(meta.description)}" />`,
+    `<meta name="twitter:image" content="${ogImage}" />`,
     `<link rel="canonical" href="${url}" />`,
     `<link rel="alternate" hreflang="en" href="${url}" />`,
     `<link rel="alternate" hreflang="zh-Hans" href="${url}" />`,
@@ -152,12 +163,28 @@ function seoPlugin(): Plugin {
       }
 
       // Generate sitemap.xml
+      const buildDate = new Date().toISOString().split('T')[0]
       const urls = PUBLIC_ROUTES.map((r) => {
         let priority = 0.7
-        if (r === '/') priority = 1.0
-        else if (['/id-photo', '/image-tools', '/pdf-tools', '/text-tools'].includes(r)) priority = 0.8
-        else if (r.startsWith('/legal/')) priority = 0.3
-        return `  <url>\n    <loc>${SITE_URL}${r}</loc>\n    <priority>${priority}</priority>\n  </url>`
+        let changefreq = 'monthly'
+        if (r === '/') {
+          priority = 1.0
+          changefreq = 'weekly'
+        } else if (['/id-photo', '/facemap', '/image-tools', '/pdf-tools', '/text-tools'].includes(r)) {
+          priority = 0.8
+          changefreq = 'weekly'
+        } else if (r.startsWith('/legal/')) {
+          priority = 0.3
+          changefreq = 'yearly'
+        }
+        return [
+          '  <url>',
+          `    <loc>${SITE_URL}${r}</loc>`,
+          `    <lastmod>${buildDate}</lastmod>`,
+          `    <changefreq>${changefreq}</changefreq>`,
+          `    <priority>${priority}</priority>`,
+          '  </url>',
+        ].join('\n')
       }).join('\n')
       writeFileSync(
         path.join(distDir, 'sitemap.xml'),

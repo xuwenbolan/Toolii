@@ -45,7 +45,9 @@
     "textTools": "文本工具",
     "textToolsDesc": "字数统计、字符统计、AI Token 计数。",
     "fileTransfer": "文件快传",
-    "fileTransferDesc": "上传文件生成短链分享，登录用户免费使用。"
+    "fileTransferDesc": "上传文件生成短链分享，登录用户免费使用。",
+    "faceMap": "FaceMap",
+    "faceMapDesc": "AI 面部美学顾问，个性化美学评分与风格推荐。"
   },
   "notFound": {
     "title": "页面不存在",
@@ -124,7 +126,7 @@
     }
   },
   "apiErrors": {
-    "UNAUTHORIZED": "邮箱或密码错误",
+    "UNAUTHORIZED": "请登录或会话已过期",
     "EMAIL_EXISTS": "邮箱已注册",
     "GOOGLE_OAUTH_DISABLED": "Google 登录未配置",
     "GOOGLE_AUTH_CONFLICT": "Google 登录冲突",
@@ -133,7 +135,10 @@
     "NO_PASSWORD": "该账号使用 Google 登录，无法修改密码",
     "PASSWORD_REQUIRED": "修改邮箱需要验证密码",
     "SESSION_NOT_FOUND": "会话未找到",
+    "ACCOUNT_LOCKED": "登录尝试次数过多，请稍后再试。",
     "ACCOUNT_DELETED": "账号已删除，7 天内可通过登录恢复",
+    "RECOVER_FAILED": "无法恢复账号",
+    "EMAIL_CONFIRMATION_REQUIRED": "请输入邮箱地址以确认",
     "INVALID_VERIFICATION_TOKEN": "验证链接无效或已过期",
     "INVALID_RESET_TOKEN": "重置链接无效或已过期",
     "USER_NOT_FOUND": "用户未找到",
@@ -153,6 +158,9 @@
     "CARD_CODE_USED": "卡密已被使用",
     "CARD_CODE_EXPIRED": "卡密已过期",
     "CARD_REDEEM_FAILED": "卡密兑换失败",
+    "NO_FACE_DETECTED": "未检测到人脸，请上传正面清晰照片",
+    "FACE_QUALITY_POOR": "照片不符合分析要求，请上传正面、清晰、脸部占比较大的近照",
+    "MODEL_UNAVAILABLE": "面部分析模型暂时不可用，请稍后重试",
     "IMAGE_PROCESS_FAILED": "图片处理失败",
     "INVALID_QUALITY": "质量值需在 1 到 100 之间",
     "INVALID_TARGET_KB": "目标大小必须大于 0",
@@ -194,6 +202,8 @@
     "INVALID_EXTRACT_CODE": "无效或缺少提取码",
     "INVALID_MAX_DOWNLOADS": "最大下载次数至少为 1",
     "TOTAL_TOO_LARGE": "文件总大小超出限制",
+    "BURN_SINGLE_FILE_ONLY": "阅后即焚仅支持单个文件",
+    "BURN_NO_ZIP": "阅后即焚传输不支持打包下载",
     "TRANSFER_CREATE_FAILED": "创建传输失败",
     "TRANSFER_NOT_ACTIVE": "该传输已失效",
     "TRANSFER_EXPIRED": "该传输已过期",

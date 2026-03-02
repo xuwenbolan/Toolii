@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Loader2 } from 'lucide-react'
 
 import { GoogleLinkPasswordDialog } from '@/components/auth/GoogleLinkPasswordDialog'
 import { loginWithGoogleAccessToken } from '@/services/authApi'
@@ -81,8 +82,8 @@ export function GoogleOAuthButton() {
         disabled={loading}
         onClick={() => googleLogin()}
       >
-        <GoogleIcon />
-        {loading ? 'Google ...' : 'Google'}
+        {loading ? <Loader2 className="size-4 animate-spin" /> : <GoogleIcon />}
+        Google
       </Button>
       {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
       <GoogleLinkPasswordDialog

@@ -39,7 +39,7 @@ export function ToolActionBar({
   const clampedProgress = progress == null ? null : Math.max(0, Math.min(100, Math.round(progress)))
 
   return (
-    <div className={cn('fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4 motion-safe:animate-bar-enter', className)}>
+    <div className={cn('fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4 motion-safe:animate-bar-enter', className)} style={{ bottom: 'var(--sai-bottom)' }}>
       <div className={cn('mx-auto w-full', maxWidthClassName)}>
         <div
           className={cn(
@@ -52,7 +52,7 @@ export function ToolActionBar({
               <div className="flex items-center gap-2">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" /> : null}
                 {done && !pending && !error ? (
-                  <span className="success-check text-emerald-500" aria-hidden="true">
+                  <span className="success-check text-success" aria-hidden="true">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>

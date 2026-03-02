@@ -45,7 +45,9 @@ async function refreshAccessToken(): Promise<string | null> {
       .then((res) => {
         const access = res.data?.tokens?.access_token as string | undefined
         if (!access) return null
-        useAuthStore.getState().setAccessToken(access)
+        const store = useAuthStore.getState()
+        store.setAccessToken(access)
+        if (res.data?.user) store.setUser(res.data.user)
         return access
       })
       .catch(() => null)

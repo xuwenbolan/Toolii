@@ -88,7 +88,7 @@ function SortablePdfRow({ item, onRemove }: RowProps) {
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border bg-muted/50 text-muted-foreground hover:bg-muted"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded border bg-muted/50 text-muted-foreground hover:bg-muted"
           aria-label={t('shared.dragHandle')}
           {...attributes}
           {...listeners}
@@ -112,7 +112,7 @@ function SortablePdfRow({ item, onRemove }: RowProps) {
             type="button"
             size="icon"
             variant="ghost"
-            className="h-8 w-8 shrink-0"
+            className="h-9 w-9 shrink-0"
             onClick={() => onRemove(item.index)}
             aria-label={t('shared.remove')}
           >
@@ -154,7 +154,7 @@ function SortableImageCard({ item, onRemove }: RowProps) {
     >
       <button
         type="button"
-        className="absolute left-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded border bg-background/90 text-muted-foreground backdrop-blur hover:bg-muted"
+        className="absolute left-2 top-2 z-10 inline-flex h-9 w-9 items-center justify-center rounded border bg-background/90 text-muted-foreground backdrop-blur hover:bg-muted"
         aria-label={t('shared.dragHandle')}
         {...attributes}
         {...listeners}
@@ -167,7 +167,7 @@ function SortableImageCard({ item, onRemove }: RowProps) {
           type="button"
           size="icon"
           variant="ghost"
-          className="absolute right-2 top-2 z-10 h-7 w-7 rounded border bg-background/90 backdrop-blur hover:bg-muted"
+          className="absolute right-2 top-2 z-10 h-9 w-9 rounded border bg-background/90 backdrop-blur hover:bg-muted"
           onClick={() => onRemove(item.index)}
           aria-label={t('shared.remove')}
         >

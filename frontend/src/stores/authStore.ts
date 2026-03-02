@@ -7,6 +7,7 @@ export type AuthUser = {
   is_active: boolean
   email_verified: boolean
   is_admin: boolean
+  has_password: boolean
 }
 
 type AuthState = {

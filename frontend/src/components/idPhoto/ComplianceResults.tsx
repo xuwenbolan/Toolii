@@ -72,16 +72,16 @@ export function ComplianceResults({ result }: Props) {
   const attentionCount = failedChecks.length
   const criticalCount = failedChecks.filter((check) => normalizeSeverity(check.severity) === 'critical').length
   const scoreClassMap: Record<'excellent' | 'good' | 'fair' | 'risky', string> = {
-    excellent: 'bg-emerald-500',
-    good: 'bg-teal-500',
-    fair: 'bg-amber-500',
-    risky: 'bg-rose-500',
+    excellent: 'bg-success',
+    good: 'bg-info',
+    fair: 'bg-warning',
+    risky: 'bg-destructive',
   }
   const scoreTextMap: Record<'excellent' | 'good' | 'fair' | 'risky', string> = {
-    excellent: 'text-emerald-700 dark:text-emerald-300',
-    good: 'text-teal-700 dark:text-teal-300',
-    fair: 'text-amber-700 dark:text-amber-300',
-    risky: 'text-rose-700 dark:text-rose-300',
+    excellent: 'text-success',
+    good: 'text-info',
+    fair: 'text-warning',
+    risky: 'text-destructive',
   }
 
   return (
@@ -95,7 +95,7 @@ export function ComplianceResults({ result }: Props) {
           <span
             className={cn(
               'inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-medium',
-              result.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+              result.passed ? 'bg-success-light text-success' : 'bg-warning-light text-warning',
             )}
           >
             {result.passed ? <ShieldCheck className="h-3 w-3" aria-hidden /> : <ShieldAlert className="h-3 w-3" aria-hidden />}
@@ -117,9 +117,9 @@ export function ComplianceResults({ result }: Props) {
           />
         </div>
         <div className="grid gap-2 sm:grid-cols-3">
-          <SummaryMetric label={t('compliance.metrics.passed')} value={passedCount} toneClassName="text-emerald-700 dark:text-emerald-300" />
-          <SummaryMetric label={t('compliance.metrics.attention')} value={attentionCount} toneClassName="text-amber-700 dark:text-amber-300" />
-          <SummaryMetric label={t('compliance.metrics.critical')} value={criticalCount} toneClassName="text-rose-700 dark:text-rose-300" />
+          <SummaryMetric label={t('compliance.metrics.passed')} value={passedCount} toneClassName="text-success" />
+          <SummaryMetric label={t('compliance.metrics.attention')} value={attentionCount} toneClassName="text-warning" />
+          <SummaryMetric label={t('compliance.metrics.critical')} value={criticalCount} toneClassName="text-destructive" />
         </div>
       </div>
 
@@ -138,20 +138,20 @@ export function ComplianceResults({ result }: Props) {
               key={check.id}
               className={cn(
                 'rounded-lg border px-3 py-2',
-                check.passed && 'border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/60 dark:bg-emerald-950/20',
-                !check.passed && isCritical && 'border-rose-200/80 bg-rose-50/40 dark:border-rose-900/60 dark:bg-rose-950/20',
-                !check.passed && isWarning && 'border-amber-200/80 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/20',
+                check.passed && 'border-success/20 bg-success-light',
+                !check.passed && isCritical && 'border-destructive/20 bg-destructive-light',
+                !check.passed && isWarning && 'border-warning/20 bg-warning-light',
                 !check.passed && !isWarning && !isCritical && 'border-slate-200/80 bg-white/70 dark:border-slate-800 dark:bg-slate-900/60',
               )}
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-center gap-2 text-sm font-medium">
                   {check.passed ? (
-                    <BadgeCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden />
+                    <BadgeCheck className="h-4 w-4 text-success" aria-hidden />
                   ) : isCritical ? (
-                    <ShieldAlert className="h-4 w-4 text-rose-600 dark:text-rose-300" aria-hidden />
+                    <ShieldAlert className="h-4 w-4 text-destructive" aria-hidden />
                   ) : (
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" aria-hidden />
+                    <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
                   )}
                   {checkLabel(t, check.id, check.label)}
                 </p>
@@ -160,8 +160,8 @@ export function ComplianceResults({ result }: Props) {
                     <span
                       className={cn(
                         'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
-                        isCritical && 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
-                        isWarning && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200',
+                        isCritical && 'bg-destructive-light text-destructive',
+                        isWarning && 'bg-warning-light text-warning',
                         !isWarning && !isCritical && 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
                       )}
                     >
@@ -172,8 +172,8 @@ export function ComplianceResults({ result }: Props) {
                     className={cn(
                       'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
                       check.passed
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'
-                        : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
+                        ? 'bg-success-light text-success'
+                        : 'bg-destructive-light text-destructive',
                     )}
                   >
                     {check.passed ? t('compliance.status.pass') : t('compliance.status.check')}

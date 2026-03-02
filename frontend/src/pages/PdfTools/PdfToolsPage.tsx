@@ -15,6 +15,7 @@ import { PdfPageLightbox } from '@/components/pdf/PdfPageLightbox'
 import { PdfWorkspaceEmpty } from '@/components/pdf/PdfWorkspaceEmpty'
 import { PdfWorkspaceGrid } from '@/components/pdf/PdfWorkspaceGrid'
 import { SEOHead } from '@/components/common/SEOHead'
+import { buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -241,6 +242,7 @@ export function PdfToolsPage() {
         description={t('pdf.seoDescription')}
         keywords={t('pdf.seoKeywords')}
         canonicalPath="/pdf-tools"
+        jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('pdf.title'), path: '/pdf-tools' }])}
       />
 
       <div className="mx-auto w-full max-w-[96rem] space-y-4">

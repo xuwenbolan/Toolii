@@ -72,8 +72,8 @@ export function TransactionList({
             <p
               className={
                 item.amount >= 0
-                  ? 'text-sm font-semibold text-emerald-700 dark:text-emerald-300'
-                  : 'text-sm font-semibold text-amber-700 dark:text-amber-300'
+                  ? 'text-sm font-semibold text-success'
+                  : 'text-sm font-semibold text-warning'
               }
             >
               {item.amount > 0 ? `+${item.amount}` : item.amount}

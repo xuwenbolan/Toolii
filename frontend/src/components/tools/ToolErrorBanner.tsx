@@ -76,6 +76,8 @@ export function ToolErrorBanner({ error, errorMeta, onRetry, className }: Props)
               setRetrying(true)
               try {
                 await onRetry()
+              } catch {
+                // Retry errors are reflected by parent error state; avoid unhandled rejection noise.
               } finally {
                 setRetrying(false)
               }

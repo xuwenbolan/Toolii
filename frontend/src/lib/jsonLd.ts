@@ -27,3 +27,35 @@ export function buildToolJsonLd(opts: {
     },
   }
 }
+
+export function buildWebSiteJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Toolii',
+    url: SITE_URL,
+    description:
+      'Free online tools for ID photo processing, image compression, format conversion, PDF tools, and text utilities.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'Toolii',
+      url: SITE_URL,
+      logo: { '@type': 'ImageObject', url: `${SITE_URL}/favicon.svg` },
+    },
+  }
+}
+
+export function buildBreadcrumbJsonLd(
+  items: Array<{ name: string; path: string }>,
+) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: `${SITE_URL}${item.path}`,
+    })),
+  }
+}

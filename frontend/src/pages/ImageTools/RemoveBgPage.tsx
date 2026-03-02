@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { DownloadButton } from '@/components/tools/DownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
@@ -65,7 +65,7 @@ export function RemoveBgPage() {
 
   return (
     <>
-      <SEOHead title={t('removeBg.seoTitle')} description={t('removeBg.seoDescription')} keywords={t('removeBg.seoKeywords')} canonicalPath="/image-tools/remove-bg" jsonLd={buildToolJsonLd({ name: t('removeBg.seoTitle'), description: t('removeBg.seoDescription'), url: '/image-tools/remove-bg' })} />
+      <SEOHead title={t('removeBg.seoTitle')} description={t('removeBg.seoDescription')} keywords={t('removeBg.seoKeywords')} canonicalPath="/image-tools/remove-bg" jsonLd={[buildToolJsonLd({ name: t('removeBg.seoTitle'), description: t('removeBg.seoDescription'), url: '/image-tools/remove-bg' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('removeBg.title'), path: '/image-tools/remove-bg' }])]} />
       <ToolPageShell title={t('removeBg.title')} description={t('removeBg.description')} backTo="/image-tools" width="wide" layout="split">
         <div className="space-y-5 tool-section-stagger">
           <ToolWorkspaceDropzone

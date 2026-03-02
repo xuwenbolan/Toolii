@@ -20,6 +20,7 @@ export function RootLayout() {
   const [isBootstrapping, setIsBootstrapping] = useState(true)
   const isToolWorkspaceRoute =
     location.pathname === '/id-photo' ||
+    location.pathname === '/facemap' ||
     location.pathname.startsWith('/image-tools/') ||
     location.pathname === '/pdf-tools' ||
     location.pathname.startsWith('/pdf-tools/') ||
@@ -30,12 +31,12 @@ export function RootLayout() {
   }, [bootstrap])
 
   useEffect(() => {
-    if (cookieConsent !== 'accepted') return
+    if (cookieConsent === 'rejected') return
     initAnalytics(gaMeasurementId)
   }, [cookieConsent])
 
   useEffect(() => {
-    if (cookieConsent !== 'accepted') return
+    if (cookieConsent === 'rejected') return
     const path = `${location.pathname}${location.search}${location.hash}`
     trackPageView(path)
   }, [cookieConsent, location.hash, location.pathname, location.search])

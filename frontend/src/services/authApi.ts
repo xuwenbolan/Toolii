@@ -12,8 +12,10 @@ type AuthResponse = {
   tokens: AccessTokenResponse
 }
 
-export async function registerWithEmail(email: string, password: string) {
-  const res = await api.post<AuthResponse>('/api/auth/register', { email, password })
+export async function registerWithEmail(email: string, password: string, name?: string) {
+  const body: Record<string, string> = { email, password }
+  if (name) body.name = name
+  const res = await api.post<AuthResponse>('/api/auth/register', body)
   const { user, tokens } = res.data
   useAuthStore.getState().setSession({
     user,

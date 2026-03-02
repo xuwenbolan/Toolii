@@ -35,8 +35,8 @@ export function BalanceDisplay({
               className={cn(
                 'inline-flex rounded-full border px-2 py-0.5 text-[11px]',
                 enough
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-                  : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+                  ? 'border-success/40 bg-success/10 text-success'
+                  : 'border-warning/40 bg-warning/10 text-warning',
               )}
             >
               {hasBalance ? (enough ? t('balance.enough', { credit: requiredCredits }) : t('balance.insufficient', { credit: requiredCredits })) : t('balance.notLoaded')}

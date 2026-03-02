@@ -56,9 +56,9 @@ function scoreFromSignals(signals: SignalItem[]) {
 }
 
 function SignalStateIcon({ state }: { state: QualityState }) {
-  if (state === 'pass') return <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" aria-hidden />
-  if (state === 'warn') return <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" aria-hidden />
-  if (state === 'fail') return <XCircle className="h-4 w-4 text-rose-600 dark:text-rose-300" aria-hidden />
+  if (state === 'pass') return <CheckCircle2 className="h-4 w-4 text-success" aria-hidden />
+  if (state === 'warn') return <AlertTriangle className="h-4 w-4 text-warning" aria-hidden />
+  if (state === 'fail') return <XCircle className="h-4 w-4 text-destructive" aria-hidden />
   return <CircleDashed className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
 }
 
@@ -140,14 +140,14 @@ export function UploadQualityPanel({
   const score = scoreFromSignals(signals)
   const band = score == null ? 'risky' : getBand(score)
   const bandColorMap: Record<'excellent' | 'good' | 'risky', string> = {
-    excellent: 'text-emerald-700 dark:text-emerald-300',
-    good: 'text-teal-700 dark:text-teal-300',
-    risky: 'text-amber-700 dark:text-amber-300',
+    excellent: 'text-success',
+    good: 'text-info',
+    risky: 'text-warning',
   }
   const barColorMap: Record<'excellent' | 'good' | 'risky', string> = {
-    excellent: 'bg-emerald-500',
-    good: 'bg-teal-500',
-    risky: 'bg-amber-500',
+    excellent: 'bg-success',
+    good: 'bg-info',
+    risky: 'bg-warning',
   }
 
   return (
@@ -183,9 +183,9 @@ export function UploadQualityPanel({
             key={item.id}
             className={cn(
               'rounded-lg border px-3 py-2',
-              item.state === 'pass' && 'border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20',
-              item.state === 'warn' && 'border-amber-200/80 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20',
-              item.state === 'fail' && 'border-rose-200/80 bg-rose-50/40 dark:border-rose-900/50 dark:bg-rose-950/20',
+              item.state === 'pass' && 'border-success/20 bg-success-light',
+              item.state === 'warn' && 'border-warning/20 bg-warning-light',
+              item.state === 'fail' && 'border-destructive/20 bg-destructive-light',
               item.state === 'pending' && 'border-slate-200/80 bg-white/70 dark:border-slate-800 dark:bg-slate-900/60',
             )}
           >
@@ -201,9 +201,9 @@ export function UploadQualityPanel({
                 <span
                   className={cn(
                     'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase',
-                    item.state === 'pass' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200',
-                    item.state === 'warn' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200',
-                    item.state === 'fail' && 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
+                    item.state === 'pass' && 'bg-success-light text-success',
+                    item.state === 'warn' && 'bg-warning-light text-warning',
+                    item.state === 'fail' && 'bg-destructive-light text-destructive',
                     item.state === 'pending' && 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
                   )}
                 >
@@ -217,9 +217,9 @@ export function UploadQualityPanel({
       </div>
 
       {warnings.length > 0 ? (
-        <div className="space-y-1.5 rounded-lg border border-amber-200/80 bg-amber-50/70 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
+        <div className="space-y-1.5 rounded-lg border border-warning/20 bg-warning-light p-3">
           {warnings.map((w, idx) => (
-            <p key={`${w.id}-${idx}`} className="text-xs text-amber-800 dark:text-amber-100">
+            <p key={`${w.id}-${idx}`} className="text-xs text-warning">
               {t(`uploadQuality.warnings.${w.id}`, w.params)}
             </p>
           ))}
@@ -231,19 +231,19 @@ export function UploadQualityPanel({
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
           <div className="rounded-md border border-slate-200/80 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/60">
             <p className="flex items-center gap-1.5 text-xs font-medium">
-              <UserRound className="h-3.5 w-3.5 text-teal-600 dark:text-teal-300" aria-hidden />
+              <UserRound className="h-3.5 w-3.5 text-info" aria-hidden />
               {t('uploadQuality.tips.front')}
             </p>
           </div>
           <div className="rounded-md border border-slate-200/80 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/60">
             <p className="flex items-center gap-1.5 text-xs font-medium">
-              <Lightbulb className="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" aria-hidden />
+              <Lightbulb className="h-3.5 w-3.5 text-warning" aria-hidden />
               {t('uploadQuality.tips.light')}
             </p>
           </div>
           <div className="rounded-md border border-slate-200/80 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/60">
             <p className="flex items-center gap-1.5 text-xs font-medium">
-              <Camera className="h-3.5 w-3.5 text-rose-600 dark:text-rose-300" aria-hidden />
+              <Camera className="h-3.5 w-3.5 text-destructive" aria-hidden />
               {t('uploadQuality.tips.shoulder')}
             </p>
           </div>

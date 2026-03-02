@@ -56,9 +56,9 @@ export function FeedbackPage() {
 
   const statusBadge = (s: string) => {
     const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      reviewed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      pending: 'bg-warning-light text-warning',
+      reviewed: 'bg-info-light text-info',
+      resolved: 'bg-success-light text-success',
     }
     return (
       <span className={`inline-block rounded px-1.5 py-0.5 text-xs ${colors[s] ?? 'bg-muted'}`}>
@@ -99,7 +99,7 @@ export function FeedbackPage() {
           <span className="text-xs text-muted-foreground">{content.length}/1000</span>
           <div className="flex items-center gap-3">
             {submitMsg && (
-              <span className={`text-sm ${submitMsg.includes(t('feedback.submitSuccess')) ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-sm ${submitMsg.includes(t('feedback.submitSuccess')) ? 'text-success' : 'text-destructive'}`}>
                 {submitMsg}
               </span>
             )}

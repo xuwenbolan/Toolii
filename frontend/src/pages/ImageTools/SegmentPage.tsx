@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Download, RotateCcw, Undo2 } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
@@ -307,7 +307,7 @@ export function SegmentPage() {
         description={t('segment.seoDescription')}
         keywords={t('segment.seoKeywords')}
         canonicalPath="/image-tools/segment"
-        jsonLd={buildToolJsonLd({ name: t('segment.seoTitle'), description: t('segment.seoDescription'), url: '/image-tools/segment' })}
+        jsonLd={[buildToolJsonLd({ name: t('segment.seoTitle'), description: t('segment.seoDescription'), url: '/image-tools/segment' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('segment.title'), path: '/image-tools/segment' }])]}
       />
       <ToolPageShell title={t('segment.title')} description={t('segment.description')} backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5 tool-section-stagger">
@@ -358,11 +358,11 @@ export function SegmentPage() {
 
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-3 w-3 rounded-full bg-green-500" />
+                  <span className="inline-block h-3 w-3 rounded-full bg-success" />
                   {t('segment.leftClick')}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-3 w-3 rounded-full bg-red-500" />
+                  <span className="inline-block h-3 w-3 rounded-full bg-destructive" />
                   {t('segment.rightClick')}
                 </span>
               </div>

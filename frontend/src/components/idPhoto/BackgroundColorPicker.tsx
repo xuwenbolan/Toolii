@@ -53,7 +53,7 @@ export function BackgroundColorPicker({ value, onChange }: Props) {
             className={[
               'flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-colors',
               normalizedSelected === preset.value
-                ? 'border-teal-400 bg-teal-50 ring-1 ring-teal-300 dark:border-teal-700 dark:bg-teal-950/20'
+                ? 'border-info/40 bg-info-light ring-1 ring-info/30'
                 : 'hover:bg-muted/50',
             ].join(' ')}
             onClick={() => onChange(preset.value)}
@@ -67,7 +67,7 @@ export function BackgroundColorPicker({ value, onChange }: Props) {
               <span>{t(preset.i18nKey)}</span>
             </span>
             <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              {normalizedSelected === preset.value ? <Check className="h-3.5 w-3.5 text-teal-600 dark:text-teal-300" aria-hidden /> : null}
+              {normalizedSelected === preset.value ? <Check className="h-3.5 w-3.5 text-info" aria-hidden /> : null}
               {preset.value}
             </span>
           </button>
@@ -135,7 +135,7 @@ export function BackgroundColorPicker({ value, onChange }: Props) {
           'rounded-md border border-dashed px-2 py-1 text-[11px]',
           isManualHexValid
             ? 'border-slate-300/80 text-muted-foreground dark:border-slate-700'
-            : 'border-rose-300/80 text-rose-700 dark:border-rose-800 dark:text-rose-300',
+            : 'border-destructive/30 text-destructive',
         )}
       >
         {isManualHexValid ? `${t('bgColor.hex')}: ${normalizedManualHex}` : t('bgColor.invalidHex')}

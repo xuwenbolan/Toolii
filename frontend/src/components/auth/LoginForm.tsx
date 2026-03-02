@@ -6,8 +6,10 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 
 import { loginWithEmail } from '@/services/authApi'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { sanitizeRedirect } from '@/lib/authRedirect'
 
@@ -41,8 +43,8 @@ export function LoginForm() {
     try {
       await loginWithEmail(values.email, values.password)
       navigate(redirectTo, { replace: true })
-    } catch {
-      setError(t('loginForm.loginFailed'))
+    } catch (err: unknown) {
+      setError(getTranslatedApiError(err, t('loginForm.loginFailed')))
     }
   }
 
@@ -71,9 +73,8 @@ export function LoginForm() {
             {t('loginForm.forgotPassword')}
           </Link>
         </div>
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           {...register('password')}
         />

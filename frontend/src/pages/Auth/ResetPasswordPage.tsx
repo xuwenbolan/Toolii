@@ -8,8 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SEOHead } from '@/components/common/SEOHead'
-import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
+import { PasswordStrength } from '@/components/auth/PasswordStrength'
 import { api } from '@/services/api'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 
@@ -39,8 +40,11 @@ export function ResetPasswordPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
+
+  const passwordValue = watch('password', '')
 
   if (!token) {
     return (
@@ -51,7 +55,7 @@ export function ResetPasswordPage() {
             <CardTitle>{t('resetPassword.title')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-600 dark:text-red-400">{t('resetPassword.missingToken')}</p>
+            <p className="text-destructive">{t('resetPassword.missingToken')}</p>
             <Link
               to="/auth/forgot-password"
               className="mt-3 inline-block text-sm text-foreground underline underline-offset-4"
@@ -87,7 +91,7 @@ export function ResetPasswordPage() {
       <CardContent>
         {success ? (
           <div className="space-y-3">
-            <p className="text-green-700 dark:text-green-400">
+            <p className="text-success">
               {t('resetPassword.success')}
             </p>
             <Link
@@ -101,21 +105,21 @@ export function ResetPasswordPage() {
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
             <div className="space-y-2">
               <Label htmlFor="password">{t('newPassword')}</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="new-password"
                 {...register('password')}
               />
               {errors.password ? (
                 <p className="text-sm text-destructive">{errors.password.message}</p>
-              ) : null}
+              ) : (
+                <PasswordStrength password={passwordValue} />
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
-              <Input
+              <PasswordInput
                 id="confirmPassword"
-                type="password"
                 autoComplete="new-password"
                 {...register('confirmPassword')}
               />

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { buildToolJsonLd } from '@/lib/jsonLd'
+import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { DownloadButton } from '@/components/tools/DownloadButton'
@@ -59,7 +59,7 @@ export function DenoisePage() {
 
   return (
     <>
-      <SEOHead title={t('denoise.seoTitle')} description={t('denoise.seoDescription')} keywords={t('denoise.seoKeywords')} canonicalPath="/image-tools/denoise" jsonLd={buildToolJsonLd({ name: t('denoise.seoTitle'), description: t('denoise.seoDescription'), url: '/image-tools/denoise' })} />
+      <SEOHead title={t('denoise.seoTitle')} description={t('denoise.seoDescription')} keywords={t('denoise.seoKeywords')} canonicalPath="/image-tools/denoise" jsonLd={[buildToolJsonLd({ name: t('denoise.seoTitle'), description: t('denoise.seoDescription'), url: '/image-tools/denoise' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('denoise.title'), path: '/image-tools/denoise' }])]} />
       <ToolPageShell title={t('denoise.title')} description={t('denoise.description')} backTo="/image-tools">
         <div className="space-y-5 tool-section-stagger">
           <FileDropzone

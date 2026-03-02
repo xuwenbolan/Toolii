@@ -45,7 +45,9 @@
     "textTools": "Text Tools",
     "textToolsDesc": "Word counter, character counter, and AI token counter.",
     "fileTransfer": "File Transfer",
-    "fileTransferDesc": "Upload files and share via short link. Free for logged-in users."
+    "fileTransferDesc": "Upload files and share via short link. Free for logged-in users.",
+    "faceMap": "FaceMap",
+    "faceMapDesc": "AI face aesthetics consultant with personalized scoring and style recommendations."
   },
   "notFound": {
     "title": "Page Not Found",
@@ -124,7 +126,7 @@
     }
   },
   "apiErrors": {
-    "UNAUTHORIZED": "Invalid email or password",
+    "UNAUTHORIZED": "Login required or session expired",
     "EMAIL_EXISTS": "Email already registered",
     "GOOGLE_OAUTH_DISABLED": "Google login not configured",
     "GOOGLE_AUTH_CONFLICT": "Google login conflict",
@@ -133,7 +135,10 @@
     "NO_PASSWORD": "This account uses Google login, password cannot be changed",
     "PASSWORD_REQUIRED": "Password is required to change email",
     "SESSION_NOT_FOUND": "Session not found",
+    "ACCOUNT_LOCKED": "Too many failed attempts. Please try again later.",
     "ACCOUNT_DELETED": "Account deleted, recoverable within 7 days",
+    "RECOVER_FAILED": "Unable to recover account",
+    "EMAIL_CONFIRMATION_REQUIRED": "Please enter your email to confirm",
     "INVALID_VERIFICATION_TOKEN": "Verification link invalid or expired",
     "INVALID_RESET_TOKEN": "Reset link invalid or expired",
     "USER_NOT_FOUND": "User not found",
@@ -153,6 +158,9 @@
     "CARD_CODE_USED": "Card code already used",
     "CARD_CODE_EXPIRED": "Card code expired",
     "CARD_REDEEM_FAILED": "Card redemption failed",
+    "NO_FACE_DETECTED": "No face detected. Please upload a clear, front-facing photo.",
+    "FACE_QUALITY_POOR": "Photo does not meet analysis requirements. Please upload a close-up, front-facing, clear photo.",
+    "MODEL_UNAVAILABLE": "Face analysis model temporarily unavailable. Please try again later.",
     "IMAGE_PROCESS_FAILED": "Image processing failed",
     "INVALID_QUALITY": "Quality must be between 1 and 100",
     "INVALID_TARGET_KB": "Target size must be greater than 0",
@@ -194,6 +202,8 @@
     "INVALID_EXTRACT_CODE": "Invalid or missing extract code",
     "INVALID_MAX_DOWNLOADS": "Max downloads must be at least 1",
     "TOTAL_TOO_LARGE": "Total file size exceeds limit",
+    "BURN_SINGLE_FILE_ONLY": "Burn after read only supports a single file",
+    "BURN_NO_ZIP": "Zip download is not available for burn-after-read transfers",
     "TRANSFER_CREATE_FAILED": "Failed to create transfer",
     "TRANSFER_NOT_ACTIVE": "This transfer is no longer active",
     "TRANSFER_EXPIRED": "This transfer has expired",
