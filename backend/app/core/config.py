@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     # Cortex GPU inference service
     cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
 
+    # LLM settings (for physiognomy detailed analysis)
+    llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
+    llm_api_key: str = Field(default="", alias="LLM_API_KEY")
+    llm_model: str = Field(default="", alias="LLM_MODEL")
+
     model_config = SettingsConfigDict(
         env_file=(_repo_root() / ".env"),
         env_file_encoding="utf-8",

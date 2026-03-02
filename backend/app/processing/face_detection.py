@@ -380,6 +380,59 @@ def detect_faces(image_bytes: bytes) -> dict[str, Any]:
     return _detect_fallback(img)
 
 
+LANDMARKER_UNAVAILABLE = "LANDMARKER_UNAVAILABLE"
+
+
+def detect_face_landmarks(
+    image_bytes: bytes,
+) -> tuple[list, list, int, int] | str | None:
+    """Return raw (landmarks, blendshapes, width, height) for the largest face.
+
+    Used by physiognomy analysis to access all 478 mesh points directly.
+    Returns:
+        tuple: (landmarks, blendshapes, width, height) when face found.
+        LANDMARKER_UNAVAILABLE: when MediaPipe model cannot be loaded.
+        None: when no face detected in the image.
+    """
+    landmarker = _get_landmarker()
+    if landmarker is None:
+        return LANDMARKER_UNAVAILABLE
+
+    img = _decode_image(image_bytes)
+    height, width = img.shape[:2]
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    try:
+        from mediapipe import Image as MpImage, ImageFormat
+    except ImportError:
+        return LANDMARKER_UNAVAILABLE
+
+    try:
+        mp_image = MpImage(image_format=ImageFormat.SRGB, data=rgb)
+        with _landmarker_lock:
+            result = landmarker.detect(mp_image)
+    except (RuntimeError, OSError, ValueError):
+        logger.warning("MediaPipe detection failed", exc_info=True)
+        return None
+
+    if not result.face_landmarks:
+        return None
+
+    # Select the largest face by bounding box area
+    best_idx = 0
+    best_area = 0.0
+    for i, lms in enumerate(result.face_landmarks):
+        _, _, bw, bh = _bbox_from_landmarks(lms, width, height)
+        area = bw * bh
+        if area > best_area:
+            best_area = area
+            best_idx = i
+
+    face_lms = result.face_landmarks[best_idx]
+    bs = result.face_blendshapes[best_idx] if best_idx < len(result.face_blendshapes) else []
+    return face_lms, bs, width, height
+
+
 def select_primary_face(faces: list[FaceBox] | list[dict[str, object]] | None) -> dict[str, Any] | None:
     if not faces:
         return None
