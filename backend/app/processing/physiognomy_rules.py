@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -383,34 +384,47 @@ def _get_template(feature_key: str, shape_id: str, locale: str) -> dict[str, str
     return shape.get(locale, shape.get("zh-CN", {"label": shape_id, "desc": "", "beauty_tip": ""}))
 
 
+def _proximity(value: float, ideal: float, sigma: float) -> float:
+    """Gaussian proximity: 1.0 when value==ideal, falls off with sigma."""
+    return math.exp(-0.5 * ((value - ideal) / sigma) ** 2)
+
+
+_SCORE_FLOOR = 15  # Minimum feature score to avoid extreme outliers
+
+
 def _feature_score(feature_key: str, features: dict[str, Any]) -> int:
-    """Compute a score (0-100) for a single feature based on its measurements."""
+    """Compute a score (0-100) for a single feature based on its measurements.
+
+    Uses Gaussian proximity for smooth falloff with a floor to prevent
+    unrealistically low scores from minor deviations.
+    """
     raw = features.get("raw_ratios", {})
 
     if feature_key == "face_shape":
         whr = raw.get("face_width_height_ratio", 0.76)
-        return max(0, min(100, int(100 - abs(whr - 0.76) * 200)))
+        return max(_SCORE_FLOOR, int(_proximity(whr, 0.76, 0.10) * 100))
     elif feature_key == "eyes":
         angle = abs(raw.get("eye_corner_angle_avg", 0))
-        return max(0, min(100, int(90 - angle * 1.5)))
+        # Lower angle is better; map via proximity to 0 degrees
+        return max(_SCORE_FLOOR, int(_proximity(angle, 0, 8.0) * 90))
     elif feature_key == "nose":
         straightness = raw.get("nose_bridge_straightness", 0.5)
-        return max(0, min(100, int(straightness * 100)))
+        return max(_SCORE_FLOOR, min(100, int(straightness * 100)))
     elif feature_key == "mouth":
         lip_r = raw.get("lip_thickness_ratio", 1.0)
-        return max(0, min(100, int(100 - abs(lip_r - 0.85) * 80)))
+        return max(_SCORE_FLOOR, int(_proximity(lip_r, 0.85, 0.25) * 100))
     elif feature_key == "eyebrows":
         arch = raw.get("eyebrow_arch_ratio", 0.15)
-        return max(0, min(100, int(100 - abs(arch - 0.15) * 250)))
+        return max(_SCORE_FLOOR, int(_proximity(arch, 0.15, 0.12) * 100))
     elif feature_key == "forehead":
         hr = raw.get("forehead_height_ratio", 0.33)
-        return max(0, min(100, int(100 - abs(hr - 0.33) * 250)))
+        return max(_SCORE_FLOOR, int(_proximity(hr, 0.33, 0.08) * 100))
     elif feature_key == "jawline":
         wr = raw.get("jaw_width_ratio", 0.78)
-        return max(0, min(100, int(100 - abs(wr - 0.78) * 150)))
+        return max(_SCORE_FLOOR, int(_proximity(wr, 0.78, 0.12) * 100))
     elif feature_key == "symmetry":
         sym = raw.get("symmetry_score", 80)
-        return max(0, min(100, int(sym)))
+        return max(_SCORE_FLOOR, min(100, int(sym)))
 
     return 50
 
@@ -598,9 +612,13 @@ def build_llm_prompt(
     """
     raw = features.get("raw_ratios", {})
     shapes = {}
+    shape_labels = {}
     for key in ["face_shape", "eyes", "nose", "mouth", "eyebrows", "forehead", "jawline"]:
         feat = features.get(key, {})
-        shapes[key] = feat.get("shape_id", "unknown")
+        sid = feat.get("shape_id", "unknown")
+        shapes[key] = sid
+        tpl = _get_template(key, sid, locale)
+        shape_labels[key] = tpl.get("label", sid)
 
     courts = features.get("three_courts", {})
     five_eyes = features.get("five_eyes", {})
@@ -627,17 +645,17 @@ def build_llm_prompt(
         user_prompt = (
             f"以下是面部特征测量数据，请进行详细的面相分析：\n\n"
             f"【基础数据】\n"
-            f"- 脸型：{shapes['face_shape']}（宽高比 {raw.get('face_width_height_ratio', 'N/A')}）\n"
+            f"- 脸型：{shape_labels['face_shape']}（宽高比 {raw.get('face_width_height_ratio', 'N/A')}）\n"
             f"- 三庭比例：上庭 {courts.get('upper', 'N/A')}，中庭 {courts.get('middle', 'N/A')}，下庭 {courts.get('lower', 'N/A')}（{'均衡' if courts.get('balanced') else '略有偏差'}）\n"
             f"- 五眼比例：{five_eyes.get('ratio', 'N/A')}（理想值5.0，偏差 {five_eyes.get('ideal_deviation', 'N/A')}）\n"
             f"- 对称度：{symmetry.get('overall_score', 'N/A')}分\n\n"
             f"【五官数据】\n"
-            f"- 眼型：{shapes['eyes']}（眼角倾斜 {raw.get('eye_corner_angle_avg', 'N/A')}度，宽高比 {raw.get('eye_width_height_ratio_avg', 'N/A')}）\n"
-            f"- 鼻型：{shapes['nose']}（长度比 {raw.get('nose_length_ratio', 'N/A')}，宽度比 {raw.get('nose_width_ratio', 'N/A')}，鼻梁直度 {raw.get('nose_bridge_straightness', 'N/A')}）\n"
-            f"- 嘴型：{shapes['mouth']}（宽度比 {raw.get('mouth_width_ratio', 'N/A')}，唇厚比 {raw.get('lip_thickness_ratio', 'N/A')}，嘴角角度 {raw.get('mouth_corner_angle', 'N/A')}度）\n"
-            f"- 眉型：{shapes['eyebrows']}（弓高比 {raw.get('eyebrow_arch_ratio', 'N/A')}，长度比 {raw.get('eyebrow_length_ratio', 'N/A')}）\n"
-            f"- 额头：{shapes['forehead']}（高度比 {raw.get('forehead_height_ratio', 'N/A')}）\n"
-            f"- 下颌：{shapes['jawline']}（宽度比 {raw.get('jaw_width_ratio', 'N/A')}，角度 {raw.get('jaw_angle_sharpness', 'N/A')}）\n\n"
+            f"- 眼型：{shape_labels['eyes']}（眼角倾斜 {raw.get('eye_corner_angle_avg', 'N/A')}度，宽高比 {raw.get('eye_width_height_ratio_avg', 'N/A')}）\n"
+            f"- 鼻型：{shape_labels['nose']}（长度比 {raw.get('nose_length_ratio', 'N/A')}，宽度比 {raw.get('nose_width_ratio', 'N/A')}，鼻梁直度 {raw.get('nose_bridge_straightness', 'N/A')}）\n"
+            f"- 嘴型：{shape_labels['mouth']}（宽度比 {raw.get('mouth_width_ratio', 'N/A')}，唇厚比 {raw.get('lip_thickness_ratio', 'N/A')}，嘴角角度 {raw.get('mouth_corner_angle', 'N/A')}度）\n"
+            f"- 眉型：{shape_labels['eyebrows']}（弓高比 {raw.get('eyebrow_arch_ratio', 'N/A')}，长度比 {raw.get('eyebrow_length_ratio', 'N/A')}）\n"
+            f"- 额头：{shape_labels['forehead']}（高度比 {raw.get('forehead_height_ratio', 'N/A')}）\n"
+            f"- 下颌：{shape_labels['jawline']}（宽度比 {raw.get('jaw_width_ratio', 'N/A')}，角度 {raw.get('jaw_angle_sharpness', 'N/A')}）\n\n"
             f"【十二宫数据】\n"
             f"- 命宫(印堂)宽度比：{palaces.get('yintang', {}).get('ratio', 'N/A')}（理想~1.0倍眼宽）\n"
             f"- 田宅宫(眉眼距)：{palaces.get('tianzhai', {}).get('ratio', 'N/A')}\n"
@@ -690,17 +708,17 @@ def build_llm_prompt(
         user_prompt = (
             f"Facial measurement data for detailed physiognomy analysis:\n\n"
             f"[Base Data]\n"
-            f"- Face shape: {shapes['face_shape']} (width-height ratio: {raw.get('face_width_height_ratio', 'N/A')})\n"
+            f"- Face shape: {shape_labels['face_shape']} (width-height ratio: {raw.get('face_width_height_ratio', 'N/A')})\n"
             f"- Three Courts: upper {courts.get('upper', 'N/A')}, middle {courts.get('middle', 'N/A')}, lower {courts.get('lower', 'N/A')} ({'balanced' if courts.get('balanced') else 'slightly uneven'})\n"
             f"- Five Eyes ratio: {five_eyes.get('ratio', 'N/A')} (ideal: 5.0, deviation: {five_eyes.get('ideal_deviation', 'N/A')})\n"
             f"- Symmetry: {symmetry.get('overall_score', 'N/A')}/100\n\n"
             f"[Feature Data]\n"
-            f"- Eyes: {shapes['eyes']} (corner angle: {raw.get('eye_corner_angle_avg', 'N/A')} deg, W/H ratio: {raw.get('eye_width_height_ratio_avg', 'N/A')})\n"
-            f"- Nose: {shapes['nose']} (length ratio: {raw.get('nose_length_ratio', 'N/A')}, width ratio: {raw.get('nose_width_ratio', 'N/A')}, straightness: {raw.get('nose_bridge_straightness', 'N/A')})\n"
-            f"- Mouth: {shapes['mouth']} (width ratio: {raw.get('mouth_width_ratio', 'N/A')}, lip ratio: {raw.get('lip_thickness_ratio', 'N/A')}, corner angle: {raw.get('mouth_corner_angle', 'N/A')} deg)\n"
-            f"- Eyebrows: {shapes['eyebrows']} (arch ratio: {raw.get('eyebrow_arch_ratio', 'N/A')}, length ratio: {raw.get('eyebrow_length_ratio', 'N/A')})\n"
-            f"- Forehead: {shapes['forehead']} (height ratio: {raw.get('forehead_height_ratio', 'N/A')})\n"
-            f"- Jawline: {shapes['jawline']} (width ratio: {raw.get('jaw_width_ratio', 'N/A')}, angle: {raw.get('jaw_angle_sharpness', 'N/A')})\n\n"
+            f"- Eyes: {shape_labels['eyes']} (corner angle: {raw.get('eye_corner_angle_avg', 'N/A')} deg, W/H ratio: {raw.get('eye_width_height_ratio_avg', 'N/A')})\n"
+            f"- Nose: {shape_labels['nose']} (length ratio: {raw.get('nose_length_ratio', 'N/A')}, width ratio: {raw.get('nose_width_ratio', 'N/A')}, straightness: {raw.get('nose_bridge_straightness', 'N/A')})\n"
+            f"- Mouth: {shape_labels['mouth']} (width ratio: {raw.get('mouth_width_ratio', 'N/A')}, lip ratio: {raw.get('lip_thickness_ratio', 'N/A')}, corner angle: {raw.get('mouth_corner_angle', 'N/A')} deg)\n"
+            f"- Eyebrows: {shape_labels['eyebrows']} (arch ratio: {raw.get('eyebrow_arch_ratio', 'N/A')}, length ratio: {raw.get('eyebrow_length_ratio', 'N/A')})\n"
+            f"- Forehead: {shape_labels['forehead']} (height ratio: {raw.get('forehead_height_ratio', 'N/A')})\n"
+            f"- Jawline: {shape_labels['jawline']} (width ratio: {raw.get('jaw_width_ratio', 'N/A')}, angle: {raw.get('jaw_angle_sharpness', 'N/A')})\n\n"
             f"[Twelve Palaces]\n"
             f"- Destiny Palace (yintang width ratio): {palaces.get('yintang', {}).get('ratio', 'N/A')} (ideal ~1.0x)\n"
             f"- Property Palace (brow-eye gap): {palaces.get('tianzhai', {}).get('ratio', 'N/A')}\n"

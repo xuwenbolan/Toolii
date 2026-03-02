@@ -23,7 +23,8 @@
     "totalSize": "总大小：{{size}}",
     "removeFile": "移除",
     "burnAfterReadLabel": "阅后即焚",
-    "burnAfterReadHint": "文件在首次下载后将被永久删除",
+    "burnAfterReadHint": "文件在下载后将被永久销毁",
+    "burnSingleFileHint": "阅后即焚仅支持单个文件",
     "loginRequired": "请登录后使用文件快传"
   },
   "result": {
@@ -44,7 +45,15 @@
     "deleted": "此传输已被删除。",
     "burned": "此传输已被阅后即焚销毁。",
     "limitReached": "下载次数已达上限。",
-    "burnWarning": "阅后即焚：文件下载后将被永久删除。",
+    "burnWarning": "阅后即焚：文件下载后将被永久销毁。",
+    "burnBadge": "阅后即焚",
+    "burnConfirmTitle": "确认下载",
+    "burnConfirmDesc": "该文件下载后将被永久销毁，此操作不可撤销。",
+    "burnConfirmAction": "下载并销毁",
+    "burnPreviewConfirmTitle": "确认查看",
+    "burnPreviewConfirmDesc": "该文件查看后将被永久销毁，此操作不可撤销。",
+    "burnPreviewConfirmAction": "查看并销毁",
+    "burnDestroyed": "文件已被销毁",
     "notFound": "传输不存在。",
     "enterCode": "请输入提取码",
     "codePlaceholder": "4 位数字",
@@ -56,15 +65,19 @@
     "downloading": "正在下载...",
     "downloadAll": "全部下载（ZIP）",
     "download": "下载",
+    "preview": "查看",
     "fileCount": "{{count}} 个文件",
     "totalSize": "总大小：{{size}}",
     "downloads": "已下载 {{count}} 次",
     "expiresAt": "过期时间：{{date}}",
-    "message": "发送者留言"
+    "message": "发送者留言",
+    "cancel": "取消"
   },
   "list": {
     "title": "我的传输",
     "empty": "暂无传输记录",
+    "createFirst": "创建第一次传输",
+    "loadFailed": "加载传输记录失败",
     "files": "{{count}} 个文件",
     "downloads": "{{count}} 次下载",
     "statusActive": "有效",
@@ -73,9 +86,12 @@
     "statusDeleted": "已删除",
     "expires": "{{date}} 过期",
     "delete": "删除",
-    "deleteConfirm": "确认删除？文件将被永久移除。",
+    "deleteConfirmTitle": "删除传输",
+    "deleteConfirmDesc": "确认删除？文件将被永久移除。",
     "copyLink": "复制链接",
-    "copied": "已复制！"
+    "copied": "已复制！",
+    "previous": "上一页",
+    "next": "下一页"
   },
   "share": {
     "button": "分享链接",

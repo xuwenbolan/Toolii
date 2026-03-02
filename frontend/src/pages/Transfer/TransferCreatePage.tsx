@@ -42,16 +42,29 @@ export function TransferCreatePage() {
 
   const addFiles = useCallback(
     (newFiles: File[]) => {
-      setFiles((prev) => {
-        const combined = [...prev, ...newFiles]
-        return combined.slice(0, 20)
-      })
+      if (burnAfterRead) {
+        // Burn mode: only keep the last selected file
+        setFiles(newFiles.slice(0, 1))
+      } else {
+        setFiles((prev) => [...prev, ...newFiles].slice(0, 20))
+      }
     },
-    [],
+    [burnAfterRead],
   )
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
+  const handleBurnToggle = useCallback(() => {
+    setBurnAfterRead((prev) => {
+      const next = !prev
+      if (next) {
+        setFiles((f) => f.slice(0, 1))
+        setMaxDownloads('')
+      }
+      return next
+    })
   }, [])
 
   const maxDownloadsValid = maxDownloads === '' || (Number(maxDownloads) >= 1 && Number.isInteger(Number(maxDownloads)))
@@ -152,11 +165,11 @@ export function TransferCreatePage() {
       >
         <div className="space-y-5 tool-section-stagger">
           <ToolWorkspaceDropzone
-            multiple
-            maxFiles={20}
+            multiple={!burnAfterRead}
+            maxFiles={burnAfterRead ? 1 : 20}
             onFiles={addFiles}
             title={t('create.dropTitle')}
-            hint={t('create.dropHint')}
+            hint={burnAfterRead ? t('create.burnSingleFileHint') : t('create.dropHint')}
             browseLabel={t('create.browseLabel')}
           />
 
@@ -217,17 +230,17 @@ export function TransferCreatePage() {
 
                 <button
                   type="button"
-                  onClick={() => setBurnAfterRead((v) => !v)}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${burnAfterRead ? 'border-orange-500/50 bg-orange-500/10' : 'border-border/70 hover:bg-muted/40'}`}
+                  onClick={handleBurnToggle}
+                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${burnAfterRead ? 'border-warning/50 bg-warning/10' : 'border-border/70 hover:bg-muted/40'}`}
                 >
-                  <Flame className={`h-5 w-5 shrink-0 ${burnAfterRead ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                  <Flame className={`h-5 w-5 shrink-0 ${burnAfterRead ? 'text-warning' : 'text-muted-foreground'}`} />
                   <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-medium ${burnAfterRead ? 'text-orange-600 dark:text-orange-400' : ''}`}>
+                    <p className={`text-sm font-medium ${burnAfterRead ? 'text-warning' : ''}`}>
                       {t('create.burnAfterReadLabel')}
                     </p>
                     <p className="text-xs text-muted-foreground">{t('create.burnAfterReadHint')}</p>
                   </div>
-                  <div className={`h-5 w-9 shrink-0 rounded-full transition ${burnAfterRead ? 'bg-orange-500' : 'bg-muted'}`}>
+                  <div className={`h-5 w-9 shrink-0 rounded-full transition ${burnAfterRead ? 'bg-warning' : 'bg-muted'}`}>
                     <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${burnAfterRead ? 'translate-x-4' : 'translate-x-0'}`} />
                   </div>
                 </button>
@@ -331,14 +344,14 @@ export function TransferCreatePage() {
             </div>
 
             {result.burn_after_read ? (
-              <p className="flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm font-medium text-orange-600 dark:text-orange-400">
+              <p className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-medium text-warning">
                 <Flame className="h-4 w-4 shrink-0" />
                 {t('result.burnReminder')}
               </p>
             ) : null}
 
             {result.extract_code ? (
-              <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+              <div className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
                 <span className="text-sm font-medium">
                   {t('result.extractCodeReminder', { code: result.extract_code })}
                 </span>

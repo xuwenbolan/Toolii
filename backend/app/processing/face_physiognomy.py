@@ -710,9 +710,10 @@ def extract_features(
     # Center Mountain (中岳 = nose): prominence = nose length ratio
     center_prominence = nose_length / face_height
     # East Mountain (东岳 = right cheekbone): distance from center to cheekbone
-    east_prominence = abs(right_cheek_pt[0] - face_center_x) / face_height
+    # Normalize against cheekbone_width (horizontal reference) instead of face_height
+    east_prominence = abs(right_cheek_pt[0] - face_center_x) / cheekbone_width if cheekbone_width > 0 else 0.3
     # West Mountain (西岳 = left cheekbone): distance from center to cheekbone
-    west_prominence = abs(left_cheek_pt[0] - face_center_x) / face_height
+    west_prominence = abs(left_cheek_pt[0] - face_center_x) / cheekbone_width if cheekbone_width > 0 else 0.3
     # Balance: how evenly distributed the five mountains are
     mountain_values = [south_prominence, north_prominence, center_prominence, east_prominence, west_prominence]
     mountain_avg = sum(mountain_values) / len(mountain_values) if mountain_values else 0.3

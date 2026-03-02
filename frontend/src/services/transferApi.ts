@@ -1,6 +1,15 @@
 import { api } from '@/services/api'
 import type { AxiosProgressEvent } from 'axios'
 
+export const TRANSFER_STATUS = {
+  ACTIVE: 'active',
+  EXPIRED: 'expired',
+  BURNED: 'burned',
+  DELETED: 'deleted',
+} as const
+
+export type TransferStatusType = (typeof TRANSFER_STATUS)[keyof typeof TRANSFER_STATUS]
+
 export type TransferFileItem = {
   id: number
   original_filename: string
@@ -28,7 +37,7 @@ export type TransferInfoResponse = {
   download_count: number
   max_downloads: number | null
   burn_after_read: boolean
-  status: string
+  status: TransferStatusType
   files: TransferFileItem[]
   created_at: string
 }
@@ -38,7 +47,7 @@ export type TransferMyItem = {
   token: string
   file_count: number
   total_size: number
-  status: string
+  status: TransferStatusType
   download_count: number
   max_downloads: number | null
   burn_after_read: boolean
@@ -95,8 +104,10 @@ export async function createTransferFromResult(
   return res.data
 }
 
-export async function getTransferInfo(token: string): Promise<TransferInfoResponse> {
-  const res = await api.get<TransferInfoResponse>(`/api/transfer/info/${token}`)
+export async function getTransferInfo(token: string, code?: string): Promise<TransferInfoResponse> {
+  const res = await api.get<TransferInfoResponse>(`/api/transfer/info/${token}`, {
+    params: code ? { code } : undefined,
+  })
   return res.data
 }
 

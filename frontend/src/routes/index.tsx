@@ -1,5 +1,5 @@
 import { lazy } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 
 import { AdminRoute } from '@/components/auth/AdminRoute'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
@@ -12,6 +12,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 
 const HomePage = lazy(() => import('@/pages/Home/HomePage').then((m) => ({ default: m.HomePage })))
 const IdPhotoPage = lazy(() => import('@/pages/IdPhoto/IdPhotoPage').then((m) => ({ default: m.IdPhotoPage })))
+const FaceMapPage = lazy(() => import('@/pages/FaceMap/FaceMapPage').then((m) => ({ default: m.FaceMapPage })))
 const PrivacyPolicyPage = lazy(() => import('@/pages/Legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })))
 const TermsPage = lazy(() => import('@/pages/Legal/TermsPage').then((m) => ({ default: m.TermsPage })))
 const ShareClaimPage = lazy(() => import('@/pages/Credits/ShareClaimPage').then((m) => ({ default: m.ShareClaimPage })))
@@ -69,6 +70,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'id-photo', element: <IdPhotoPage /> },
+      { path: 'face-reading', element: <Navigate to="/facemap" replace /> },
+      { path: 'facemap', element: <FaceMapPage /> },
       { path: 'legal/privacy', element: <PrivacyPolicyPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'share/:token', element: <ShareClaimPage /> },

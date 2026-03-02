@@ -23,7 +23,8 @@
     "totalSize": "Total: {{size}}",
     "removeFile": "Remove",
     "burnAfterReadLabel": "Burn After Reading",
-    "burnAfterReadHint": "Files will be permanently deleted after the first download",
+    "burnAfterReadHint": "File will be permanently destroyed after first download",
+    "burnSingleFileHint": "Burn after reading only supports a single file",
     "loginRequired": "Please log in to use file transfer"
   },
   "result": {
@@ -33,7 +34,7 @@
     "copyLink": "Copy Link",
     "extractCodeReminder": "Extract Code: {{code}}",
     "copyCode": "Copy Code",
-    "burnReminder": "Burn after reading is enabled. Files will be destroyed after the first download.",
+    "burnReminder": "Burn after reading is enabled. The file will be destroyed after the first download.",
     "expiresAt": "Expires: {{date}}",
     "createAnother": "Create Another"
   },
@@ -44,7 +45,15 @@
     "deleted": "This transfer has been deleted.",
     "burned": "This transfer has been destroyed after reading.",
     "limitReached": "Download limit has been reached.",
-    "burnWarning": "Burn after reading: files will be permanently deleted after download.",
+    "burnWarning": "Burn after reading: the file will be permanently destroyed after download.",
+    "burnBadge": "Burn After Reading",
+    "burnConfirmTitle": "Confirm download",
+    "burnConfirmDesc": "This file will be permanently destroyed after download. This action cannot be undone.",
+    "burnConfirmAction": "Download and destroy",
+    "burnPreviewConfirmTitle": "Confirm viewing",
+    "burnPreviewConfirmDesc": "This file will be permanently destroyed after viewing. This action cannot be undone.",
+    "burnPreviewConfirmAction": "View and destroy",
+    "burnDestroyed": "File has been destroyed",
     "notFound": "Transfer not found.",
     "enterCode": "Enter Extract Code",
     "codePlaceholder": "4-digit PIN",
@@ -56,15 +65,19 @@
     "downloading": "Downloading...",
     "downloadAll": "Download All (ZIP)",
     "download": "Download",
+    "preview": "View",
     "fileCount": "{{count}} files",
     "totalSize": "Total: {{size}}",
     "downloads": "Downloaded {{count}} times",
     "expiresAt": "Expires: {{date}}",
-    "message": "Sender's message"
+    "message": "Sender's message",
+    "cancel": "Cancel"
   },
   "list": {
     "title": "My Transfers",
     "empty": "No transfers yet",
+    "createFirst": "Create your first transfer",
+    "loadFailed": "Failed to load transfers",
     "files": "{{count}} files",
     "downloads": "{{count}} downloads",
     "statusActive": "Active",
@@ -73,9 +86,12 @@
     "statusDeleted": "Deleted",
     "expires": "Expires {{date}}",
     "delete": "Delete",
-    "deleteConfirm": "Delete this transfer? Files will be permanently removed.",
+    "deleteConfirmTitle": "Delete transfer",
+    "deleteConfirmDesc": "Delete this transfer? Files will be permanently removed.",
     "copyLink": "Copy Link",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "previous": "Previous",
+    "next": "Next"
   },
   "share": {
     "button": "Share Link",

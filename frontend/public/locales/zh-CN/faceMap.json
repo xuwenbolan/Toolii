@@ -1,0 +1,185 @@
+{
+  "seo": {
+    "title": "FaceMap - AI 面部美学分析",
+    "description": "免费 AI 面部美学分析工具，获取面部比例评分、五官详析、发型和眉型推荐。",
+    "keywords": "面部分析,面部美学,AI颜值评分,脸型分析,发型推荐,面相分析"
+  },
+  "title": "FaceMap",
+  "subtitle": "AI 面部美学顾问 - 上传正面照片，探索你的面部美学",
+  "upload": {
+    "title": "上传照片",
+    "hint": "请上传正面清晰照片，五官完整可见效果最佳",
+    "button": "开始分析",
+    "reanalyze": "重新分析",
+    "analyzing": "分析中..."
+  },
+  "profile": {
+    "overallScore": "综合评分",
+    "tags": "面部特征标签",
+    "summary": "综合评价",
+    "features": "五官详析",
+    "dimensions": "美学六维评估",
+    "geneCard": "面部基因卡",
+    "funIndices": "趣味指数",
+    "photoAngle": "最佳拍照指南"
+  },
+  "dimensions": {
+    "proportion_harmony": "比例协调",
+    "symmetry": "对称美感",
+    "feature_refinement": "特征精致度",
+    "contour_definition": "轮廓清晰度",
+    "facial_dimensionality": "面部立体感",
+    "feature_harmony": "五官和谐度"
+  },
+  "funIndices": {
+    "age_defying": "冻龄指数",
+    "distinctiveness": "辨识度",
+    "photogenic": "上镜指数",
+    "approachability": "亲和力"
+  },
+  "photoAngle": {
+    "bestSide": "最佳侧",
+    "verticalAngle": "垂直角度",
+    "expressionTip": "表情建议",
+    "rationale": "原因",
+    "sides": {
+      "left": "左侧",
+      "right": "右侧",
+      "center": "正面"
+    },
+    "angles": {
+      "level": "平视",
+      "slight_up": "微仰",
+      "slight_down": "微俯"
+    }
+  },
+  "features": {
+    "face_shape": "脸型",
+    "eyes": "眼型",
+    "nose": "鼻型",
+    "mouth": "嘴型",
+    "eyebrows": "眉型",
+    "forehead": "额头",
+    "jawline": "下颌",
+    "symmetry": "对称性"
+  },
+  "report": {
+    "unlock": "解锁完整报告",
+    "unlockHint": "获取发型、眉型、修容、眼镜等个性化推荐",
+    "creditHint": "完整报告消耗 1 积分",
+    "generating": "生成报告中...",
+    "hairstyles": "发型推荐",
+    "hairstylesRecommend": "推荐发型",
+    "hairstylesAvoid": "不推荐",
+    "eyebrows": "眉型建议",
+    "eyebrowsCurrent": "当前眉型",
+    "eyebrowsSuggested": "建议眉型",
+    "eyebrowsAdjustments": "调整建议",
+    "adjustmentKeys": {
+      "arch_change": "眉峰调整",
+      "length_change": "眉长调整",
+      "no_change": "无需调整"
+    },
+    "contouring": "修容指南",
+    "glasses": "眼镜推荐",
+    "glassesRecommend": "推荐框型",
+    "glassesAvoid": "不推荐",
+    "insights": "深度洞察",
+    "physiognomy": "面相趣味解读",
+    "physiognomyDisclaimer": "仅供娱乐参考",
+    "foreheadExposure": "前额暴露度"
+  },
+  "locked": {
+    "title": "完整报告",
+    "description": "解锁专属美学推荐方案",
+    "features": ["发型推荐", "眉型建议", "修容指南", "眼镜推荐", "深度洞察"]
+  },
+  "share": {
+    "button": "分享报告",
+    "generating": "生成中...",
+    "saved": "已保存到相册",
+    "failed": "生成分享卡片失败",
+    "scoreLabel": "评分",
+    "insightLabel": "面部美学洞察",
+    "watermark": "由 Toolii FaceMap 生成"
+  },
+  "physiognomy": {
+    "templateBased": "基于模板分析",
+    "collapse": "收起",
+    "sectionCount": "{{count}} 个部分",
+    "sections": {
+      "three_courts": "三庭分析",
+      "five_eyes": "五眼分析",
+      "eyes": "眼部解读",
+      "nose": "鼻部解读",
+      "mouth": "口部解读",
+      "eyebrows": "眉型解读",
+      "forehead_jawline_mountains": "额头/下颌/五岳",
+      "overall": "综合面相"
+    }
+  },
+  "contouring": {
+    "zoneTypes": {
+      "highlight": "高光",
+      "shadow": "阴影",
+      "blush": "腮红"
+    }
+  },
+  "dimensionBasis": {
+    "expand": "查看测量详情",
+    "collapse": "收起",
+    "metric": "指标",
+    "value": "数值",
+    "ideal": "理想值",
+    "keys": {
+      "three_courts": "三庭比例",
+      "five_eyes": "五眼比例",
+      "face_whr": "面宽高比",
+      "eyes": "眼部",
+      "eyebrows": "眉部",
+      "nose": "鼻部",
+      "mouth": "口部",
+      "avg_confidence": "平均置信度",
+      "jaw_sharpness": "下颌锐度",
+      "cheekbone_ratio": "颧骨比",
+      "mountain_balance": "五岳均衡",
+      "nose_bridge_straightness": "鼻梁直度",
+      "nose_length_ratio": "鼻长比",
+      "forehead_height_ratio": "额高比",
+      "brow_length_ratio": "眉长比",
+      "nose_mouth_ratio": "鼻口比",
+      "face_jaw_compat": "脸型/颌型",
+      "forehead_ratio": "额头比",
+      "lip_ratio": "唇厚比"
+    }
+  },
+  "annotation": {
+    "contour": "轮廓",
+    "threeCourts": "三庭",
+    "fiveEyes": "五眼",
+    "keyPoints": "关键点",
+    "clickToView": "点击查看解读",
+    "tooltip": {
+      "contour": "面部轮廓线",
+      "upperCourt": "上庭：发际线到眉毛",
+      "middleCourt": "中庭：眉毛到鼻底",
+      "lowerCourt": "下庭：鼻底到下巴",
+      "fiveEyes": "五眼：以眼宽为单位度量面部横向比例"
+    }
+  },
+  "image": {
+    "expand": "展开照片",
+    "collapse": "收起照片"
+  },
+  "nav": {
+    "report": "完整报告"
+  },
+  "exceeded": "超过了 {{percent}}% 的人",
+  "loginRequired": "请先登录",
+  "loginAction": "去登录",
+  "errors": {
+    "noFace": "未检测到人脸，请上传正面清晰照片",
+    "analyzeFailed": "分析失败，请重试",
+    "reportFailed": "报告生成失败，请重试"
+  }
+}

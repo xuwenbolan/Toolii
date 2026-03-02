@@ -20,17 +20,17 @@ _AVG_IPD_MM = 63.0  # Average inter-pupillary distance (mm)
 # anthropometric input distributions (see `calibrate_percentile_params()`).
 # Recalibrate when scoring formulas change or when real user data is available.
 _PERCENTILE_PARAMS: dict[str, tuple[float, float]] = {
-    "proportion_harmony":    (85.0, 5.6),
-    "symmetry":              (82.0, 7.0),
-    "feature_refinement":    (49.5, 7.1),
-    "contour_definition":    (70.8, 19.0),
-    "facial_dimensionality": (66.4, 8.9),
-    "feature_harmony":       (75.2, 9.8),
+    "proportion_harmony":    (78.0, 10.0),
+    "symmetry":              (78.0, 9.0),
+    "feature_refinement":    (50.0, 10.0),
+    "contour_definition":    (65.0, 16.0),
+    "facial_dimensionality": (60.0, 12.0),
+    "feature_harmony":       (70.0, 12.0),
     # Fun indices
-    "age_defying":           (66.1, 13.8),
-    "distinctiveness":       (30.7, 8.0),
-    "photogenic":            (82.8, 4.6),
-    "approachability":       (62.1, 8.5),
+    "age_defying":           (55.0, 16.0),
+    "distinctiveness":       (30.0, 10.0),
+    "photogenic":            (75.0, 10.0),
+    "approachability":       (58.0, 12.0),
 }
 
 
@@ -995,6 +995,7 @@ def recommend_eyebrows(
         "current_type": current_sid,
         "current_description": current_label,
         "suggested_type": ideal_sid,
+        "suggested_description": ideal_label,
         "rationale": rationale,
         "adjustments": adjustments,
     }
