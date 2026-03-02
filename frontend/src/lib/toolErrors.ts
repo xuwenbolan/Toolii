@@ -71,6 +71,14 @@ export function deriveToolErrorMeta(error: unknown, fallbackMessage: string): To
     return { kind: 'auth_required', message, status, code, recoverable: false }
   }
 
+  if (code === 'NO_FACE_DETECTED') {
+    return { kind: 'invalid_input', message, status, code, recoverable: true }
+  }
+
+  if (code === 'MODEL_UNAVAILABLE') {
+    return { kind: 'processing_failed', message, status, code, recoverable: true }
+  }
+
   if (
     code === 'INVALID_FILE_TYPE' ||
     code === 'INVALID_OUTPUT_FORMAT' ||

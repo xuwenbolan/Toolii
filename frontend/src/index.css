@@ -1,6 +1,5 @@
 @import 'tailwindcss';
-
-@plugin 'tailwindcss-animate';
+@import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -27,6 +26,8 @@ svg {
   max-width: 100%;
   height: auto;
 }
+
+/* ── Custom keyframes ─────────────────────────────────────── */
 
 @keyframes fade-in {
   from {
@@ -72,63 +73,6 @@ svg {
   }
 }
 
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  15% {
-    transform: translateX(-6px);
-  }
-  30% {
-    transform: translateX(5px);
-  }
-  45% {
-    transform: translateX(-4px);
-  }
-  60% {
-    transform: translateX(3px);
-  }
-  75% {
-    transform: translateX(-2px);
-  }
-}
-
-@keyframes icon-bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-8px);
-  }
-  60% {
-    transform: translateY(-3px);
-  }
-}
-
-@keyframes breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.06);
-    opacity: 1;
-  }
-}
-
-@keyframes glow-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgb(14 165 233 / 0%);
-  }
-  50% {
-    box-shadow: 0 0 12px 3px rgb(14 165 233 / 35%);
-  }
-}
-
 @keyframes check-draw {
   from {
     stroke-dashoffset: 24;
@@ -158,13 +102,18 @@ svg {
   }
 }
 
+/* ── Theme bridge: CSS vars → Tailwind utilities ──────────── */
+
 @theme inline {
+  /* Custom animations */
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-delay-1: fade-in 0.4s ease-out 0.15s both;
   --animate-card-in: card-in 0.35s ease-out both;
   --animate-rise-in: rise-in 0.55s var(--ease-out) both;
   --animate-bar-enter: bar-enter 0.4s var(--ease-out) both;
   --animate-section-in: section-in 0.4s var(--ease-out) both;
+
+  /* Radius scale */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -172,6 +121,8 @@ svg {
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* shadcn core colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -187,6 +138,7 @@ svg {
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -203,15 +155,60 @@ svg {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Brand indigo scale (Logo #4F46E5, hue 264) */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-900: var(--brand-900);
+
+  /* Brand accent aliases */
+  --color-accent-brand: var(--accent-brand);
+  --color-accent-brand-light: var(--accent-brand-light);
+  --color-accent-brand-dark: var(--accent-brand-dark);
+
+  /* Semantic status colors */
+  --color-success: var(--success);
+  --color-success-light: var(--success-light);
+  --color-warning: var(--warning);
+  --color-warning-light: var(--warning-light);
+  --color-info: var(--info);
+  --color-info-light: var(--info-light);
+  --color-destructive-light: var(--destructive-light);
+
+  /* Tool category colors */
+  --color-cat-image: var(--cat-image);
+  --color-cat-image-light: var(--cat-image-light);
+  --color-cat-image-surface: var(--cat-image-surface);
+  --color-cat-pdf: var(--cat-pdf);
+  --color-cat-pdf-light: var(--cat-pdf-light);
+  --color-cat-pdf-surface: var(--cat-pdf-surface);
+  --color-cat-text: var(--cat-text);
+  --color-cat-text-light: var(--cat-text-light);
+  --color-cat-text-surface: var(--cat-text-surface);
+  --color-cat-idphoto: var(--cat-idphoto);
+  --color-cat-idphoto-light: var(--cat-idphoto-light);
+  --color-cat-idphoto-surface: var(--cat-idphoto-surface);
 }
 
+/* ── Light mode variables ─────────────────────────────────── */
+
 :root {
+  /* Timing & easing */
   --duration-fast: 170ms;
   --duration-normal: 280ms;
   --duration-slow: 450ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Radius */
   --radius: 0.625rem;
+
+  /* shadcn core - neutral base */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -227,14 +224,19 @@ svg {
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+
+  /* Charts */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+
+  /* Sidebar */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -243,7 +245,53 @@ svg {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Brand indigo scale (Logo #4F46E5, hue 264) */
+  --brand-50: oklch(0.97 0.01 264);
+  --brand-100: oklch(0.92 0.04 264);
+  --brand-200: oklch(0.84 0.08 264);
+  --brand-400: oklch(0.65 0.20 264);
+  --brand-500: oklch(0.53 0.24 264);
+  --brand-600: oklch(0.45 0.24 264);
+  --brand-700: oklch(0.38 0.22 264);
+  --brand-900: oklch(0.25 0.14 264);
+
+  /* Brand accent aliases */
+  --accent-brand: var(--brand-600);
+  --accent-brand-light: var(--brand-100);
+  --accent-brand-dark: var(--brand-400);
+
+  /* Semantic status colors */
+  --destructive-light: oklch(0.94 0.03 27);
+  --success: oklch(0.60 0.17 145);
+  --success-light: oklch(0.94 0.03 145);
+  --warning: oklch(0.75 0.15 85);
+  --warning-light: oklch(0.95 0.03 85);
+  --info: oklch(0.55 0.18 250);
+  --info-light: oklch(0.94 0.03 250);
+
+  /* Tool category colors */
+  --cat-image: oklch(0.78 0.10 55);
+  --cat-image-light: oklch(0.95 0.025 55);
+  --cat-image-surface: oklch(0.98 0.012 55);
+  --cat-pdf: oklch(0.75 0.09 15);
+  --cat-pdf-light: oklch(0.95 0.022 15);
+  --cat-pdf-surface: oklch(0.98 0.010 15);
+  --cat-text: oklch(0.72 0.08 280);
+  --cat-text-light: oklch(0.95 0.020 280);
+  --cat-text-surface: oklch(0.98 0.010 280);
+  --cat-idphoto: oklch(0.75 0.08 160);
+  --cat-idphoto-light: oklch(0.95 0.020 160);
+  --cat-idphoto-surface: oklch(0.98 0.010 160);
+
+  /* Safe area insets (fallback 0px for non-notched devices) */
+  --sai-top: env(safe-area-inset-top, 0px);
+  --sai-right: env(safe-area-inset-right, 0px);
+  --sai-bottom: env(safe-area-inset-bottom, 0px);
+  --sai-left: env(safe-area-inset-left, 0px);
 }
+
+/* ── Custom utility classes ───────────────────────────────── */
 
 .animate-rise-in {
   opacity: 0;
@@ -312,6 +360,15 @@ svg {
   animation: check-draw 0.4s var(--ease-out) 0.15s both;
 }
 
+/* Hide scrollbar but keep scroll behavior */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -322,7 +379,10 @@ svg {
   }
 }
 
+/* ── Dark mode variables ──────────────────────────────────── */
+
 .dark {
+  /* shadcn core - dark */
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -338,14 +398,19 @@ svg {
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+
+  /* Charts - dark */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+
+  /* Sidebar - dark */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -354,4 +419,28 @@ svg {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  /* Brand accent - dark mode override */
+  --accent-brand: var(--brand-400);
+  --accent-brand-light: var(--brand-900);
+  --accent-brand-dark: var(--brand-200);
+
+  /* Semantic status - dark */
+  --destructive-light: oklch(0.25 0.04 27);
+  --success: oklch(0.70 0.15 145);
+  --success-light: oklch(0.25 0.03 145);
+  --warning: oklch(0.80 0.13 85);
+  --warning-light: oklch(0.25 0.03 85);
+  --info: oklch(0.65 0.16 250);
+  --info-light: oklch(0.25 0.03 250);
+
+  /* Tool category colors - dark (basic functional) */
+  --cat-image-light: oklch(0.25 0.025 55);
+  --cat-image-surface: oklch(0.20 0.012 55);
+  --cat-pdf-light: oklch(0.25 0.025 15);
+  --cat-pdf-surface: oklch(0.20 0.012 15);
+  --cat-text-light: oklch(0.25 0.025 280);
+  --cat-text-surface: oklch(0.20 0.012 280);
+  --cat-idphoto-light: oklch(0.25 0.025 160);
+  --cat-idphoto-surface: oklch(0.20 0.012 160);
 }

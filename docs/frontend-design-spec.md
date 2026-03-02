@@ -68,6 +68,39 @@ This approach keeps the overall feel clean and content-first, while the indigo t
 - Personality comes from **typography, spacing, and motion** — not from color
 - The only non-gray colors in the UI are: brand accent (indigo, sparse), semantic colors (red/green/amber for status), and the user's own content
 
+### 1.4 UI Foundation — shadcn/ui (new-york)
+
+**All UI components MUST use [shadcn/ui](https://ui.shadcn.com/) with the `new-york` style variant.**
+
+This is the single source of truth for component patterns in the project. Do not introduce alternative component libraries (Ant Design, MUI, Chakra, Headless UI, etc.) or hand-roll equivalents of components that shadcn/ui already provides.
+
+**Configuration (see `components.json`):**
+```
+style:      new-york
+baseColor:  neutral
+icons:      lucide-react
+css:        Tailwind CSS v4 + CSS variables (oklch)
+```
+
+**What "new-york" means for our design:**
+- Buttons use a flat, high-contrast fill with no rounded-full pills — aligns with our "minimal-neutral" tone
+- Cards, dialogs, and popovers use subtle borders over heavy shadows — consistent with our Level 1 elevation approach
+- Form controls (Input, Select, Checkbox, etc.) are compact and precise — matches "editorial precision"
+- The variant has tighter padding and sharper visual rhythm than the default shadcn style, fitting our content-first philosophy
+
+**Component usage rules:**
+1. **Use shadcn/ui primitives first** — Button, Card, Dialog, Sheet, Select, Input, Tabs, Badge, Skeleton, etc. Customize via Tailwind classes and CSS variable overrides, not by forking the component source
+2. **Follow the variant API** — use `variant` and `size` props (e.g., `<Button variant="outline" size="sm">`) rather than ad-hoc className overrides for standard states
+3. **Extend, don't replace** — if a shadcn component needs project-specific behavior, wrap it in a thin project component (e.g., `ToolActionButton` wrapping `Button`) rather than modifying the `ui/` source directly
+4. **Theme via CSS variables** — all customization of colors, radii, and spacing flows through the CSS variable system defined in `index.css`. Never hard-code color values in component code
+5. **Icon consistency** — use `lucide-react` exclusively. Do not mix in icons from other libraries (heroicons, phosphor, etc.)
+
+**Adding new shadcn components:**
+```bash
+pnpm dlx shadcn@latest add <component-name>
+```
+Always use the CLI to add components — this ensures the `new-york` style and project aliases are applied correctly. Do not copy-paste component source from the shadcn website.
+
 ---
 
 ## 2. Design Tokens
@@ -1117,6 +1150,9 @@ Canonical names for consistency across code, UI, URLs, and translations:
 | Error handling | In-context errors, specific & actionable messages | 9 |
 | i18n | Key conventions, text length constraints, no concatenation | 10 |
 | Performance | FCP < 1.5s, LCP < 2.5s, canvas ops < 16ms | 11 |
+| UI component library | shadcn/ui (new-york style), Tailwind CSS v4, OKLCH color space | 1.4 |
+| Animation system | tw-animate-css (pure CSS import), replaces tailwindcss-animate plugin | 1.4 |
+| Color token enforcement | All semantic colors via CSS variables, no hardcoded Tailwind color names | 2.1 |
 
 ## 14. Open Items
 
@@ -1129,5 +1165,5 @@ Items still needing resolution:
 
 ---
 
-*Document version: 0.4 (PDF unified workspace, spec consistency fixes)*
-*Last updated: 2026-02-27*
+*Document version: 0.5 (shadcn/ui alignment, animation system migration, color token enforcement)*
+*Last updated: 2026-02-28*
