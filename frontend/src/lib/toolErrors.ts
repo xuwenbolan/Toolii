@@ -5,6 +5,7 @@ export type ToolErrorKind =
   | 'unsupported_format'
   | 'upload_failed'
   | 'processing_failed'
+  | 'service_unavailable'
   | 'timeout'
   | 'rate_limited'
   | 'auth_required'
@@ -75,8 +76,8 @@ export function deriveToolErrorMeta(error: unknown, fallbackMessage: string): To
     return { kind: 'invalid_input', message, status, code, recoverable: true }
   }
 
-  if (code === 'MODEL_UNAVAILABLE') {
-    return { kind: 'processing_failed', message, status, code, recoverable: true }
+  if (code === 'GPU_BUSY' || code === 'MODEL_UNAVAILABLE' || status === 502 || status === 503) {
+    return { kind: 'service_unavailable', message, status, code, recoverable: true }
   }
 
   if (code?.startsWith('FACE_')) {

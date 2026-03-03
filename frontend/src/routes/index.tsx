@@ -65,6 +65,7 @@ const AdminCardsPage = lazy(() => import('@/pages/Admin/AdminCardsPage').then((m
 const AdminOperationsPage = lazy(() => import('@/pages/Admin/AdminOperationsPage').then((m) => ({ default: m.AdminOperationsPage })))
 const AdminFeedbackPage = lazy(() => import('@/pages/Admin/AdminFeedbackPage').then((m) => ({ default: m.AdminFeedbackPage })))
 const AdminToolsPage = lazy(() => import('@/pages/Admin/AdminToolsPage').then((m) => ({ default: m.AdminToolsPage })))
+const AdminSystemPage = lazy(() => import('@/pages/Admin/AdminSystemPage').then((m) => ({ default: m.AdminSystemPage })))
 
 export const router = createBrowserRouter([
   {
@@ -168,6 +169,7 @@ export const router = createBrowserRouter([
           { path: 'tools', element: <AdminToolsPage /> },
           { path: 'operations', element: <AdminOperationsPage /> },
           { path: 'feedback', element: <AdminFeedbackPage /> },
+          { path: 'system', element: <AdminSystemPage /> },
         ],
       },
     ],

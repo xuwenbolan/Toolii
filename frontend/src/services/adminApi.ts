@@ -173,6 +173,82 @@ export type RevenueResponse = {
   total_transactions: number
 }
 
+// ── Cortex / System types ─────────────────────────────────
+
+export type CortexGpuInfo = {
+  name: string
+  vram_total_mb: number
+  vram_used_mb: number
+  vram_free_mb: number
+}
+
+export type CortexModelItem = {
+  name: string
+  status: 'loaded' | 'available' | 'missing'
+  required: boolean
+  vram_mb: number
+  file_size_mb: number | null
+  path: string
+  last_used?: number
+  idle_seconds?: number
+}
+
+export type CortexModelsSummary = {
+  registered: number
+  loaded: number
+  vram_used_mb: number
+  vram_budget_mb: number
+  vram_utilization: number
+}
+
+export type CortexModelsResponse = {
+  summary: CortexModelsSummary
+  models: CortexModelItem[]
+  gpu: CortexGpuInfo
+  uptime_seconds: number
+}
+
+export type CortexHealthResponse = {
+  status: string
+  gpu: CortexGpuInfo
+  models: {
+    loaded: string[]
+    available: string[]
+    vram_estimated_mb: number
+  }
+  uptime_seconds: number
+}
+
+export type CortexStatusResponse = {
+  online: boolean
+  health: CortexHealthResponse | null
+  models: CortexModelsResponse | null
+}
+
+export type CortexModelCheckResult = {
+  name: string
+  healthy: boolean
+  required?: boolean
+  vram_mb?: number
+  path?: string
+  file_size_mb?: number
+  status?: string
+  error?: string
+  detail?: string
+  idle_seconds?: number
+  inputs?: Array<{ name: string; shape: (number | string)[]; dtype: string }>
+  outputs?: Array<{ name: string; shape: (number | string)[]; dtype: string }>
+  providers?: string[]
+}
+
+export type CortexModelsCheckResponse = {
+  healthy: boolean
+  healthy_count?: number
+  total?: number
+  models?: CortexModelCheckResult[]
+  error?: string
+}
+
 // ── API calls ─────────────────────────────────────────────
 
 export async function fetchDashboardStats(days = 30) {
@@ -267,5 +343,24 @@ export async function fetchAdminShareLinks(params?: {
 
 export async function fetchRevenue(params?: { granularity?: string; days?: number }) {
   const res = await api.get<RevenueResponse>('/api/admin/operations/revenue', { params })
+  return res.data
+}
+
+// ── System / Cortex ───────────────────────────────────────
+
+export async function fetchCortexStatus() {
+  const res = await api.get<CortexStatusResponse>('/api/admin/system/cortex/status')
+  return res.data
+}
+
+export async function checkCortexModels() {
+  const res = await api.get<CortexModelsCheckResponse>('/api/admin/system/cortex/models/check')
+  return res.data
+}
+
+export async function checkCortexModel(modelName: string) {
+  const res = await api.get<CortexModelCheckResult>(
+    `/api/admin/system/cortex/models/${modelName}/check`,
+  )
   return res.data
 }

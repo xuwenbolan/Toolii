@@ -7,7 +7,8 @@
     "cards": "Card Codes",
     "operations": "Operations",
     "feedback": "Feedback",
-    "tools": "Tools"
+    "tools": "Tools",
+    "system": "System"
   },
   "dashboard": {
     "totalUsers": "Total Users",
@@ -194,6 +195,35 @@
       "admin": "Admin Only"
     },
     "updateSuccess": "Tool updated"
+  },
+  "system": {
+    "title": "System Status",
+    "refresh": "Refresh",
+    "online": "Cortex Connected",
+    "offline": "Cortex Offline",
+    "cortexUnavailable": "Cortex GPU inference service is unavailable. Please check if the service is running.",
+    "uptime": "Uptime",
+    "gpu": "GPU",
+    "gpuVram": "GPU VRAM",
+    "modelBudget": "Model Budget",
+    "modelsLoaded": "Models Loaded",
+    "modelRegistry": "Model Registry",
+    "model": "Model",
+    "status": "Status",
+    "required": "Required",
+    "fileSize": "File Size",
+    "idle": "Idle",
+    "check": "Check",
+    "checkAll": "Check All",
+    "healthy": "Healthy",
+    "unhealthy": "Unhealthy",
+    "yes": "Yes",
+    "no": "No",
+    "modelStatus": {
+      "loaded": "Loaded",
+      "available": "Available",
+      "missing": "Missing"
+    }
   },
   "common": {
     "loading": "Loading...",

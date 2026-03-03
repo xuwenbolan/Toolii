@@ -124,7 +124,8 @@
       "rateLimitTitle": "请求过于频繁",
       "authTitle": "需要登录或验证",
       "creditsTitle": "Credits 余额不足",
-      "processingTitle": "处理失败"
+      "processingTitle": "处理失败",
+      "serviceTitle": "服务暂时不可用"
     }
   },
   "apiErrors": {
@@ -169,7 +170,8 @@
     "FACE_EYES_CLOSED": "检测到闭眼，请睁开眼睛拍照",
     "FACE_EXTREME_EXPRESSION": "检测到夸张表情，请保持自然放松的表情",
     "FACE_BLURRY": "照片太模糊，请使用更清晰的照片",
-    "MODEL_UNAVAILABLE": "面部分析模型暂时不可用，请稍后重试",
+    "GPU_BUSY": "GPU 推理繁忙，请稍后重试",
+    "MODEL_UNAVAILABLE": "模型暂时不可用，请稍后重试",
     "IMAGE_PROCESS_FAILED": "图片处理失败",
     "INVALID_QUALITY": "质量值需在 1 到 100 之间",
     "INVALID_TARGET_KB": "目标大小必须大于 0",

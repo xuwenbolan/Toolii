@@ -124,7 +124,8 @@
       "rateLimitTitle": "Too many requests",
       "authTitle": "Sign-in required",
       "creditsTitle": "Insufficient credits",
-      "processingTitle": "Processing failed"
+      "processingTitle": "Processing failed",
+      "serviceTitle": "Service temporarily unavailable"
     }
   },
   "apiErrors": {
@@ -169,7 +170,8 @@
     "FACE_EYES_CLOSED": "Eyes appear closed. Please keep your eyes open for the photo.",
     "FACE_EXTREME_EXPRESSION": "Extreme facial expression detected. Please maintain a natural, relaxed expression.",
     "FACE_BLURRY": "Photo is too blurry. Please use a clearer, sharper photo.",
-    "MODEL_UNAVAILABLE": "Face analysis model temporarily unavailable. Please try again later.",
+    "GPU_BUSY": "GPU inference busy, please try again later.",
+    "MODEL_UNAVAILABLE": "Model temporarily unavailable. Please try again later.",
     "IMAGE_PROCESS_FAILED": "Image processing failed",
     "INVALID_QUALITY": "Quality must be between 1 and 100",
     "INVALID_TARGET_KB": "Target size must be greater than 0",

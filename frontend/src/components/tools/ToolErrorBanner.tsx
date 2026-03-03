@@ -33,6 +33,8 @@ export function ToolErrorBanner({ error, errorMeta, onRetry, className }: Props)
       case 'unsupported_format':
       case 'invalid_input':
         return { tone: 'warning' as const, icon: AlertTriangle, title: t('errors.banner.invalidInputTitle') }
+      case 'service_unavailable':
+        return { tone: 'warning' as const, icon: CloudOff, title: t('errors.banner.serviceTitle') }
       case 'upload_failed':
       case 'timeout':
         return { tone: 'warning' as const, icon: CloudOff, title: t('errors.banner.networkTitle') }

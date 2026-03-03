@@ -7,7 +7,8 @@
     "cards": "卡密管理",
     "operations": "运营数据",
     "feedback": "用户反馈",
-    "tools": "工具管理"
+    "tools": "工具管理",
+    "system": "系统状态"
   },
   "dashboard": {
     "totalUsers": "用户总数",
@@ -194,6 +195,35 @@
       "admin": "仅管理员"
     },
     "updateSuccess": "工具已更新"
+  },
+  "system": {
+    "title": "系统状态",
+    "refresh": "刷新",
+    "online": "Cortex 已连接",
+    "offline": "Cortex 离线",
+    "cortexUnavailable": "Cortex GPU 推理服务不可用，请检查服务是否已启动。",
+    "uptime": "运行时间",
+    "gpu": "GPU",
+    "gpuVram": "GPU 显存",
+    "modelBudget": "模型预算",
+    "modelsLoaded": "已加载模型",
+    "modelRegistry": "模型列表",
+    "model": "模型",
+    "status": "状态",
+    "required": "必需",
+    "fileSize": "文件大小",
+    "idle": "空闲时间",
+    "check": "检查",
+    "checkAll": "检查全部",
+    "healthy": "正常",
+    "unhealthy": "异常",
+    "yes": "是",
+    "no": "否",
+    "modelStatus": {
+      "loaded": "已加载",
+      "available": "可用",
+      "missing": "缺失"
+    }
   },
   "common": {
     "loading": "加载中...",
