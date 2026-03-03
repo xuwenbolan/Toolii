@@ -385,12 +385,12 @@ LANDMARKER_UNAVAILABLE = "LANDMARKER_UNAVAILABLE"
 
 def detect_face_landmarks(
     image_bytes: bytes,
-) -> tuple[list, list, int, int] | str | None:
-    """Return raw (landmarks, blendshapes, width, height) for the largest face.
+) -> tuple[list, list, int, int, int] | str | None:
+    """Return raw (landmarks, blendshapes, width, height, face_count) for the largest face.
 
     Used by physiognomy analysis to access all 478 mesh points directly.
     Returns:
-        tuple: (landmarks, blendshapes, width, height) when face found.
+        tuple: (landmarks, blendshapes, width, height, face_count) when face found.
         LANDMARKER_UNAVAILABLE: when MediaPipe model cannot be loaded.
         None: when no face detected in the image.
     """
@@ -418,6 +418,8 @@ def detect_face_landmarks(
     if not result.face_landmarks:
         return None
 
+    face_count = len(result.face_landmarks)
+
     # Select the largest face by bounding box area
     best_idx = 0
     best_area = 0.0
@@ -430,7 +432,7 @@ def detect_face_landmarks(
 
     face_lms = result.face_landmarks[best_idx]
     bs = result.face_blendshapes[best_idx] if best_idx < len(result.face_blendshapes) else []
-    return face_lms, bs, width, height
+    return face_lms, bs, width, height, face_count
 
 
 def select_primary_face(faces: list[FaceBox] | list[dict[str, object]] | None) -> dict[str, Any] | None:

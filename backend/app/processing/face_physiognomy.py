@@ -146,6 +146,9 @@ def _proximity(value: float, center: float, sigma: float) -> float:
 def _top_two(scores: dict[str, float]) -> dict[str, Any]:
     """Normalize soft scores and return primary + secondary classification."""
     total = sum(scores.values()) or 1.0
+    # Find absolute best score (0-1 range after average-based classifiers)
+    best_key = max(scores, key=scores.get)  # type: ignore[arg-type]
+    best_raw = scores[best_key]
     ranked = sorted(
         [(k, round(v / total, 3)) for k, v in scores.items()],
         key=lambda x: -x[1],
@@ -153,6 +156,9 @@ def _top_two(scores: dict[str, float]) -> dict[str, Any]:
     result: dict[str, Any] = {
         "shape_id": ranked[0][0],
         "confidence": ranked[0][1],
+        # Absolute match quality (0-1). Unlike confidence (relative softmax),
+        # this reflects how well the feature actually matches its best type.
+        "clarity": round(best_raw, 4),
     }
     if len(ranked) > 1 and ranked[1][1] > 0.05:
         result["secondary_id"] = ranked[1][0]
@@ -177,14 +183,16 @@ def _classify_face_shape(
     jaw_to_cheek = jaw_ratio / cheekbone_ratio if cheekbone_ratio > 0 else 1.0
     forehead_to_cheek = forehead_ratio / cheekbone_ratio if cheekbone_ratio > 0 else 1.0
 
+    # Observed ranges: face_wh 0.67-0.79, jaw/cheek 0.64-0.73, f/c 0.93-1.01.
+    # Heart vs diamond use forehead_to_cheek with tight σ=0.04 for discrimination.
     scores = {
-        "round":   _proximity(width_height_ratio, 0.90, 0.08) * _proximity(jaw_to_cheek, 0.93, 0.06),
-        "square":  _proximity(width_height_ratio, 0.88, 0.07) * _proximity(jaw_to_cheek, 0.83, 0.06),
-        "oval":    _proximity(width_height_ratio, 0.73, 0.09) * _proximity(jaw_to_cheek, 0.76, 0.08),
-        "long":    _proximity(width_height_ratio, 0.62, 0.07) * _proximity(jaw_to_cheek, 0.85, 0.08),
-        "diamond": _proximity(width_height_ratio, 0.76, 0.07) * _proximity(jaw_to_cheek, 0.74, 0.07) * _proximity(forehead_to_cheek, 0.82, 0.06),
-        "heart":   _proximity(width_height_ratio, 0.76, 0.07) * _proximity(jaw_to_cheek, 0.72, 0.07) * _proximity(forehead_to_cheek, 0.98, 0.06),
-        "pear":    _proximity(width_height_ratio, 0.80, 0.08) * _proximity(jaw_to_cheek, 1.02, 0.08),
+        "round":   (_proximity(width_height_ratio, 0.88, 0.07) + _proximity(jaw_to_cheek, 0.90, 0.07)) / 2,
+        "square":  (_proximity(width_height_ratio, 0.85, 0.07) + _proximity(jaw_to_cheek, 0.82, 0.07)) / 2,
+        "oval":    (_proximity(width_height_ratio, 0.73, 0.06) + _proximity(jaw_to_cheek, 0.70, 0.06)) / 2,
+        "long":    (_proximity(width_height_ratio, 0.64, 0.06) + _proximity(jaw_to_cheek, 0.80, 0.07)) / 2,
+        "diamond": (_proximity(width_height_ratio, 0.72, 0.06) + _proximity(jaw_to_cheek, 0.70, 0.06) + _proximity(forehead_to_cheek, 0.90, 0.04)) / 3,
+        "heart":   (_proximity(width_height_ratio, 0.73, 0.06) + _proximity(jaw_to_cheek, 0.65, 0.05) + _proximity(forehead_to_cheek, 0.97, 0.04)) / 3,
+        "pear":    (_proximity(width_height_ratio, 0.80, 0.07) + _proximity(jaw_to_cheek, 1.00, 0.07)) / 2,
     }
     return _top_two(scores)
 
@@ -194,12 +202,13 @@ def _classify_eye_shape(
     width_height_ratio: float,
 ) -> dict[str, Any]:
     """Classify eye shape with soft scoring and confidence."""
+    # Average instead of multiply to prevent single-factor collapse.
     scores = {
-        "phoenix": _proximity(corner_angle, 10.0, 5.0) * _proximity(width_height_ratio, 3.0, 1.0),
-        "droopy":  _proximity(corner_angle, -10.0, 5.0) * _proximity(width_height_ratio, 3.0, 1.0),
-        "narrow":  _proximity(corner_angle, 0, 6.0) * _proximity(width_height_ratio, 4.5, 1.0),
-        "round":   _proximity(corner_angle, 0, 6.0) * _proximity(width_height_ratio, 1.6, 0.5),
-        "almond":  _proximity(corner_angle, 0, 5.0) * _proximity(width_height_ratio, 2.8, 0.7),
+        "phoenix": (_proximity(corner_angle, 10.0, 6.0) + _proximity(width_height_ratio, 3.0, 1.0)) / 2,
+        "droopy":  (_proximity(corner_angle, -10.0, 6.0) + _proximity(width_height_ratio, 3.0, 1.0)) / 2,
+        "narrow":  (_proximity(corner_angle, 0, 7.0) + _proximity(width_height_ratio, 4.5, 1.2)) / 2,
+        "round":   (_proximity(corner_angle, 0, 7.0) + _proximity(width_height_ratio, 1.6, 0.6)) / 2,
+        "almond":  (_proximity(corner_angle, 0, 6.0) + _proximity(width_height_ratio, 2.8, 0.8)) / 2,
     }
     return _top_two(scores)
 
@@ -211,17 +220,21 @@ def _classify_nose_shape(
     face_height: float,
 ) -> dict[str, Any]:
     """Classify nose shape with soft scoring and confidence."""
+    # Gaussian straightness score instead of linear cutoff (was *60 → zeroed at 1.7%)
     rel_straightness = straightness / face_height if face_height > 0 else 0.0
-    straight_score = max(0.0, 1.0 - rel_straightness * 60)
+    straight_score = _proximity(rel_straightness, 0, 0.025)
 
+    # Centers calibrated for MediaPipe landmark 6 (nasion) to landmark 1 (tip),
+    # which measures the visible nose bridge+tip (~16-22% of face height).
+    # σ=0.03 for length (narrow observed range), σ=0.06 for width.
     scores = {
-        "straight":      _proximity(length_ratio, 0.34, 0.04) * _proximity(width_ratio, 0.25, 0.04) * _proximity(straight_score, 0.95, 0.15),
-        "straight_long": _proximity(length_ratio, 0.42, 0.04) * _proximity(width_ratio, 0.25, 0.04) * _proximity(straight_score, 0.95, 0.15),
-        "aquiline":      _proximity(length_ratio, 0.40, 0.05) * _proximity(straight_score, 0.40, 0.25),
-        "snub":          _proximity(length_ratio, 0.27, 0.04) * _proximity(width_ratio, 0.22, 0.04),
-        "snub_wide":     _proximity(length_ratio, 0.27, 0.04) * _proximity(width_ratio, 0.32, 0.05),
-        "wide":          _proximity(width_ratio, 0.35, 0.05) * _proximity(length_ratio, 0.34, 0.06),
-        "normal":        _proximity(length_ratio, 0.34, 0.05) * _proximity(width_ratio, 0.27, 0.04) * _proximity(straight_score, 0.70, 0.25),
+        "straight":      (_proximity(length_ratio, 0.20, 0.03) + _proximity(width_ratio, 0.25, 0.06) + _proximity(straight_score, 0.95, 0.15)) / 3,
+        "straight_long": (_proximity(length_ratio, 0.23, 0.03) + _proximity(width_ratio, 0.25, 0.06) + _proximity(straight_score, 0.95, 0.15)) / 3,
+        "aquiline":      (_proximity(length_ratio, 0.21, 0.03) + _proximity(straight_score, 0.40, 0.25)) / 2,
+        "snub":          (_proximity(length_ratio, 0.15, 0.03) + _proximity(width_ratio, 0.22, 0.06)) / 2,
+        "snub_wide":     (_proximity(length_ratio, 0.15, 0.03) + _proximity(width_ratio, 0.35, 0.06)) / 2,
+        "wide":          (_proximity(width_ratio, 0.35, 0.06) + _proximity(length_ratio, 0.19, 0.03)) / 2,
+        "normal":        (_proximity(length_ratio, 0.19, 0.03) + _proximity(width_ratio, 0.28, 0.06) + _proximity(straight_score, 0.70, 0.25)) / 3,
     }
     return _top_two(scores)
 
@@ -232,14 +245,15 @@ def _classify_mouth_shape(
     corner_angle: float,
 ) -> dict[str, Any]:
     """Classify mouth shape with soft scoring and confidence."""
+    # Average instead of multiply; widened σ for realistic variation.
     scores = {
-        "small":      _proximity(width_ratio, 0.28, 0.04) * _proximity(lip_ratio, 0.85, 0.30),
-        "wide":       _proximity(width_ratio, 0.52, 0.05) * _proximity(lip_ratio, 0.85, 0.30),
-        "upper_full": _proximity(lip_ratio, 1.40, 0.20) * _proximity(width_ratio, 0.40, 0.08),
-        "lower_full": _proximity(lip_ratio, 0.50, 0.15) * _proximity(width_ratio, 0.40, 0.08),
-        "upturned":   _proximity(corner_angle, 5.0, 2.5) * _proximity(width_ratio, 0.40, 0.08),
-        "downturned": _proximity(corner_angle, -5.0, 2.5) * _proximity(width_ratio, 0.40, 0.08),
-        "balanced":   _proximity(width_ratio, 0.40, 0.06) * _proximity(lip_ratio, 0.85, 0.20) * _proximity(corner_angle, 0, 3.0),
+        "small":      (_proximity(width_ratio, 0.28, 0.06) + _proximity(lip_ratio, 0.85, 0.30)) / 2,
+        "wide":       (_proximity(width_ratio, 0.52, 0.06) + _proximity(lip_ratio, 0.85, 0.30)) / 2,
+        "upper_full": (_proximity(lip_ratio, 1.40, 0.25) + _proximity(width_ratio, 0.40, 0.08)) / 2,
+        "lower_full": (_proximity(lip_ratio, 0.50, 0.20) + _proximity(width_ratio, 0.40, 0.08)) / 2,
+        "upturned":   (_proximity(corner_angle, 5.0, 3.0) + _proximity(width_ratio, 0.40, 0.08)) / 2,
+        "downturned": (_proximity(corner_angle, -5.0, 3.0) + _proximity(width_ratio, 0.40, 0.08)) / 2,
+        "balanced":   (_proximity(width_ratio, 0.40, 0.06) + _proximity(lip_ratio, 0.85, 0.25) + _proximity(corner_angle, 0, 4.0)) / 3,
     }
     return _top_two(scores)
 
@@ -250,12 +264,14 @@ def _classify_eyebrow_shape(
     brow_eye_gap_ratio: float,
 ) -> dict[str, Any]:
     """Classify eyebrow shape with soft scoring and confidence."""
+    # Average instead of multiply; widened σ for realistic variation.
+    # length_ratio uses brow baseline span / eye width; typical range 1.3-1.8.
     scores = {
-        "high_arch":     _proximity(arch_ratio, 0.28, 0.06) * _proximity(length_ratio, 0.78, 0.12),
-        "straight":      _proximity(arch_ratio, 0.06, 0.04) * _proximity(length_ratio, 0.70, 0.10),
-        "straight_long": _proximity(arch_ratio, 0.06, 0.04) * _proximity(length_ratio, 0.88, 0.08),
-        "soft_arch":     _proximity(arch_ratio, 0.16, 0.05) * _proximity(length_ratio, 0.76, 0.10),
-        "long_arch":     _proximity(arch_ratio, 0.18, 0.05) * _proximity(length_ratio, 0.90, 0.08),
+        "high_arch":     (_proximity(arch_ratio, 0.28, 0.07) + _proximity(length_ratio, 1.45, 0.20)) / 2,
+        "straight":      (_proximity(arch_ratio, 0.06, 0.05) + _proximity(length_ratio, 1.35, 0.20)) / 2,
+        "straight_long": (_proximity(arch_ratio, 0.06, 0.05) + _proximity(length_ratio, 1.70, 0.20)) / 2,
+        "soft_arch":     (_proximity(arch_ratio, 0.16, 0.06) + _proximity(length_ratio, 1.45, 0.20)) / 2,
+        "long_arch":     (_proximity(arch_ratio, 0.18, 0.06) + _proximity(length_ratio, 1.75, 0.20)) / 2,
     }
     return _top_two(scores)
 
@@ -275,12 +291,15 @@ def _classify_jawline(
     jaw_angle_sharpness: float,
 ) -> dict[str, Any]:
     """Classify jawline with soft scoring and confidence."""
+    # jaw_angle_sharpness = chin_width / jaw_width: low = pointed, high = square.
+    # Observed sharpness range is narrow (0.54-0.59), so use tight σ=0.04
+    # to discriminate. jaw_width_ratio has more variance, keep σ=0.06.
     scores = {
-        "square":     _proximity(jaw_width_ratio, 0.90, 0.06) * _proximity(jaw_angle_sharpness, 0.80, 0.10),
-        "wide_round": _proximity(jaw_width_ratio, 0.90, 0.06) * _proximity(jaw_angle_sharpness, 0.50, 0.10),
-        "pointed":    _proximity(jaw_width_ratio, 0.65, 0.06) * _proximity(jaw_angle_sharpness, 0.50, 0.12),
-        "angular":    _proximity(jaw_width_ratio, 0.78, 0.06) * _proximity(jaw_angle_sharpness, 0.70, 0.10),
-        "moderate":   _proximity(jaw_width_ratio, 0.78, 0.06) * _proximity(jaw_angle_sharpness, 0.55, 0.10),
+        "square":     (_proximity(jaw_width_ratio, 0.88, 0.06) + _proximity(jaw_angle_sharpness, 0.78, 0.04)) / 2,
+        "wide_round": (_proximity(jaw_width_ratio, 0.82, 0.06) + _proximity(jaw_angle_sharpness, 0.70, 0.04)) / 2,
+        "pointed":    (_proximity(jaw_width_ratio, 0.65, 0.06) + _proximity(jaw_angle_sharpness, 0.54, 0.04)) / 2,
+        "angular":    (_proximity(jaw_width_ratio, 0.75, 0.06) + _proximity(jaw_angle_sharpness, 0.62, 0.04)) / 2,
+        "moderate":   (_proximity(jaw_width_ratio, 0.70, 0.06) + _proximity(jaw_angle_sharpness, 0.57, 0.04)) / 2,
     }
     return _top_two(scores)
 
@@ -330,9 +349,6 @@ def extract_features(
     # --- Reference measurements ---
     forehead_pt = _px(landmarks, _FOREHEAD_TOP, w, h)
     chin_pt = _px(landmarks, _CHIN_CENTER, w, h)
-    face_height = _dist(forehead_pt, chin_pt)
-    if face_height < 1.0:
-        face_height = 1.0  # safety
 
     # Face width at three levels
     forehead_width = _dist(
@@ -343,9 +359,11 @@ def extract_features(
         _px(landmarks, _LEFT_CHEEK, w, h),
         _px(landmarks, _RIGHT_CHEEK, w, h),
     )
+    # Use jaw angle points [2:5], not chin points [:3].
+    # [:3] measures chin width (too narrow); [2:5] measures mandibular angle width.
     jaw_width = _dist(
-        _centroid(landmarks, _JAW_LEFT[:3], w, h),
-        _centroid(landmarks, _JAW_RIGHT[:3], w, h),
+        _centroid(landmarks, _JAW_LEFT[2:5], w, h),
+        _centroid(landmarks, _JAW_RIGHT[2:5], w, h),
     )
 
     # --- Three Courts (san ting) ---
@@ -354,7 +372,25 @@ def extract_features(
     brow_mid = _midpoint(right_brow_center, left_brow_center)
     nose_tip = _px(landmarks, _NOSE_TIP, w, h)
 
-    upper_court = brow_mid[1] - forehead_pt[1]
+    # Hairline estimation: MediaPipe landmark 10 sits at the upper edge of
+    # the face mesh, well below the actual hairline. Extrapolate upward
+    # from landmark 10 using the landmark10-to-brow gap as reference.
+    # Factor 0.8 empirically produces realistic three-court proportions
+    # (tested against multiple face images with known proportions).
+    _HAIRLINE_FACTOR = 0.8
+    landmark10_to_brow = brow_mid[1] - forehead_pt[1]
+    if landmark10_to_brow > 0:
+        hairline_offset = landmark10_to_brow * _HAIRLINE_FACTOR
+        hairline_est = (forehead_pt[0], forehead_pt[1] - hairline_offset)
+    else:
+        hairline_est = forehead_pt
+        hairline_offset = 0.0
+
+    face_height = _dist(hairline_est, chin_pt)
+    if face_height < 1.0:
+        face_height = 1.0  # safety
+
+    upper_court = brow_mid[1] - hairline_est[1]
     middle_court = nose_tip[1] - brow_mid[1]
     lower_court = chin_pt[1] - nose_tip[1]
     court_total = upper_court + middle_court + lower_court
@@ -416,6 +452,7 @@ def extract_features(
         ew = _dist(outer_pt, inner_pt)
         eh = _contour_height(landmarks, contour, w, h)
         whr = ew / eh if eh > 0 else 3.0
+        whr = max(1.0, min(6.0, whr))  # clamp to anthropometric range
         # Compute tilt consistently for both eyes using absolute horizontal
         # distance so left/right eyes produce the same sign convention:
         # positive = outer corner higher than inner (phoenix eye)
@@ -423,9 +460,10 @@ def extract_features(
         horiz = abs(outer_pt[0] - inner_pt[0])
         vert = inner_pt[1] - outer_pt[1]  # positive when outer is higher (lower y in image)
         angle = math.degrees(math.atan2(vert, horiz)) if horiz > 0 else 0.0
-        shape_id = _classify_eye_shape(angle, whr)
+        angle = max(-20.0, min(20.0, angle))  # clamp extreme angles
+        classification = _classify_eye_shape(angle, whr)
         return {
-            "shape_id": shape_id,
+            **classification,
             "width": round(ew, 1),
             "height": round(eh, 1),
             "width_height_ratio": round(whr, 2),
@@ -461,11 +499,17 @@ def extract_features(
         straightness=bridge_deviation,
         face_height=face_height,
     )
+    # Bridge straightness: Gaussian decay instead of harsh linear cutoff.
+    # Old formula (1.0 - dev/fh * 50) zeroed at 2% deviation; now σ=0.025
+    # means 2.5% deviation ≈ 60 score, graceful falloff for natural curvature.
+    rel_bridge_dev = bridge_deviation / face_height if face_height > 0 else 0.0
+    bridge_straightness = math.exp(-0.5 * (rel_bridge_dev / 0.025) ** 2)
+
     nose = {
         **nose_classification,
         "length_ratio": round(nose_length / face_height, 3),
         "width_ratio": round(nose_width / cheekbone_width, 3),
-        "bridge_straightness": round(1.0 - min(bridge_deviation / face_height * 50, 1.0), 3),
+        "bridge_straightness": round(bridge_straightness, 3),
     }
 
     # --- Mouth ---
@@ -491,11 +535,9 @@ def extract_features(
     left_tilt = math.degrees(math.atan2(lip_center[1] - mouth_left[1], left_horiz)) if left_horiz > 0 else 0.0
     corner_angle = (right_tilt + left_tilt) / 2
 
-    # Enhance mouth corner detection with smile blendshape
-    if blendshapes:
-        avg_smile = (smile_left + smile_right) / 2.0
-        if avg_smile > 0.15:
-            corner_angle = max(-15.0, min(15.0, corner_angle + avg_smile * 3.0))
+    # Smile blendshape removed: expression data should not contaminate
+    # anatomical mouth shape classification. Same face smiling vs neutral
+    # was producing different classifications due to corner_angle shift.
 
     mouth_classification = _classify_mouth_shape(
         width_ratio=mouth_width / cheekbone_width,
@@ -523,13 +565,29 @@ def extract_features(
         brow_top = min(brow_ys)
         brow_bottom = max(brow_ys)
 
-        # Arch: max height deviation from the line connecting brow endpoints
-        arch_dev = _max_perp_deviation(landmarks, indices, w, h)
-        arch_ratio = arch_dev / brow_width if brow_width > 0 else 0.0
+        # Arch: perpendicular deviation from leftmost-to-rightmost baseline.
+        # MediaPipe eyebrow indices form a CLOSED LOOP (upper edge →
+        # lower edge → back), so first/last landmarks nearly overlap.
+        # Using leftmost/rightmost x-coordinate gives a meaningful baseline.
+        li = min(range(len(brow_pts)), key=lambda i: brow_pts[i][0])
+        ri = max(range(len(brow_pts)), key=lambda i: brow_pts[i][0])
+        p_l, p_r = brow_pts[li], brow_pts[ri]
+        bl = _dist(p_l, p_r)
+        if bl > 1.0:
+            dx, dy = p_r[0] - p_l[0], p_r[1] - p_l[1]
+            md = 0.0
+            for i, pt in enumerate(brow_pts):
+                if i in (li, ri):
+                    continue
+                d = abs(dy * pt[0] - dx * pt[1] + p_r[0] * p_l[1] - p_r[1] * p_l[0]) / bl
+                md = max(md, d)
+            arch_ratio = md / brow_width if brow_width > 0 else 0.0
+        else:
+            arch_ratio = 0.15
 
-        # Length relative to eye width
+        # Length relative to eye width (use baseline span, not full contour)
         eye_w = _contour_width(landmarks, eye_contour, w, h)
-        length_ratio = brow_width / eye_w if eye_w > 0 else 1.0
+        length_ratio = bl / eye_w if eye_w > 0 else 1.0
 
         # Brow-eye gap
         eye_top = min(landmarks[i].y * h for i in eye_contour)
@@ -559,7 +617,7 @@ def extract_features(
     }
 
     # --- Forehead ---
-    forehead_height = brow_mid[1] - forehead_pt[1]
+    forehead_height = brow_mid[1] - hairline_est[1]
     forehead_height_ratio = forehead_height / face_height
     forehead_classification = _classify_forehead(forehead_height_ratio)
 
@@ -571,11 +629,16 @@ def extract_features(
 
     # --- Jawline ---
     jaw_to_cheek = jaw_width / cheekbone_width if cheekbone_width > 0 else 1.0
-    # Jaw angle sharpness: how pointed the chin is relative to jaw width
-    chin_to_jaw_left = _dist(chin_pt, _centroid(landmarks, _JAW_LEFT[:3], w, h))
-    chin_to_jaw_right = _dist(chin_pt, _centroid(landmarks, _JAW_RIGHT[:3], w, h))
-    avg_chin_jaw_dist = (chin_to_jaw_left + chin_to_jaw_right) / 2
-    jaw_angle_sharpness = jaw_width / (2 * avg_chin_jaw_dist) if avg_chin_jaw_dist > 0 else 0.5
+    # Clamp to anthropometric range (jaw can't be wider than face)
+    # Classifier centers range 0.65-1.02; clamp with small margin
+    jaw_to_cheek = max(0.55, min(1.10, jaw_to_cheek))
+    # Jaw taper: chin_width / jaw_width.  Low = pointed chin, high = square.
+    chin_width = _dist(
+        _centroid(landmarks, _JAW_LEFT[:2], w, h),
+        _centroid(landmarks, _JAW_RIGHT[:2], w, h),
+    )
+    jaw_angle_sharpness = chin_width / jaw_width if jaw_width > 0 else 0.65
+    jaw_angle_sharpness = max(0.30, min(1.0, jaw_angle_sharpness))
 
     jawline_classification = _classify_jawline(jaw_to_cheek, jaw_angle_sharpness)
     jawline = {
@@ -590,7 +653,10 @@ def extract_features(
         if avg < 1e-6:
             return 100.0
         diff_pct = abs(left_val - right_val) / avg * 100
-        return max(0.0, 100.0 - diff_pct)
+        # 3% tolerance for natural human asymmetry + detection noise.
+        # Only penalize the portion exceeding the tolerance band.
+        effective_diff = max(0.0, diff_pct - 3.0)
+        return max(0.0, 100.0 - effective_diff * 1.5)
 
     sym_eyes = _sym_score(left_eye_features["width"], right_eye_features["width"])
     sym_brows = _sym_score(left_brow["arch_ratio"], right_brow["arch_ratio"])
@@ -653,7 +719,7 @@ def extract_features(
 
     # 8. Health Palace (疾厄宫): nose bridge root height relative to face height
     nose_root = _px(landmarks, _NOSE_BRIDGE[0], w, h)  # landmark 6
-    jie_e_ratio = (nose_root[1] - forehead_pt[1]) / face_height if face_height > 0 else 0.30
+    jie_e_ratio = (nose_root[1] - hairline_est[1]) / face_height if face_height > 0 else 0.30
 
     # 9. Children Palace (子女宫): under-eye area fullness
     right_lower_ys = [landmarks[i].y * h for i in _RIGHT_LOWER_EYE]
@@ -673,8 +739,8 @@ def extract_features(
     # 11. Parents Palace (父母宫): forehead-to-brow outer distance / face height
     right_brow_outer = _px(landmarks, _RIGHT_BROW_OUTER, w, h)
     left_brow_outer = _px(landmarks, _LEFT_BROW_OUTER, w, h)
-    right_parent_height = abs(forehead_pt[1] - right_brow_outer[1])
-    left_parent_height = abs(forehead_pt[1] - left_brow_outer[1])
+    right_parent_height = abs(hairline_est[1] - right_brow_outer[1])
+    left_parent_height = abs(hairline_est[1] - left_brow_outer[1])
     fumu_ratio = (right_parent_height + left_parent_height) / (2 * face_height) if face_height > 0 else 0.15
 
     # 12. Fortune Palace (福德宫): forehead edge to temple distance / cheekbone width
@@ -736,7 +802,7 @@ def extract_features(
 
     visualization = {
         "three_courts": {
-            "y_hairline": round(forehead_pt[1] / h, 4),
+            "y_hairline": round(hairline_est[1] / h, 4),
             "y_brow": round(brow_mid[1] / h, 4),
             "y_nose_base": round(nose_tip_pt[1] / h, 4),
             "y_chin": round(chin_pt[1] / h, 4),

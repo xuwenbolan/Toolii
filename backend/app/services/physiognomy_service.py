@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import re
 from functools import partial
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.exceptions import AppError
+from app.processing.face_compliance import validate_face_compliance
 from app.processing.face_detection import LANDMARKER_UNAVAILABLE, detect_face_landmarks
 from app.processing.face_physiognomy import extract_features
 from app.processing.physiognomy_rules import (
@@ -31,7 +29,6 @@ from app.processing.aesthetics_rules import (
     recommend_photo_angle,
 )
 from app.services import llm_client
-from app.services.credit_service import CreditService
 
 logger = logging.getLogger(__name__)
 
@@ -46,65 +43,6 @@ _SECTION_KEY_MAP = {
     "7": "forehead_jawline_mountains",
     "8": "overall",
 }
-
-
-def _validate_face_quality(
-    landmarks: list,
-    width: int,
-    height: int,
-) -> None:
-    """Validate that the detected face is suitable for analysis.
-
-    Checks:
-    - Face size: bounding box must cover at least 5% of image area.
-    - Face tilt: eye-line angle must be within 25 degrees of horizontal.
-    - Resolution: inter-pupillary distance must be at least 40px.
-
-    Raises AppError with code FACE_QUALITY_POOR on failure.
-    """
-    # Bounding box from face oval landmarks
-    _FACE_OVAL = [
-        10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288,
-        397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136,
-        172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
-    ]
-    xs = [landmarks[i].x * width for i in _FACE_OVAL]
-    ys = [landmarks[i].y * height for i in _FACE_OVAL]
-    face_w = max(xs) - min(xs)
-    face_h = max(ys) - min(ys)
-    face_area = face_w * face_h
-    image_area = width * height
-
-    if image_area > 0 and face_area / image_area < 0.05:
-        raise AppError(
-            code="FACE_QUALITY_POOR",
-            message="Face is too small in the frame. Please take a closer photo.",
-            status_code=422,
-        )
-
-    # Eye-line tilt check (iris centers: 468=left iris, 473=right iris)
-    if len(landmarks) > 473:
-        lx, ly = landmarks[468].x * width, landmarks[468].y * height
-        rx, ry = landmarks[473].x * width, landmarks[473].y * height
-        dx = abs(rx - lx)
-        dy = abs(ry - ly)
-        if dx > 1.0:
-            tilt_deg = math.degrees(math.atan2(dy, dx))
-            if tilt_deg > 25.0:
-                raise AppError(
-                    code="FACE_QUALITY_POOR",
-                    message="Face is tilted too much. Please hold the camera level and face forward.",
-                    status_code=422,
-                )
-
-        # IPD resolution check
-        ipd = math.hypot(rx - lx, ry - ly)
-        if ipd < 40.0:
-            raise AppError(
-                code="FACE_QUALITY_POOR",
-                message="Face resolution is too low. Please move closer or use a higher-resolution photo.",
-                status_code=422,
-            )
 
 
 def _detect_and_extract(image_bytes: bytes) -> dict[str, Any]:
@@ -123,8 +61,17 @@ def _detect_and_extract(image_bytes: bytes) -> dict[str, Any]:
             status_code=422,
         )
 
-    landmarks, blendshapes, width, height = result
-    _validate_face_quality(landmarks, width, height)
+    landmarks, blendshapes, width, height, face_count = result
+
+    validate_face_compliance(
+        landmarks=landmarks,
+        blendshapes=blendshapes,
+        width=width,
+        height=height,
+        face_count=face_count,
+        image_bytes=image_bytes,
+    )
+
     features = extract_features(landmarks, width, height, blendshapes=blendshapes)
     return features
 
@@ -194,70 +141,42 @@ class FaceMapService:
         *,
         image_bytes: bytes,
         locale: str = "zh-CN",
-        user_id: int,
-        db: AsyncSession,
     ) -> dict[str, Any]:
         """Paid tier: full report with recommendations + physiognomy.
 
-        Always charges 1 credit (fail-fast if insufficient).
+        Credit charging is handled by ToolGatewayRoute.
         """
-        # Charge BEFORE processing (fail-fast)
-        credit_svc = CreditService(db)
-        await credit_svc.consume(
-            user_id=user_id,
-            amount=1,
-            tx_type="facemap_report",
-            description="FaceMap detailed report",
+        loop = asyncio.get_running_loop()
+
+        # Detect + extract features
+        features = await loop.run_in_executor(
+            None, partial(_detect_and_extract, image_bytes),
         )
 
-        try:
-            loop = asyncio.get_running_loop()
+        # Build profile data
+        profile_data = await loop.run_in_executor(
+            None, partial(_build_profile_data, features, locale),
+        )
 
-            # Detect + extract features
-            features = await loop.run_in_executor(
-                None, partial(_detect_and_extract, image_bytes),
-            )
+        # Run recommendations + LLM physiognomy in parallel
+        recommendations_task = loop.run_in_executor(
+            None,
+            partial(_build_recommendations, features, profile_data["dimensions"], locale),
+        )
 
-            # Build profile data
-            profile_data = await loop.run_in_executor(
-                None, partial(_build_profile_data, features, locale),
-            )
+        physiognomy_task = self._generate_physiognomy(features, locale)
 
-            # Run recommendations + LLM physiognomy in parallel
-            recommendations_task = loop.run_in_executor(
-                None,
-                partial(_build_recommendations, features, profile_data["dimensions"], locale),
-            )
+        recommendations, physiognomy = await asyncio.gather(
+            recommendations_task, physiognomy_task,
+        )
 
-            physiognomy_task = self._generate_physiognomy(features, locale)
-
-            recommendations, physiognomy = await asyncio.gather(
-                recommendations_task, physiognomy_task,
-            )
-
-            return {
-                "profile": profile_data,
-                **recommendations,
-                "physiognomy_narrative": physiognomy["narrative"],
-                "physiognomy_sections": physiognomy["sections"],
-                "llm_used": physiognomy["llm_used"],
-            }
-        except Exception:
-            # Refund on processing failure (credit was already charged)
-            try:
-                await credit_svc.add(
-                    user_id=user_id,
-                    amount=1,
-                    tx_type="facemap_refund",
-                    description="FaceMap report processing failed -- refund",
-                )
-            except Exception:
-                logger.error(
-                    "Failed to refund credit for user %d after facemap report failure",
-                    user_id,
-                    exc_info=True,
-                )
-            raise
+        return {
+            "profile": profile_data,
+            **recommendations,
+            "physiognomy_narrative": physiognomy["narrative"],
+            "physiognomy_sections": physiognomy["sections"],
+            "llm_used": physiognomy["llm_used"],
+        }
 
     async def _generate_physiognomy(
         self,
