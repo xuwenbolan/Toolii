@@ -40,10 +40,14 @@ class MIGANEngine(BaseEngine):
         mask_inverted = 255 - mask_resized
         mask_binary = (mask_inverted > 127).astype(np.float32)
 
-        # Prepare inputs
-        img_inp = img_resized.astype(np.float32) / 255.0
-        img_inp = img_inp.transpose(2, 0, 1)[np.newaxis]
-        mask_inp = mask_binary[np.newaxis, np.newaxis]
+        # Prepare inputs — check model's expected dtype
+        input_type = session.get_inputs()[0].type
+        if "uint8" in input_type:
+            img_inp = img_resized.transpose(2, 0, 1)[np.newaxis].astype(np.uint8)
+            mask_inp = (mask_binary * 255).astype(np.uint8)[np.newaxis, np.newaxis]
+        else:
+            img_inp = (img_resized.astype(np.float32) / 255.0).transpose(2, 0, 1)[np.newaxis]
+            mask_inp = mask_binary[np.newaxis, np.newaxis]
 
         input_names = [inp.name for inp in session.get_inputs()]
         output_name = session.get_outputs()[0].name
@@ -59,7 +63,11 @@ class MIGANEngine(BaseEngine):
         result = session.run([output_name], feed)[0]
 
         out = result[0].transpose(1, 2, 0)
-        out = (out * 255.0).clip(0, 255).astype(np.uint8)
+        # Adapt output conversion based on value range
+        if out.dtype == np.uint8:
+            pass  # already 0-255
+        else:
+            out = (out * 255.0).clip(0, 255).astype(np.uint8)
         out = cv2.resize(out, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
 
         # Paste only inpainted region

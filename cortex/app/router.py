@@ -123,19 +123,30 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
     _gpu_sem = asyncio.Semaphore(settings.max_concurrent)
 
     async def _gpu_run(engine: BaseEngine, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:
-        """Run engine inference in a thread pool with GPU concurrency control."""
+        """Run engine inference in a thread pool with GPU concurrency control.
+
+        Timeout only applies to waiting for a free GPU slot.
+        Once a slot is acquired, inference runs without queue timeout
+        (first-time model loading can be slow for large models).
+        """
         try:
             async with asyncio.timeout(settings.gpu_queue_timeout):
-                async with _gpu_sem:
-                    return await asyncio.to_thread(engine.run, manager, image, **kwargs)
+                await _gpu_sem.acquire()
         except TimeoutError:
             raise GpuBusyError()
+        try:
+            return await asyncio.to_thread(engine.run, manager, image, **kwargs)
+        finally:
+            _gpu_sem.release()
 
-    @router.post("/remove-background")
-    async def remove_background(req: RemoveBgRequest) -> dict | JSONResponse:
+    @router.post("/remove-background", response_model=None)
+    async def remove_background(req: RemoveBgRequest):
         from app.engines.birefnet import BiRefNetEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -144,7 +155,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", f"Model '{req.model}' not found", 400)
         except Exception as exc:
             logger.exception("remove-background failed")
@@ -159,11 +170,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("output_size", None)
         return result
 
-    @router.post("/upscale")
-    async def upscale(req: UpscaleRequest) -> dict | JSONResponse:
+    @router.post("/upscale", response_model=None)
+    async def upscale(req: UpscaleRequest):
         from app.engines.realesrgan import RealESRGANEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -173,7 +187,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", f"Model '{req.model}' not found", 400)
         except Exception as exc:
             logger.exception("upscale failed")
@@ -188,11 +202,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("output_size", None)
         return result
 
-    @router.post("/restore-face")
-    async def restore_face(req: RestoreFaceRequest) -> dict | JSONResponse:
+    @router.post("/restore-face", response_model=None)
+    async def restore_face(req: RestoreFaceRequest):
         from app.engines.gfpgan import GFPGANEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -203,7 +220,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", "GFPGAN model not found", 400)
         except Exception as exc:
             logger.exception("restore-face failed")
@@ -218,11 +235,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("output_size", None)
         return result
 
-    @router.post("/denoise")
-    async def denoise(req: DenoiseRequest) -> dict | JSONResponse:
+    @router.post("/denoise", response_model=None)
+    async def denoise(req: DenoiseRequest):
         from app.engines.nafnet import NAFNetEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -232,7 +252,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", "NAFNet model not found", 400)
         except Exception as exc:
             logger.exception("denoise failed")
@@ -246,11 +266,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("model_name", None)
         return result
 
-    @router.post("/colorize")
-    async def colorize(req: ColorizeRequest) -> dict | JSONResponse:
+    @router.post("/colorize", response_model=None)
+    async def colorize(req: ColorizeRequest):
         from app.engines.ddcolor import DDColorEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -259,7 +282,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", f"DDColor model '{req.model}' not found", 400)
         except Exception as exc:
             logger.exception("colorize failed")
@@ -272,14 +295,17 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("extra_meta", None)
         return result
 
-    @router.post("/inpaint")
-    async def inpaint(req: InpaintRequest) -> dict | JSONResponse:
+    @router.post("/inpaint", response_model=None)
+    async def inpaint(req: InpaintRequest):
         from app.engines.lama import LaMaEngine
         from app.engines.migan import MIGANEngine
 
-        image, (w, h) = decode_image(req.image_b64)
-        mask_raw = base64.b64decode(req.mask_b64)
-        mask = np.array(Image.open(io.BytesIO(mask_raw)).convert("L"))
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+            mask_raw = base64.b64decode(req.mask_b64)
+            mask = np.array(Image.open(io.BytesIO(mask_raw)).convert("L"))
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64 or mask_b64", 400)
 
         # Auto-route based on mask area
         model = req.model
@@ -296,7 +322,7 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
             )
         except GpuBusyError:
             return _error("GPU_BUSY", "All GPU slots occupied, try again later", 503)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError):
             return _error("MODEL_NOT_FOUND", f"Inpaint model '{model}' not found", 400)
         except Exception as exc:
             logger.exception("inpaint failed")
@@ -312,11 +338,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         result.pop("extra_meta", None)
         return result
 
-    @router.post("/ocr")
-    async def ocr(req: OcrRequest) -> dict | JSONResponse:
+    @router.post("/ocr", response_model=None)
+    async def ocr(req: OcrRequest):
         from app.engines.rapidocr import RapidOCREngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(
@@ -341,11 +370,14 @@ def create_router(manager: OnnxModelManager) -> APIRouter:
         }
         return result
 
-    @router.post("/segment")
-    async def segment(req: SegmentRequest) -> dict | JSONResponse:
+    @router.post("/segment", response_model=None)
+    async def segment(req: SegmentRequest):
         from app.engines.mobilesam import MobileSAMEngine
 
-        image, (w, h) = decode_image(req.image_b64)
+        try:
+            image, (w, h) = decode_image(req.image_b64)
+        except Exception:
+            return _error("INVALID_IMAGE", "Failed to decode image_b64", 400)
         t0 = time.perf_counter()
         try:
             result = await _gpu_run(

@@ -120,7 +120,18 @@ class MobileSAMEngine(BaseEngine):
         std = np.array([58.395, 57.12, 57.375], dtype=np.float32)
         padded = (padded - mean) / std
 
-        inp = padded.transpose(2, 0, 1)[np.newaxis]  # [1, 3, 1024, 1024]
+        # Adapt layout to model's expected input shape
+        expected_shape = encoder.get_inputs()[0].shape
+        expected_rank = len(expected_shape)
+        channels_last = expected_shape[-1] == 3
+
+        if channels_last:
+            inp = padded  # HWC: [1024, 1024, 3]
+        else:
+            inp = padded.transpose(2, 0, 1)  # CHW: [3, 1024, 1024]
+
+        if expected_rank == 4:
+            inp = inp[np.newaxis]
 
         input_name = encoder.get_inputs()[0].name
         output_name = encoder.get_outputs()[0].name
