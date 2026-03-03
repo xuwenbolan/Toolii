@@ -39,6 +39,7 @@ processing = [
   "rembg[cpu]>=2.0.0",
   "reportlab>=4.0.0",
   "mediapipe>=0.10.0",
+  "onnxruntime>=1.17.0",
 ]
 
 [tool.ruff]

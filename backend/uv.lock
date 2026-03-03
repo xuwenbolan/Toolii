@@ -1613,6 +1613,7 @@ dev = [
 ]
 processing = [
     { name = "mediapipe" },
+    { name = "onnxruntime" },
     { name = "opencv-python-headless" },
     { name = "pikepdf" },
     { name = "pillow" },
@@ -1633,6 +1634,7 @@ requires-dist = [
     { name = "google-auth", specifier = ">=2.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "mediapipe", marker = "extra == 'processing'", specifier = ">=0.10.0" },
+    { name = "onnxruntime", marker = "extra == 'processing'", specifier = ">=1.17.0" },
     { name = "opencv-python-headless", marker = "extra == 'processing'", specifier = ">=4.10.0" },
     { name = "orjson", specifier = ">=3.10.0" },
     { name = "pikepdf", marker = "extra == 'processing'", specifier = ">=9.0.0" },

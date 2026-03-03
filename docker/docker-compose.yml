@@ -19,6 +19,12 @@ services:
     expose:
       - "8000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   web:
     build:
@@ -32,5 +38,6 @@ services:
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
