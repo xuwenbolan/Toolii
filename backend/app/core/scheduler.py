@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from app.core.database import SessionLocal
+from app.core import database as _db
 from app.core.login_guard import login_guard
 from app.core.token_blacklist import token_blacklist
 from app.services.facemap_share_service import FaceMapShareService
@@ -20,7 +20,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         FileService().cleanup_expired_files()
 
     async def _expire_share_links() -> None:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await ShareService(db).expire_pending_links()
 
     scheduler.add_job(
@@ -48,7 +48,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         misfire_grace_time=60,
     )
     async def _cleanup_token_blacklist() -> None:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await token_blacklist.cleanup_expired(db)
 
     scheduler.add_job(
@@ -69,7 +69,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
     )
 
     async def _expire_transfers() -> None:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await TransferService(db).expire_transfers()
 
     scheduler.add_job(
@@ -82,7 +82,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
     )
 
     async def _expire_facemap_shares() -> None:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await FaceMapShareService(db).expire_shares()
 
     scheduler.add_job(
@@ -105,7 +105,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
 
         logger = logging.getLogger("app.scheduler")
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             result = await db.execute(
                 select(User).where(
                     User.deleted_at.isnot(None),
@@ -155,7 +155,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
 
         logger = logging.getLogger("app.scheduler")
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             result = await db.execute(
                 select(User.id).where(
                     User.email_verified.is_(False),

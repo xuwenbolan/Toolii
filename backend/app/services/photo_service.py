@@ -4,6 +4,7 @@ import asyncio
 import base64
 import io
 import json
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -55,7 +56,7 @@ class ProcessedSession:
 
 _upload_sessions: dict[str, UploadSession] = {}
 _processed_sessions: dict[str, ProcessedSession] = {}
-_session_lock = asyncio.Lock()
+_session_lock = threading.Lock()
 
 # Sessions older than this (seconds) will be purged by the scheduler.
 _SESSION_TTL = 2 * 3600  # 2 hours
@@ -65,11 +66,12 @@ def cleanup_expired_sessions() -> int:
     """Remove photo sessions that have exceeded their TTL. Returns count removed."""
     cutoff = time.time() - _SESSION_TTL
     removed = 0
-    for store in (_upload_sessions, _processed_sessions):
-        expired = [k for k, v in store.items() if v.created_at < cutoff]
-        for k in expired:
-            del store[k]
-            removed += 1
+    with _session_lock:
+        for store in (_upload_sessions, _processed_sessions):
+            expired = [k for k, v in store.items() if v.created_at < cutoff]
+            for k in expired:
+                del store[k]
+                removed += 1
     return removed
 
 
@@ -138,22 +140,22 @@ class PhotoService:
         )
 
     async def _store_upload_session(self, session: UploadSession) -> None:
-        async with _session_lock:
+        with _session_lock:
             _upload_sessions[session.upload_id] = session
 
     async def _store_processed_session(self, session: ProcessedSession) -> None:
-        async with _session_lock:
+        with _session_lock:
             _processed_sessions[session.processed_id] = session
 
     async def _get_upload_session(self, upload_id: str) -> UploadSession:
-        async with _session_lock:
+        with _session_lock:
             session = _upload_sessions.get(upload_id)
         if session is None:
             raise AppError(code="UPLOAD_NOT_FOUND", message="Upload session not found or expired", status_code=404)
         return session
 
     async def _get_processed_session(self, processed_id: str) -> ProcessedSession:
-        async with _session_lock:
+        with _session_lock:
             session = _processed_sessions.get(processed_id)
         if session is None:
             raise AppError(code="PROCESS_NOT_FOUND", message="Processing session not found or expired", status_code=404)
@@ -203,11 +205,15 @@ class PhotoService:
         content_type: str,
     ) -> PhotoUploadResponse:
         """Phase 1 (heavy): face detection + background removal + compliance check."""
-        from app.services.cortex_client import detect_faces as cortex_detect_faces
+        from app.processing.face_detection import detect_faces as local_detect_faces
         from app.services.cortex_client import remove_background as cortex_remove_bg
 
+        # Face detection (always local MediaPipe)
+        loop = asyncio.get_running_loop()
         try:
-            detection = await cortex_detect_faces(image_bytes)
+            detection = await loop.run_in_executor(
+                None, partial(local_detect_faces, image_bytes),
+            )
         except AppError:
             raise
         except Exception as exc:
@@ -219,16 +225,18 @@ class PhotoService:
         engine = str(detection["engine"])
         warnings = self._build_upload_warnings(detection, width, height)
 
-        # Background removal (the expensive step)
+        # Background removal (Cortex GPU with local fallback)
         try:
-            cutout_png, bg_meta = await cortex_remove_bg(image_bytes)
+            bg_result = await cortex_remove_bg(image_bytes)
         except AppError:
             raise
         except Exception as exc:
             raise AppError(code="PHOTO_BG_REMOVE_FAILED", message="Background removal failed", status_code=400) from exc
 
+        cutout_png = base64.b64decode(bg_result["image_b64"])
+        bg_meta = bg_result.get("meta", {})
+
         # Compliance check (pure CPU heuristics, run in executor)
-        loop = asyncio.get_running_loop()
         try:
             compliance = await loop.run_in_executor(
                 None,

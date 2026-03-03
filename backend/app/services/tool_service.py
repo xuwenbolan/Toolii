@@ -9,7 +9,7 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import SessionLocal
+from app.core import database as _db
 from app.core.exceptions import AppError, NotFoundError
 from app.models.processing_history import ProcessingHistory
 from app.models.tool import Tool
@@ -46,7 +46,7 @@ async def _refresh_cache(db: AsyncSession) -> None:
 async def get_tool(tool_name: str) -> Tool | None:
     """Get a single tool config, using cache."""
     if not _is_cache_valid():
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await _refresh_cache(db)
     return _cache.get(tool_name)
 
@@ -54,14 +54,14 @@ async def get_tool(tool_name: str) -> Tool | None:
 async def list_tools() -> list[Tool]:
     """List all tools, ordered by display_order."""
     if not _is_cache_valid():
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             await _refresh_cache(db)
     return list(_cache.values())
 
 
 async def update_tool(tool_name: str, **fields: object) -> Tool:
     """Update tool fields and invalidate cache. Returns updated tool."""
-    async with SessionLocal() as db:
+    async with _db.SessionLocal() as db:
         result = await db.execute(
             select(Tool).where(Tool.tool_name == tool_name).with_for_update(),
         )
@@ -92,7 +92,7 @@ async def get_daily_usage_count(
 ) -> int:
     """Count today's usage for a tool by a specific user (or all anonymous)."""
     today = date.today()
-    async with SessionLocal() as db:
+    async with _db.SessionLocal() as db:
         stmt = (
             select(func.count())
             .select_from(ProcessingHistory)

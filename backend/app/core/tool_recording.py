@@ -10,7 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.config import settings
-from app.core.database import SessionLocal
+from app.core import database as _db
 from app.core.exceptions import AppError
 from app.models.processing_history import ProcessingHistory
 
@@ -47,7 +47,7 @@ async def _check_is_admin(user_id: int) -> bool:
     from app.models.user import User
 
     try:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             from sqlalchemy import select
             result = await db.execute(
                 select(User.is_admin).where(User.id == user_id),
@@ -61,7 +61,7 @@ async def _check_is_admin(user_id: int) -> bool:
 async def _record_usage(tool_name: str, user_id: int | None) -> None:
     """Record a single tool usage entry in its own db session."""
     try:
-        async with SessionLocal() as session:
+        async with _db.SessionLocal() as session:
             session.add(ProcessingHistory(
                 user_id=user_id,
                 tool_name=tool_name,
@@ -76,7 +76,7 @@ async def _charge_credits(user_id: int, amount: int, tool_name: str) -> None:
     """Charge credits in an independent session. Raises AppError on failure."""
     from app.services.credit_service import CreditService
 
-    async with SessionLocal() as db:
+    async with _db.SessionLocal() as db:
         svc = CreditService(db)
         await svc.consume(
             user_id=user_id,
@@ -91,7 +91,7 @@ async def _refund_credits(user_id: int, amount: int, tool_name: str) -> None:
     from app.services.credit_service import CreditService
 
     try:
-        async with SessionLocal() as db:
+        async with _db.SessionLocal() as db:
             svc = CreditService(db)
             await svc.add(
                 user_id=user_id,

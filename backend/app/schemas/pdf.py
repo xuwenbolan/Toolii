@@ -2,16 +2,9 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel
+from app.schemas.common import FileResult
 
-
-class FileResult(BaseModel):
-    file_id: str
-    filename: str
-    size: int
-    content_type: str
-    download_url: str
-    expires_in: int
+__all__ = ["FileResult", "PdfPagesOperation"]
 
 
 class PdfPagesOperation(str, Enum):
@@ -19,4 +12,3 @@ class PdfPagesOperation(str, Enum):
     delete = "delete"
     extract = "extract"
     reorder = "reorder"
-

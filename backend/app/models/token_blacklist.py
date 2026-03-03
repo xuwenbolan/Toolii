@@ -16,3 +16,7 @@ class TokenBlacklistEntry(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     token_type: Mapped[str] = mapped_column(String(10), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# Alias used by scheduler cleanup
+TokenBlacklist = TokenBlacklistEntry
