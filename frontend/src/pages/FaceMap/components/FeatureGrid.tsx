@@ -32,13 +32,13 @@ function FeatureCard({
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       className={cn(
-        'cursor-pointer rounded-lg border bg-card p-3 space-y-2 transition-all',
-        active && 'ring-2 ring-primary border-primary/50',
+        'cursor-pointer rounded-xl border bg-card p-3.5 space-y-2 h-full hover-lift-sm',
+        active && 'ring-2 ring-primary border-primary/50 shadow-md',
       )}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
-        <span className="text-xs font-semibold text-muted-foreground">{feature.score}</span>
+        <span className="text-xs font-semibold text-muted-foreground tabular-nums">{feature.score}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted">
         <div

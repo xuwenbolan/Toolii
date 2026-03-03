@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react'
 
+import { shareOrDownloadBlob } from '@/lib/shareDownload'
+
 type ShareDimension = {
   label: string
   percentile: number
@@ -209,25 +211,11 @@ export function useShareCard() {
     }
   }, [])
 
-  const shareOrDownload = useCallback(async (blob: Blob, fileName?: string) => {
-    const name = fileName || `facemap-${Date.now()}.png`
-    const file = new File([blob], name, { type: 'image/png' })
-
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'FaceMap' })
-      return 'shared'
-    }
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = name
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.setTimeout(() => URL.revokeObjectURL(url), 500)
-    return 'downloaded'
-  }, [])
+  const shareOrDownload = useCallback(
+    (blob: Blob, fileName?: string) =>
+      shareOrDownloadBlob(blob, fileName || `facemap-${Date.now()}.png`),
+    [],
+  )
 
   return {
     pending,

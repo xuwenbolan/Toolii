@@ -62,7 +62,7 @@ export function SectionNav({ sections }: Props) {
       'bg-background/80 backdrop-blur-sm',
     )}>
       <div className="relative">
-        <div className="overflow-x-auto no-scrollbar">
+        <div className="overflow-x-auto no-scrollbar snap-x snap-mandatory">
           <div className="flex gap-1.5 min-w-max pr-6">
             {sections.map((s) => (
               <button
@@ -70,7 +70,7 @@ export function SectionNav({ sections }: Props) {
                 type="button"
                 onClick={() => handleSelect(s.id)}
                 className={cn(
-                  'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  'snap-start shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
                   activeId === s.id
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground',

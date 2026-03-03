@@ -55,6 +55,7 @@ export type AestheticsDimension = {
   label: string
   score: number
   percentile: number
+  description?: string
   basis?: DimensionBasisItem[]
 }
 
@@ -205,5 +206,97 @@ export async function analyzeFaceReport(
         }
       : undefined,
   })
+  return res.data
+}
+
+// --- Face similarity types ---
+
+export type RegionScore = {
+  region: string
+  score: number
+  description: string | null
+}
+
+export type FaceSimilarityResponse = {
+  regions: RegionScore[]
+  overall_score: number
+  title: string
+  summary: string
+  disclaimer: string
+}
+
+// --- Face similarity API call ---
+
+export async function compareFaces(
+  file1: File,
+  file2: File,
+  onProgress?: (percent: number) => void,
+): Promise<FaceSimilarityResponse> {
+  const fd = new FormData()
+  fd.append('file1', file1)
+  fd.append('file2', file2)
+  const res = await api.post<FaceSimilarityResponse>('/api/facemap/similarity', fd, {
+    onUploadProgress: onProgress
+      ? (evt: AxiosProgressEvent) => {
+          const total = evt.total ?? (file1.size + file2.size)
+          if (total) onProgress((evt.loaded / total) * 100)
+        }
+      : undefined,
+  })
+  return res.data
+}
+
+// --- Share types ---
+
+export type FaceMapShareCreateResponse = {
+  token: string
+  share_url: string
+  expires_at: string
+}
+
+export type FaceMapShareData = {
+  token: string
+  result_json: string
+  share_type: 'profile' | 'report' | 'similarity'
+  locale: string
+  image_url: string
+  expires_at: string
+  created_at: string
+}
+
+// --- Share API calls ---
+
+export async function createFaceMapShare(
+  file: File,
+  resultJson: string,
+  shareType: 'profile' | 'report',
+  locale: string,
+): Promise<FaceMapShareCreateResponse> {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('result_json', resultJson)
+  fd.append('share_type', shareType)
+  fd.append('locale', locale)
+  const res = await api.post<FaceMapShareCreateResponse>('/api/facemap/share', fd)
+  return res.data
+}
+
+export async function createSimilarityShare(
+  file1: File,
+  file2: File,
+  resultJson: string,
+  locale: string,
+): Promise<FaceMapShareCreateResponse> {
+  const fd = new FormData()
+  fd.append('file1', file1)
+  fd.append('file2', file2)
+  fd.append('result_json', resultJson)
+  fd.append('locale', locale)
+  const res = await api.post<FaceMapShareCreateResponse>('/api/facemap/share/similarity', fd)
+  return res.data
+}
+
+export async function getFaceMapShare(token: string): Promise<FaceMapShareData> {
+  const res = await api.get<FaceMapShareData>(`/api/facemap/share/${token}`)
   return res.data
 }
