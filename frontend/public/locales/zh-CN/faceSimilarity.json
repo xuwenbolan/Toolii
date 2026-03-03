@@ -1,0 +1,51 @@
+{
+  "seo": {
+    "title": "认贼做父 - AI 人脸相似度分析",
+    "description": "上传两张照片，AI 分析五官相似度，看看你们到底有多像！"
+  },
+  "title": "认贼做父",
+  "subtitle": "上传两张脸，AI 告诉你有多像",
+  "upload": {
+    "face1Title": "上传第一张照片",
+    "face2Title": "上传第二张照片",
+    "face1Hint": "正面清晰照片效果最佳",
+    "face2Hint": "明星、朋友、家人都行",
+    "button": "开始对比",
+    "recompare": "重新对比",
+    "replace": "更换照片"
+  },
+  "result": {
+    "overallScore": "总体相似度",
+    "regions": "分区对比",
+    "eyes": "眼睛",
+    "nose": "鼻子",
+    "mouth": "嘴巴",
+    "jawline": "脸型轮廓",
+    "overall_face": "整体面部",
+    "vs": "VS"
+  },
+  "errors": {
+    "compareFailed": "对比失败，请重试",
+    "needTwoFaces": "请上传两张照片"
+  },
+  "share": {
+    "button": "分享结果",
+    "creating": "生成分享链接...",
+    "createFailed": "创建分享链接失败",
+    "dialogTitle": "分享相似度结果",
+    "copyLink": "复制链接",
+    "copied": "链接已复制!",
+    "expiryNotice": "链接有效期 7 天"
+  },
+  "sharePage": {
+    "title": "人脸相似度分析结果",
+    "description": "查看分享的人脸相似度分析结果",
+    "expired": "此分享链接已过期",
+    "notFound": "未找到分享链接",
+    "badge": "相似度分析分享",
+    "cta": "来试试认贼做父",
+    "ctaDescription": "上传两张照片，AI 告诉你有多像！完全免费",
+    "expiresAt": "有效期至 {{date}}"
+  },
+  "disclaimer": "本工具仅供娱乐，不具备真实亲缘鉴定能力"
+}

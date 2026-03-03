@@ -1,0 +1,51 @@
+{
+  "seo": {
+    "title": "Who's Your Dad? - AI Face Similarity",
+    "description": "Upload two photos and let AI tell you how similar they are!"
+  },
+  "title": "Who's Your Dad?",
+  "subtitle": "Upload two faces, AI tells you how similar they are",
+  "upload": {
+    "face1Title": "Upload first photo",
+    "face2Title": "Upload second photo",
+    "face1Hint": "Clear front-facing photo works best",
+    "face2Hint": "Celebrity, friend, or family member",
+    "button": "Compare",
+    "recompare": "Compare Again",
+    "replace": "Replace"
+  },
+  "result": {
+    "overallScore": "Overall Similarity",
+    "regions": "Region Comparison",
+    "eyes": "Eyes",
+    "nose": "Nose",
+    "mouth": "Mouth",
+    "jawline": "Jawline",
+    "overall_face": "Overall Face",
+    "vs": "VS"
+  },
+  "errors": {
+    "compareFailed": "Comparison failed. Please try again.",
+    "needTwoFaces": "Please upload two photos"
+  },
+  "share": {
+    "button": "Share Results",
+    "creating": "Creating share link...",
+    "createFailed": "Failed to create share link",
+    "dialogTitle": "Share Similarity Results",
+    "copyLink": "Copy Link",
+    "copied": "Link copied!",
+    "expiryNotice": "Link valid for 7 days"
+  },
+  "sharePage": {
+    "title": "Face Similarity Results",
+    "description": "View shared face similarity results",
+    "expired": "This share link has expired",
+    "notFound": "Share link not found",
+    "badge": "Shared Similarity Analysis",
+    "cta": "Try It Yourself",
+    "ctaDescription": "Upload two photos and let AI tell you how similar they are! Completely free",
+    "expiresAt": "Expires on {{date}}"
+  },
+  "disclaimer": "This tool is for entertainment only and has no real genetic testing capability"
+}
