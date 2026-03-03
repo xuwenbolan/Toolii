@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+from typing import Any
 
-from fastapi import APIRouter, File, Form, Request, UploadFile
-from fastapi import HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.core.config import settings
 from app.core.file_validation import validate_image_bytes
@@ -20,212 +23,172 @@ def _max_image_bytes() -> int:
     return settings.max_upload_image_mb * 1024 * 1024
 
 
-@router.post("/compress", response_model=FileResult)
-@limiter.limit(dynamic_rate_limit)
-async def compress(
+# ── Shared dependency: read + validate + acquire task slot ────────────
+
+
+@dataclass
+class ImageInput:
+    data: bytes
+    filename: str
+    sem: asyncio.Semaphore
+
+
+async def validated_image(
     request: Request,
     file: UploadFile = File(...),
-    quality: int | None = Form(None),
-    target_kb: int | None = Form(None),
-    output_format: str | None = Form(None),
-) -> FileResult:
+) -> AsyncGenerator[ImageInput, None]:
+    """FastAPI dependency: read file, check size, validate format, acquire task slot."""
     sem = await acquire_task_slot(request)
     try:
         data = await file.read()
         if len(data) > _max_image_bytes():
             raise HTTPException(status_code=413, detail="File too large")
         validate_image_bytes(data)
-        return await ImageService().compress(
-            image_bytes=data,
-            filename=file.filename or "image",
-            quality=quality,
-            target_kb=target_kb,
-            output_format=output_format,
-        )
+        yield ImageInput(data=data, filename=file.filename or "image", sem=sem)
     finally:
         sem.release()
+
+
+# ── Local CPU endpoints ───────────────────────────────────────────────
+
+
+@router.post("/compress", response_model=FileResult)
+@limiter.limit(dynamic_rate_limit)
+async def compress(
+    request: Request,
+    img: ImageInput = Depends(validated_image),
+    quality: int | None = Form(None),
+    target_kb: int | None = Form(None),
+    output_format: str | None = Form(None),
+) -> FileResult:
+    return await ImageService().compress(
+        image_bytes=img.data, filename=img.filename,
+        quality=quality, target_kb=target_kb, output_format=output_format,
+    )
 
 
 @router.post("/convert", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def convert(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     output_format: str = Form(...),
     quality: int | None = Form(None),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().convert(
-            image_bytes=data,
-            filename=file.filename or "image",
-            output_format=output_format,
-            quality=quality,
-        )
-    finally:
-        sem.release()
+    return await ImageService().convert(
+        image_bytes=img.data, filename=img.filename,
+        output_format=output_format, quality=quality,
+    )
 
 
 @router.post("/mosaic", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def mosaic(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     regions: str | None = Form(None),
     pixel_size: int = Form(12),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        parsed = None
-        if regions:
-            try:
-                parsed = json.loads(regions)
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=400, detail="Invalid regions JSON") from exc
-        return await ImageService().mosaic(
-            image_bytes=data,
-            filename=file.filename or "image",
-            regions=parsed,
-            pixel_size=pixel_size,
-        )
-    finally:
-        sem.release()
+    parsed = None
+    if regions:
+        try:
+            parsed = json.loads(regions)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Invalid regions JSON") from exc
+    return await ImageService().mosaic(
+        image_bytes=img.data, filename=img.filename,
+        regions=parsed, pixel_size=pixel_size,
+    )
 
 
 @router.post("/scan-enhance", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def scan_enhance(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     mode: str = Form("bw"),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().scan_enhance(
-            image_bytes=data,
-            filename=file.filename or "image",
-            mode=mode,
-        )
-    finally:
-        sem.release()
+    return await ImageService().scan_enhance(
+        image_bytes=img.data, filename=img.filename, mode=mode,
+    )
+
+
+# ── GPU endpoints (via Cortex) ────────────────────────────────────────
 
 
 @router.post("/remove-bg", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def remove_bg(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
+    model: str | None = Form(None),
+    output_type: str | None = Form(None),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().remove_bg(
-            image_bytes=data,
-            filename=file.filename or "image",
-        )
-    finally:
-        sem.release()
+    params: dict[str, Any] = {}
+    if model is not None:
+        params["model"] = model
+    if output_type is not None:
+        params["output_type"] = output_type
+    return await ImageService().remove_bg(
+        image_bytes=img.data, filename=img.filename, **params,
+    )
 
 
 @router.post("/upscale", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def upscale(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     scale: int = Form(4),
+    model: str | None = Form(None),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().upscale(
-            image_bytes=data,
-            filename=file.filename or "image",
-            scale=scale,
-        )
-    finally:
-        sem.release()
+    params: dict[str, Any] = {}
+    if model is not None:
+        params["model"] = model
+    return await ImageService().upscale(
+        image_bytes=img.data, filename=img.filename, scale=scale, **params,
+    )
 
 
 @router.post("/restore-face", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def restore_face(
     request: Request,
-    file: UploadFile = File(...),
-    w: float = Form(0.5),
+    img: ImageInput = Depends(validated_image),
+    weight: float = Form(0.5),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().restore_face(
-            image_bytes=data,
-            filename=file.filename or "image",
-            w=w,
-        )
-    finally:
-        sem.release()
+    return await ImageService().restore_face(
+        image_bytes=img.data, filename=img.filename, weight=weight,
+    )
 
 
 @router.post("/denoise", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def denoise(
     request: Request,
-    file: UploadFile = File(...),
-    strength: float = Form(0.5),
+    img: ImageInput = Depends(validated_image),
+    strength: float = Form(1.0),
+    task: str = Form("denoise"),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().denoise(
-            image_bytes=data,
-            filename=file.filename or "image",
-            strength=strength,
-        )
-    finally:
-        sem.release()
+    return await ImageService().denoise(
+        image_bytes=img.data, filename=img.filename,
+        strength=strength, task=task,
+    )
 
 
 @router.post("/colorize", response_model=FileResult)
 @limiter.limit(dynamic_rate_limit)
 async def colorize(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
+    model: str | None = Form(None),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().colorize(
-            image_bytes=data,
-            filename=file.filename or "image",
-        )
-    finally:
-        sem.release()
+    params: dict[str, Any] = {}
+    if model is not None:
+        params["model"] = model
+    return await ImageService().colorize(
+        image_bytes=img.data, filename=img.filename, **params,
+    )
 
 
 @router.post("/inpaint", response_model=FileResult)
@@ -234,7 +197,9 @@ async def inpaint(
     request: Request,
     file: UploadFile = File(...),
     mask: UploadFile = File(...),
+    model: str | None = Form(None),
 ) -> FileResult:
+    # inpaint needs two file uploads so cannot use validated_image dependency
     sem = await acquire_task_slot(request)
     try:
         data = await file.read()
@@ -245,10 +210,12 @@ async def inpaint(
             raise HTTPException(status_code=413, detail="Mask file too large")
         validate_image_bytes(data)
         validate_image_bytes(mask_data)
+        params: dict[str, Any] = {}
+        if model is not None:
+            params["model"] = model
         return await ImageService().inpaint(
-            image_bytes=data,
-            mask_bytes=mask_data,
-            filename=file.filename or "image",
+            image_bytes=data, mask_bytes=mask_data,
+            filename=file.filename or "image", **params,
         )
     finally:
         sem.release()
@@ -258,50 +225,34 @@ async def inpaint(
 @limiter.limit(dynamic_rate_limit)
 async def ocr(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     lang: str = Form("ch_en"),
 ) -> OcrResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        return await ImageService().ocr(image_bytes=data, lang=lang)
-    finally:
-        sem.release()
+    return await ImageService().ocr(image_bytes=img.data, lang=lang)
 
 
 @router.post("/segment", response_model=SegmentResult)
 @limiter.limit(dynamic_rate_limit)
 async def segment(
     request: Request,
-    file: UploadFile = File(...),
+    img: ImageInput = Depends(validated_image),
     points: str | None = Form(None),
     boxes: str | None = Form(None),
+    multimask: bool = Form(False),
 ) -> SegmentResult:
-    sem = await acquire_task_slot(request)
-    try:
-        data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
-        validate_image_bytes(data)
-        parsed_points = None
-        parsed_boxes = None
-        if points:
-            try:
-                parsed_points = json.loads(points)
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=400, detail="Invalid points JSON") from exc
-        if boxes:
-            try:
-                parsed_boxes = json.loads(boxes)
-            except json.JSONDecodeError as exc:
-                raise HTTPException(status_code=400, detail="Invalid boxes JSON") from exc
-        return await ImageService().segment(
-            image_bytes=data,
-            points=parsed_points,
-            boxes=parsed_boxes,
-        )
-    finally:
-        sem.release()
+    parsed_points = None
+    parsed_boxes = None
+    if points:
+        try:
+            parsed_points = json.loads(points)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Invalid points JSON") from exc
+    if boxes:
+        try:
+            parsed_boxes = json.loads(boxes)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Invalid boxes JSON") from exc
+    return await ImageService().segment(
+        image_bytes=img.data, points=parsed_points, boxes=parsed_boxes,
+        multimask=multimask,
+    )

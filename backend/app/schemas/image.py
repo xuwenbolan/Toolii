@@ -1,15 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
+from app.schemas.common import FileResult
 
-class FileResult(BaseModel):
-    file_id: str
-    filename: str
-    size: int
-    content_type: str
-    download_url: str
-    expires_in: int
+__all__ = ["FileResult", "OcrLine", "OcrResult", "SegmentMask", "SegmentResult"]
 
 
 class OcrLine(BaseModel):
@@ -19,16 +16,17 @@ class OcrLine(BaseModel):
 
 
 class OcrResult(BaseModel):
-    engine: str
-    lang: str
-    width: int
-    height: int
     lines: list[OcrLine]
     full_text: str
+    meta: dict[str, Any] | None = None
+
+
+class SegmentMask(BaseModel):
+    mask_b64: str
+    score: float
+    low_res_mask_b64: str | None = None
 
 
 class SegmentResult(BaseModel):
-    mask_b64: str
-    score: float
-    width: int
-    height: int
+    masks: list[SegmentMask]
+    meta: dict[str, Any] | None = None

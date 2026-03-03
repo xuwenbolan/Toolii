@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import os
 from functools import partial
-from typing import Iterable
+from typing import Any, Iterable
 
 from app.core.config import settings
 from app.core.exceptions import AppError
@@ -13,6 +14,15 @@ from app.processing.image_mosaic import MosaicRegion, mosaic_image
 from app.processing.scan_enhance import enhance_scan
 from app.schemas.image import FileResult, OcrResult, SegmentResult
 from app.services.file_service import FileService, StoredFile
+
+# GPU operation registry: op_name -> (cortex_endpoint, filename_suffix_template)
+_GPU_OPS: dict[str, tuple[str, str]] = {
+    "remove_bg": ("/v1/remove-background", "-nobg.png"),
+    "upscale": ("/v1/upscale", "-{scale}x.png"),
+    "restore_face": ("/v1/restore-face", "-restored.png"),
+    "denoise": ("/v1/denoise", "-denoised.png"),
+    "colorize": ("/v1/colorize", "-colorized.png"),
+}
 
 
 def _safe_stem(filename: str) -> str:
@@ -45,6 +55,8 @@ class ImageService:
             download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
             expires_in=settings.file_retention_hours * 3600,
         )
+
+    # ── Local CPU operations ──────────────────────────────────────────
 
     async def compress(
         self,
@@ -158,160 +170,102 @@ class ImageService:
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
         return self._to_result(stored, filename=out_name)
 
-    async def remove_bg(
+    # ── GPU operations (via Cortex) ───────────────────────────────────
+
+    async def _gpu_process(
         self,
+        op: str,
         *,
         image_bytes: bytes,
         filename: str,
+        **params: Any,
     ) -> FileResult:
+        """Generic GPU processing via Cortex.  Extra params forwarded transparently."""
+        from app.services.cortex_client import _b64, call as cortex_call
         from app.services.cortex_client import remove_background as cortex_remove_bg
 
+        endpoint, suffix_tpl = _GPU_OPS[op]
+        suffix = suffix_tpl.format_map({**params, "scale": params.get("scale", 4)})
+
         try:
-            out, _meta = await cortex_remove_bg(image_bytes)
+            if op == "remove_bg":
+                data = await cortex_remove_bg(image_bytes, **params)
+            else:
+                data = await cortex_call(endpoint, image_b64=_b64(image_bytes), **params)
         except AppError:
             raise
         except Exception as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="Background removal failed", status_code=500) from exc
+            status = 500 if op == "remove_bg" else 502
+            raise AppError(
+                code="IMAGE_PROCESS_FAILED",
+                message=f"{op.replace('_', ' ').title()} failed",
+                status_code=status,
+            ) from exc
 
-        out_name = f"{_safe_stem(filename)}-nobg.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
+        out_bytes = base64.b64decode(data["image_b64"])
+        out_name = f"{_safe_stem(filename)}{suffix}"
+        stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
         return self._to_result(stored, filename=out_name)
 
-    async def upscale(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str,
-        scale: int = 4,
-    ) -> FileResult:
+    async def remove_bg(self, *, image_bytes: bytes, filename: str, **params: Any) -> FileResult:
+        return await self._gpu_process("remove_bg", image_bytes=image_bytes, filename=filename, **params)
+
+    async def upscale(self, *, image_bytes: bytes, filename: str, scale: int = 4, **params: Any) -> FileResult:
         if scale not in (2, 4):
             raise AppError(code="INVALID_SCALE", message="scale must be 2 or 4", status_code=400)
+        return await self._gpu_process("upscale", image_bytes=image_bytes, filename=filename, scale=scale, **params)
 
-        from app.services.cortex_client import upscale as cortex_upscale
+    async def restore_face(self, *, image_bytes: bytes, filename: str, weight: float = 0.5, **params: Any) -> FileResult:
+        if not (0.0 <= weight <= 1.0):
+            raise AppError(code="INVALID_WEIGHT", message="weight must be between 0 and 1", status_code=400)
+        return await self._gpu_process("restore_face", image_bytes=image_bytes, filename=filename, weight=weight, **params)
 
-        try:
-            out, _meta = await cortex_upscale(image_bytes, scale=scale)
-        except AppError:
-            raise
-        except Exception as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image upscaling failed", status_code=502) from exc
-
-        out_name = f"{_safe_stem(filename)}-{scale}x.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
-
-    async def restore_face(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str,
-        w: float = 0.5,
-    ) -> FileResult:
-        if not (0.0 <= w <= 1.0):
-            raise AppError(code="INVALID_W", message="w must be between 0 and 1", status_code=400)
-
-        from app.services.cortex_client import restore_face as cortex_restore_face
-
-        try:
-            out, _meta = await cortex_restore_face(image_bytes, w=w)
-        except AppError:
-            raise
-        except Exception as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="Face restoration failed", status_code=502) from exc
-
-        out_name = f"{_safe_stem(filename)}-restored.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
-
-    async def denoise(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str,
-        strength: float = 0.5,
-    ) -> FileResult:
+    async def denoise(self, *, image_bytes: bytes, filename: str, strength: float = 1.0, **params: Any) -> FileResult:
         if not (0.0 <= strength <= 1.0):
             raise AppError(code="INVALID_STRENGTH", message="strength must be between 0 and 1", status_code=400)
+        return await self._gpu_process("denoise", image_bytes=image_bytes, filename=filename, strength=strength, **params)
 
-        from app.services.cortex_client import denoise as cortex_denoise
+    async def colorize(self, *, image_bytes: bytes, filename: str, **params: Any) -> FileResult:
+        return await self._gpu_process("colorize", image_bytes=image_bytes, filename=filename, **params)
 
-        try:
-            out, _meta = await cortex_denoise(image_bytes, strength=strength)
-        except AppError:
-            raise
-        except Exception as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image denoising failed", status_code=502) from exc
-
-        out_name = f"{_safe_stem(filename)}-denoised.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
-
-    async def colorize(
-        self,
-        *,
-        image_bytes: bytes,
-        filename: str,
-    ) -> FileResult:
-        from app.services.cortex_client import colorize as cortex_colorize
+    async def inpaint(self, *, image_bytes: bytes, mask_bytes: bytes, filename: str, **params: Any) -> FileResult:
+        from app.services.cortex_client import _b64, call as cortex_call
 
         try:
-            out, _meta = await cortex_colorize(image_bytes)
-        except AppError:
-            raise
-        except Exception as exc:
-            raise AppError(code="IMAGE_PROCESS_FAILED", message="Image colorization failed", status_code=502) from exc
-
-        out_name = f"{_safe_stem(filename)}-colorized.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
-
-    async def inpaint(
-        self,
-        *,
-        image_bytes: bytes,
-        mask_bytes: bytes,
-        filename: str,
-    ) -> FileResult:
-        from app.services.cortex_client import inpaint as cortex_inpaint
-
-        try:
-            out, _meta = await cortex_inpaint(image_bytes, mask_bytes)
+            data = await cortex_call(
+                "/v1/inpaint",
+                image_b64=_b64(image_bytes),
+                mask_b64=_b64(mask_bytes),
+                **params,
+            )
         except AppError:
             raise
         except Exception as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Image inpainting failed", status_code=502) from exc
 
+        out_bytes = base64.b64decode(data["image_b64"])
         out_name = f"{_safe_stem(filename)}-inpainted.png"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="image/png")
+        stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
         return self._to_result(stored, filename=out_name)
 
-    async def ocr(
-        self,
-        *,
-        image_bytes: bytes,
-        lang: str = "ch_en",
-    ) -> OcrResult:
+    async def ocr(self, *, image_bytes: bytes, lang: str = "ch_en", **params: Any) -> OcrResult:
         if lang not in ("ch", "en", "ch_en"):
             raise AppError(code="INVALID_LANG", message="lang must be ch, en, or ch_en", status_code=400)
 
-        from app.services.cortex_client import ocr as cortex_ocr
+        from app.services.cortex_client import _b64, call as cortex_call
 
         try:
-            data = await cortex_ocr(image_bytes, lang=lang)
+            data = await cortex_call("/v1/ocr", image_b64=_b64(image_bytes), lang=lang, **params)
         except AppError:
             raise
         except Exception as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="OCR failed", status_code=502) from exc
 
         lines = data.get("lines", [])
-        full_text = "\n".join(line["text"] for line in lines)
         return OcrResult(
-            engine=data.get("engine", "paddleocr"),
-            lang=data.get("lang", lang),
-            width=data.get("width", 0),
-            height=data.get("height", 0),
             lines=lines,
-            full_text=full_text,
+            full_text=data.get("full_text", "\n".join(line.get("text", "") for line in lines)),
+            meta=data.get("meta"),
         )
 
     async def segment(
@@ -320,22 +274,27 @@ class ImageService:
         image_bytes: bytes,
         points: list[list[float]] | None = None,
         boxes: list[list[float]] | None = None,
+        multimask: bool = False,
+        **params: Any,
     ) -> SegmentResult:
-        import base64
+        from app.services.cortex_client import _b64, call as cortex_call
 
-        from app.services.cortex_client import segment as cortex_segment
+        extra: dict[str, Any] = {}
+        if points is not None:
+            extra["points"] = points
+        if boxes is not None:
+            extra["boxes"] = boxes
+        if multimask:
+            extra["multimask"] = True
 
         try:
-            mask_bytes, meta = await cortex_segment(image_bytes, points=points, boxes=boxes)
+            data = await cortex_call("/v1/segment", image_b64=_b64(image_bytes), **extra, **params)
         except AppError:
             raise
         except Exception as exc:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Segmentation failed", status_code=502) from exc
 
         return SegmentResult(
-            mask_b64=base64.b64encode(mask_bytes).decode("ascii"),
-            score=meta.get("score", 0.0),
-            width=meta.get("width", 0),
-            height=meta.get("height", 0),
+            masks=data.get("masks", []),
+            meta=data.get("meta"),
         )
-
