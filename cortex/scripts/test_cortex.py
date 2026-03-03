@@ -175,14 +175,22 @@ class TestRunner:
         t0 = time.perf_counter()
         resp = await self.client.post(f"/v1/{endpoint}", json=payload)
         elapsed = int((time.perf_counter() - t0) * 1000)
-        return resp.status_code, resp.json(), elapsed
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"error": {"code": "NON_JSON_RESPONSE", "message": resp.text[:500]}}
+        return resp.status_code, body, elapsed
 
     async def _get(self, path: str) -> tuple[int, dict, int]:
         """GET a path, return (status_code, body, elapsed_ms)."""
         t0 = time.perf_counter()
         resp = await self.client.get(path)
         elapsed = int((time.perf_counter() - t0) * 1000)
-        return resp.status_code, resp.json(), elapsed
+        try:
+            body = resp.json()
+        except Exception:
+            body = {"error": {"code": "NON_JSON_RESPONSE", "message": resp.text[:500]}}
+        return resp.status_code, body, elapsed
 
     # ── Suite: Health & Startup ────────────────────────────────────────
 
@@ -1116,14 +1124,22 @@ Test suites:
     print(f"Target: {args.url}")
     print(f"Suite:  {args.suite}")
 
-    runner = TestRunner(base_url=args.url, verbose=args.verbose)
+    async def _run() -> None:
+        runner_ref[0] = TestRunner(base_url=args.url, verbose=args.verbose)
+        try:
+            await runner_ref[0].run_suite(args.suite, include_benchmark=args.benchmark)
+        finally:
+            await runner_ref[0].close()
 
+    runner_ref: list[TestRunner | None] = [None]
     try:
-        asyncio.run(runner.run_suite(args.suite, include_benchmark=args.benchmark))
+        asyncio.run(_run())
     except KeyboardInterrupt:
         print(f"\n{_YELLOW}Interrupted{_RESET}")
-    finally:
-        asyncio.run(runner.close())
+
+    runner = runner_ref[0]
+    if runner is None:
+        sys.exit(1)
 
     runner.print_summary()
 

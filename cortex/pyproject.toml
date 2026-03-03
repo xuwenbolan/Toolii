@@ -11,6 +11,7 @@ dependencies = [
   "numpy>=1.26.0",
   "opencv-python-headless>=4.10.0",
   "pydantic-settings>=2.0.0",
+  "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +23,15 @@ dev = [
 ]
 ocr = [
   "rapidocr-onnxruntime>=1.3.0",
+]
+
+[tool.uv]
+# rapidocr-onnxruntime pulls onnxruntime (CPU) and opencv-python (GUI) as deps.
+# We already have onnxruntime-gpu (API-compatible) and opencv-python-headless.
+# Override to prevent installing the duplicate packages.
+override-dependencies = [
+  "onnxruntime>=99; python_version < '0'",
+  "opencv-python>=99; python_version < '0'",
 ]
 
 [tool.ruff]

@@ -1,0 +1,19 @@
+{
+  "birefnet/birefnet-general.onnx": "58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c",
+  "birefnet/birefnet-portrait.onnx": "1ba1c8ff5a7bbfadc8d8d13fb11d7be793f91f23d9d466549e37a854f6668f99",
+  "ddcolor/ddcolor-artistic.onnx": "adad4b897990d627e139e858e8a6552c1f99e39e49e811d21e8f591803c877f1",
+  "ddcolor/ddcolor-modelscope.onnx": "dd6156f056d0690891ef35f9ee87176d4d976ab19bbd36e57d18e841e064d797",
+  "gfpgan/gfpgan-v1.4.onnx": "accc4757b26bdb89b32b4d3500d4f79c9dff97c1dd7c7104bf9dcb95e3311385",
+  "gfpgan/retinaface-resnet50.onnx": "5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91",
+  "inpaint/lama.onnx": "351e481e287f345b7fbfd026068cfb9ec0c7f24b440e6501458ebe54a833d1a1",
+  "inpaint/migan.onnx": "6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b",
+  "mobilesam/mobilesam-decoder.onnx": "93915fc7c993ab9d59ab8c9ccd3bce37f7509c81ab4150a74abd4d2abbd8570d",
+  "mobilesam/mobilesam-encoder.onnx": "580f5fb648ea1062c0aabc26217aed56921985f03f0cbbd852bba81d760cc749",
+  "nafnet/nafnet-gopro-w64.onnx": "00c07294585512d162bc2313a2a12cd8d9cd532d0981d0d01f444bd48c4330cd",
+  "nafnet/nafnet-sidd-w64.onnx": "9b8d0cf8a9563b04213e0253c6d7bf595beb49d77824bfed8facee7c59ba4d40",
+  "rapidocr/rapidocr-cls.onnx": "70581b300b83babd9e0dd1d7d74c5b006869e8796da277a70c2e405bf9d77c82",
+  "rapidocr/rapidocr-det.onnx": "d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9",
+  "rapidocr/rapidocr-rec.onnx": "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b",
+  "realesrgan/realesrgan-x4plus.onnx": "afa7fa42eed0315a3d7b2a54e79e4e44a672d3c0889c2828c4f84c9ab91edb0b",
+  "realesrgan/realesrgan-x4v3.onnx": "09b757accd747d7e423c1d352b3e8f23e77cc5742d04bae958d4eb8082b76fa4"
+}
