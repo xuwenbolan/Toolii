@@ -26,7 +26,8 @@ def upgrade() -> None:
     sa.Column('token', sa.String(length=32), nullable=False),
     sa.Column('result_json', sa.Text(), nullable=False),
     sa.Column('image_file_id', sa.String(length=32), nullable=False),
-    sa.Column('share_type', sa.String(length=10), nullable=False),
+    sa.Column('share_type', sa.String(length=20), nullable=False),
+    sa.Column('content_hash', sa.String(length=64), nullable=True),
     sa.Column('locale', sa.String(length=10), server_default='zh-CN', nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=True),
     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
@@ -36,6 +37,7 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     with op.batch_alter_table('facemap_shares', schema=None) as batch_op:
+        batch_op.create_index(batch_op.f('ix_facemap_shares_content_hash'), ['content_hash'], unique=False)
         batch_op.create_index(batch_op.f('ix_facemap_shares_expires_at'), ['expires_at'], unique=False)
         batch_op.create_index(batch_op.f('ix_facemap_shares_token'), ['token'], unique=True)
         batch_op.create_index(batch_op.f('ix_facemap_shares_user_id'), ['user_id'], unique=False)
@@ -50,6 +52,7 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_facemap_shares_user_id'))
         batch_op.drop_index(batch_op.f('ix_facemap_shares_token'))
         batch_op.drop_index(batch_op.f('ix_facemap_shares_expires_at'))
+        batch_op.drop_index(batch_op.f('ix_facemap_shares_content_hash'))
 
     op.drop_table('facemap_shares')
     # ### end Alembic commands ###
