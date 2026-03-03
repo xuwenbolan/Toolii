@@ -18,9 +18,9 @@ __pycache__/
 **/*.log
 
 # toolii runtime
-data/
-models/
-ssl/
+/data/
+/models/
+/ssl/
 
 client_secret_*.json
 backend/toolii.db
