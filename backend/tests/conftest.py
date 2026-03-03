@@ -14,6 +14,7 @@ from app.core import database as database_module
 from app.core.config import settings
 from app.core.rate_limiter import limiter
 from app.core.security import create_access_token, hash_password
+from app.services import tool_service
 from app.main import create_app
 from app.models.base import Base
 from app.models.user import User
@@ -28,6 +29,7 @@ def anyio_backend() -> str:
 @pytest.fixture(autouse=True)
 def reset_rate_limiter_state() -> None:
     limiter.reset()
+    tool_service.invalidate_cache()
 
 
 @pytest_asyncio.fixture()
@@ -70,6 +72,7 @@ async def app_instance(
     import app.core.task_limiter as task_limiter
 
     monkeypatch.setattr(settings, "file_storage_dir", str(tmp_path / "files"))
+    monkeypatch.setattr(app_main, "SessionLocal", session_factory)
     monkeypatch.setattr(app_main, "prewarm_background_models", lambda *_a, **_k: {})
     monkeypatch.setattr(app_main, "prewarm_face_landmarker", lambda *_a, **_k: None)
     monkeypatch.setattr(app_main, "setup_scheduler", lambda *_a, **_k: None)

@@ -45,6 +45,9 @@ def face_image_bytes():
 @pytest.fixture()
 def _mock_processing(monkeypatch):
     """Mock heavy processing functions so tests don't need ML models."""
+    import base64
+
+    import app.processing.face_detection as face_det_mod
     import app.services.cortex_client as cortex
     import app.services.photo_service as photo_svc
 
@@ -56,11 +59,14 @@ def _mock_processing(monkeypatch):
     }
     cutout = _make_cutout_png()
 
-    async def _fake_detect(image_bytes):
+    def _fake_detect(image_bytes):
         return face_result
 
-    async def _fake_remove(image_bytes):
-        return cutout, {"model": "ben2", "engine": "test-mock"}
+    async def _fake_remove(image_bytes, **params):
+        return {
+            "image_b64": base64.b64encode(cutout).decode("ascii"),
+            "meta": {"model": "ben2", "engine": "test-mock"},
+        }
 
     def _fake_compliance(image_bytes, *, faces=None, cutout_png_bytes=None, detection_engine=None):
         return {
@@ -71,8 +77,9 @@ def _mock_processing(monkeypatch):
             ],
         }
 
-    # cortex_client functions are imported inside the method, patch at source
-    monkeypatch.setattr(cortex, "detect_faces", _fake_detect)
+    # Face detection is now local (sync), patched at the processing module
+    monkeypatch.setattr(face_det_mod, "detect_faces", _fake_detect)
+    # Background removal still via cortex_client (returns Cortex-compatible dict)
     monkeypatch.setattr(cortex, "remove_background", _fake_remove)
     # check_photo_compliance is imported at module level in photo_service
     monkeypatch.setattr(photo_svc, "check_photo_compliance", _fake_compliance)
