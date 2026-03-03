@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app import gpu
 from app.config import settings
 from app.model_manager import OnnxModelManager
 
@@ -15,7 +15,23 @@ logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger(__name__)
 
 _start_time = time.time()
-manager = OnnxModelManager()
+
+
+def _resolve_budget() -> int:
+    """Resolve VRAM budget: use configured value or auto-detect from GPU."""
+    if settings.vram_budget_mb > 0:
+        logger.info("VRAM budget: %dMB (manual)", settings.vram_budget_mb)
+        return settings.vram_budget_mb
+    budget = gpu.auto_budget()
+    logger.info("VRAM budget: %dMB (auto: %dMB total - %dMB reserve)",
+                budget, gpu.vram_total_mb(), gpu.vram_total_mb() - budget)
+    return budget
+
+
+# Initialize GPU monitoring and model manager
+gpu.init()
+budget = _resolve_budget()
+manager = OnnxModelManager(vram_budget_mb=budget)
 
 
 @asynccontextmanager
@@ -38,6 +54,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     # Shutdown: release all ONNX sessions
     logger.info("Shutting down, unloading all models...")
     manager.unload_all()
+    gpu.shutdown()
     logger.info("Shutdown complete")
 
 
@@ -51,10 +68,9 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
-        gpu_info = _get_gpu_info()
         return {
             "status": "ok",
-            "gpu": gpu_info,
+            "gpu": gpu.gpu_info(),
             "models": manager.stats(),
             "uptime_seconds": int(time.time() - _start_time),
         }
@@ -63,7 +79,7 @@ def create_app() -> FastAPI:
     async def models_detail() -> dict:
         """Detailed model registry, load status, VRAM usage, and GPU memory."""
         detail = manager.detailed_stats()
-        detail["gpu"] = _get_gpu_info()
+        detail["gpu"] = gpu.gpu_info()
         detail["uptime_seconds"] = int(time.time() - _start_time)
         return detail
 
@@ -71,7 +87,7 @@ def create_app() -> FastAPI:
     async def models_check_all() -> dict:
         """Validate all registered models (file existence + ONNX integrity)."""
         result = manager.check_all()
-        result["gpu"] = _get_gpu_info()
+        result["gpu"] = gpu.gpu_info()
         return result
 
     @app.get("/models/{model_name}/check")
@@ -80,31 +96,6 @@ def create_app() -> FastAPI:
         return manager.check_model(model_name)
 
     return app
-
-
-def _get_gpu_info() -> dict:
-    try:
-        result = subprocess.run(
-            [
-                "nvidia-smi",
-                "--query-gpu=name,memory.total,memory.used,memory.free",
-                "--format=csv,nounits,noheader",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            parts = [p.strip() for p in result.stdout.strip().split(",")]
-            return {
-                "name": parts[0],
-                "vram_total_mb": int(parts[1]),
-                "vram_used_mb": int(parts[2]),
-                "vram_free_mb": int(parts[3]),
-            }
-    except Exception:
-        pass
-    return {"name": "unknown", "vram_total_mb": 0, "vram_used_mb": 0, "vram_free_mb": 0}
 
 
 app = create_app()

@@ -1,6 +1,7 @@
-"""ONNX Runtime model manager with LRU eviction and VRAM budget."""
+"""ONNX Runtime model manager with real VRAM monitoring and LRU eviction."""
 from __future__ import annotations
 
+import gc
 import logging
 import threading
 import time
@@ -11,7 +12,7 @@ from typing import Any
 
 import onnxruntime as ort
 
-from app.config import settings
+from app import gpu
 
 logger = logging.getLogger(__name__)
 
@@ -32,18 +33,25 @@ class LoadedModel:
 
 
 class OnnxModelManager:
-    """Manages ONNX Runtime sessions with LRU eviction and VRAM budget.
+    """Manages ONNX Runtime sessions with real VRAM monitoring and LRU eviction.
 
     - Lazy loading: models load on first request, not at startup
-    - LRU eviction: if VRAM budget exceeded, evict least-recently-used
+    - Real VRAM tracking: uses pynvml to query actual GPU memory
+    - LRU eviction: if real VRAM exceeds budget after loading, evict least-recently-used
+    - Estimated VRAM used as pre-load heuristic only
     - OOM recovery: catch CUDA OOM, evict least-used, retry once
-    - Fine-grained locking: reads are lock-free, only loading acquires the lock
     """
 
-    def __init__(self) -> None:
+    def __init__(self, vram_budget_mb: int) -> None:
         self._models: OrderedDict[str, LoadedModel] = OrderedDict()
         self._lock = threading.Lock()
         self._registry: dict[str, ModelInfo] = {}
+        self._vram_budget_mb = vram_budget_mb
+        self._idle_threshold = 0
+
+    @property
+    def vram_budget_mb(self) -> int:
+        return self._vram_budget_mb
 
     def register(self, info: ModelInfo) -> None:
         self._registry[info.name] = info
@@ -69,18 +77,57 @@ class OnnxModelManager:
     def _estimated_vram(self) -> int:
         return sum(m.info.vram_mb for m in self._models.values())
 
-    def _evict_lru(self, needed_mb: int) -> None:
-        """Evict least-recently-used models until there is room for needed_mb."""
-        while self._estimated_vram() + needed_mb > settings.vram_budget_mb and self._models:
-            oldest_name, oldest = next(iter(self._models.items()))
-            logger.info("Evicting model %s to free ~%dMB VRAM", oldest_name, oldest.info.vram_mb)
-            del self._models[oldest_name]
+    def _evict_model(self, name: str) -> None:
+        """Evict a model: delete session, gc.collect to reclaim CUDA memory."""
+        loaded = self._models.pop(name, None)
+        if loaded is None:
+            return
+        vram_before = gpu.vram_used_mb()
+        del loaded.session
+        del loaded
+        gc.collect()
+        vram_after = gpu.vram_used_mb()
+        freed = max(0, vram_before - vram_after)
+        logger.info("Evicted model %s (freed ~%dMB, VRAM %dMB -> %dMB)",
+                     name, freed, vram_before, vram_after)
+
+    def _evict_lru_by_estimate(self, needed_mb: int) -> None:
+        """Pre-load heuristic: evict LRU models based on estimates before loading."""
+        while self._estimated_vram() + needed_mb > self._vram_budget_mb and self._models:
+            oldest_name = next(iter(self._models))
+            logger.info("Pre-evicting model %s (estimated VRAM pressure)", oldest_name)
+            self._evict_model(oldest_name)
+
+    def _evict_until_under_budget(self, exclude: str) -> None:
+        """Post-load: evict LRU models until real VRAM is under budget."""
+        max_rounds = len(self._models)
+        for _ in range(max_rounds):
+            real_vram = gpu.vram_used_mb()
+            if real_vram <= self._vram_budget_mb:
+                return
+            # Find oldest model that is not the one we just loaded
+            victim = None
+            for name in self._models:
+                if name != exclude:
+                    victim = name
+                    break
+            if victim is None:
+                logger.warning("VRAM %dMB > budget %dMB but no models to evict",
+                               real_vram, self._vram_budget_mb)
+                return
+            logger.info("VRAM %dMB > budget %dMB, evicting LRU model %s",
+                         real_vram, self._vram_budget_mb, victim)
+            self._evict_model(victim)
+            time.sleep(0.1)  # brief pause for CUDA memory to settle
 
     def get_session(self, model_name: str) -> ort.InferenceSession:
         """Load model if not loaded, evict LRU if over budget.
 
-        Fast path (already loaded) is lock-free.
-        Slow path (loading) acquires the lock and rechecks.
+        Flow:
+        1. Fast path: already loaded, return session
+        2. Pre-evict based on estimates (avoid obviously wasteful loads)
+        3. Load model
+        4. Post-load: check real VRAM, evict LRU until under budget
         """
         # Fast path: model already loaded, no lock needed
         loaded = self._models.get(model_name)
@@ -105,32 +152,35 @@ class OnnxModelManager:
             if not info.onnx_path.exists():
                 raise FileNotFoundError(f"Model file not found: {info.onnx_path}")
 
-            self._evict_lru(info.vram_mb)
+            # Pre-evict based on estimates
+            self._evict_lru_by_estimate(info.vram_mb)
 
             try:
                 session = self._create_session(info.onnx_path)
             except RuntimeError as exc:
-                # OOM recovery: catch CUDA/ONNX runtime errors, evict one more and retry
+                # OOM recovery: evict one more and retry
                 if self._models:
                     oldest_name = next(iter(self._models))
-                    logger.warning("Runtime error loading %s (%s), evicting %s and retrying",
+                    logger.warning("OOM loading %s (%s), evicting %s and retrying",
                                    model_name, exc, oldest_name)
-                    del self._models[oldest_name]
+                    self._evict_model(oldest_name)
                     session = self._create_session(info.onnx_path)
                 else:
                     raise
 
             self._models[model_name] = LoadedModel(session=session, info=info)
-            logger.info("Loaded model %s (~%dMB, total VRAM ~%dMB)",
-                        model_name, info.vram_mb, self._estimated_vram())
+            real_vram = gpu.vram_used_mb()
+            logger.info("Loaded model %s (est ~%dMB, real VRAM %dMB/%dMB, %d models loaded)",
+                        model_name, info.vram_mb, real_vram, self._vram_budget_mb,
+                        len(self._models))
+
+            # Post-load: enforce real VRAM budget
+            self._evict_until_under_budget(exclude=model_name)
+
             return session
 
     def warmup(self, required_only: bool = True) -> None:
-        """Pre-load models so first requests don't pay loading latency.
-
-        Args:
-            required_only: If True, only load models marked as required.
-        """
+        """Pre-load models so first requests don't pay loading latency."""
         for name, info in self._registry.items():
             if required_only and not info.required:
                 continue
@@ -145,24 +195,23 @@ class OnnxModelManager:
     def unload(self, model_name: str) -> None:
         """Manually unload a model."""
         with self._lock:
-            self._models.pop(model_name, None)
+            self._evict_model(model_name)
 
     def unload_all(self) -> None:
         """Unload all models and release ONNX sessions."""
         with self._lock:
             names = list(self._models.keys())
-            self._models.clear()
+            for name in names:
+                self._evict_model(name)
         if names:
             logger.info("Unloaded %d models: %s", len(names), names)
 
-    # ── Idle eviction ────────────────────────────────────────────────
+    # -- Idle eviction ---------------------------------------------------------
 
     def start_idle_evictor(self, idle_minutes: int, check_interval: int = 60) -> None:
         """Start a daemon thread that evicts non-required models idle beyond threshold.
 
-        Args:
-            idle_minutes: Evict optional models idle longer than this (0 = disabled).
-            check_interval: Seconds between eviction sweeps.
+        Also enforces real VRAM budget on each sweep.
         """
         if idle_minutes <= 0:
             return
@@ -174,7 +223,8 @@ class OnnxModelManager:
             name="idle-evictor",
         )
         t.start()
-        logger.info("Idle evictor started (threshold=%dm, interval=%ds)", idle_minutes, check_interval)
+        logger.info("Idle evictor started (threshold=%dm, interval=%ds)",
+                     idle_minutes, check_interval)
 
     def _evict_idle_loop(self, interval: int) -> None:
         while True:
@@ -182,35 +232,46 @@ class OnnxModelManager:
             self._evict_idle()
 
     def _evict_idle(self) -> None:
-        """Evict non-required models that exceeded the idle threshold."""
+        """Evict idle models and enforce real VRAM budget."""
         now = time.time()
         with self._lock:
+            # Evict idle non-required models
             to_evict = [
                 name for name, loaded in self._models.items()
                 if not loaded.info.required
+                and self._idle_threshold > 0
                 and (now - loaded.last_used) > self._idle_threshold
             ]
             for name in to_evict:
                 idle_sec = now - self._models[name].last_used
                 logger.info("Idle-evicting model %s (idle %.0fs)", name, idle_sec)
-                del self._models[name]
+                self._evict_model(name)
+
+            # Also enforce real VRAM budget
+            real_vram = gpu.vram_used_mb()
+            while real_vram > self._vram_budget_mb and self._models:
+                oldest_name = next(iter(self._models))
+                logger.info("VRAM sweep: %dMB > budget %dMB, evicting %s",
+                            real_vram, self._vram_budget_mb, oldest_name)
+                self._evict_model(oldest_name)
+                time.sleep(0.1)
+                real_vram = gpu.vram_used_mb()
+
+    # -- Stats -----------------------------------------------------------------
 
     def stats(self) -> dict[str, Any]:
-        """Return loaded models, VRAM usage, etc. for /health."""
+        """Return loaded models, VRAM usage for /health."""
         with self._lock:
             return {
                 "loaded": list(self._models.keys()),
                 "available": list(self._registry.keys()),
                 "vram_estimated_mb": self._estimated_vram(),
+                "vram_real_mb": gpu.vram_used_mb(),
+                "vram_budget_mb": self._vram_budget_mb,
             }
 
     def check_model(self, model_name: str) -> dict[str, Any]:
-        """Validate a single model and return diagnostic info.
-
-        For loaded models: inspect the live session.
-        For unloaded models: attempt a CPU-only load to verify the file,
-        then discard the session (no VRAM cost).
-        """
+        """Validate a single model and return diagnostic info."""
         info = self._registry.get(model_name)
         if info is None:
             return {"name": model_name, "healthy": False, "error": "not_registered"}
@@ -233,7 +294,6 @@ class OnnxModelManager:
             result.update(healthy=False, error="file_empty")
             return result
 
-        # If already loaded, inspect the live session
         loaded = self._models.get(model_name)
         if loaded is not None:
             session = loaded.session
@@ -293,6 +353,7 @@ class OnnxModelManager:
         """Return per-model details for the /models management endpoint."""
         now = time.time()
         models = []
+        real_vram = gpu.vram_used_mb()
 
         with self._lock:
             for name, info in self._registry.items():
@@ -317,16 +378,17 @@ class OnnxModelManager:
                 models.append(entry)
 
             loaded_count = len(self._models)
-            vram_used = self._estimated_vram()
+            estimated_vram = self._estimated_vram()
 
         return {
             "summary": {
                 "registered": len(self._registry),
                 "loaded": loaded_count,
-                "vram_used_mb": vram_used,
-                "vram_budget_mb": settings.vram_budget_mb,
-                "vram_utilization": round(vram_used / settings.vram_budget_mb, 3)
-                    if settings.vram_budget_mb > 0 else 0,
+                "vram_estimated_mb": estimated_vram,
+                "vram_real_mb": real_vram,
+                "vram_budget_mb": self._vram_budget_mb,
+                "vram_utilization": round(real_vram / self._vram_budget_mb, 3)
+                    if self._vram_budget_mb > 0 else 0,
             },
             "models": models,
         }

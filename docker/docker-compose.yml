@@ -58,7 +58,6 @@ services:
       - ../models/cortex:/app/models:ro
     environment:
       - CORTEX_MODEL_DIR=/app/models
-      - CORTEX_VRAM_BUDGET_MB=11000
       - CORTEX_LOG_LEVEL=INFO
     ports:
       - "127.0.0.1:9100:9100"

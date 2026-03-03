@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_dir: Path = Path("models")
-    vram_budget_mb: int = 11000
+    vram_budget_mb: int = 0  # 0 = auto-detect from GPU (total - reserve)
     port: int = 9100
     log_level: str = "INFO"
     warmup: bool = False
