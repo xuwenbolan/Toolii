@@ -61,7 +61,7 @@ export function DenoisePage() {
     <>
       <SEOHead title={t('denoise.seoTitle')} description={t('denoise.seoDescription')} keywords={t('denoise.seoKeywords')} canonicalPath="/image-tools/denoise" jsonLd={[buildToolJsonLd({ name: t('denoise.seoTitle'), description: t('denoise.seoDescription'), url: '/image-tools/denoise' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('denoise.title'), path: '/image-tools/denoise' }])]} />
       <ToolPageShell title={t('denoise.title')} description={t('denoise.description')} backTo="/image-tools">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <FileDropzone
             accept="image/*"
             onFiles={(files) => {

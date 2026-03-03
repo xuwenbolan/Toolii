@@ -163,7 +163,7 @@ export function TransferCreatePage() {
         description={t('create.description')}
         backTo="/"
       >
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             multiple={!burnAfterRead}
             maxFiles={burnAfterRead ? 1 : 20}

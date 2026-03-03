@@ -417,7 +417,7 @@ function ResultsLayout({
         <div className="space-y-5 px-4 pt-5 sm:px-6 lg:px-0 lg:pt-0 motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.2s_both]">
           <SectionNav sections={navSections} />
 
-          <div className="space-y-5 tool-section-stagger">
+          <div className="space-y-5">
             {/* Gene Card */}
             <div data-section-id="gene">
               <GeneCard data={profileData.gene_card} />
@@ -580,7 +580,7 @@ const PROFILE_SECTIONS: { id: string; labelKey: string }[] = [
 
 function PaidReportResults({ data }: { data: FullReportResponse }) {
   return (
-    <div className="space-y-5 tool-section-stagger">
+    <div className="space-y-5">
       <HairstyleCard data={data.hairstyles} />
       <EyebrowComparison data={data.eyebrows} />
       <ContouringGuide data={data.contouring} />

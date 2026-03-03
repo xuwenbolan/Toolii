@@ -356,7 +356,7 @@ export function InpaintPage() {
         jsonLd={[buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('inpaint.title'), path: '/image-tools/inpaint' }])]}
       />
       <ToolPageShell title={t('inpaint.title')} description={t('inpaint.description')} backTo="/image-tools" layout="workspace" width="wide">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
             multiple={false}

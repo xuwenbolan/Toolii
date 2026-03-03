@@ -228,7 +228,7 @@ export function CompressPage() {
         layout="workspace"
         width="wide"
       >
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
             multiple={false}

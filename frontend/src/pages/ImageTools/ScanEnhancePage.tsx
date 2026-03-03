@@ -64,7 +64,7 @@ export function ScanEnhancePage() {
     <>
       <SEOHead title={t('scanEnhance.seoTitle')} description={t('scanEnhance.seoDescription')} keywords={t('scanEnhance.seoKeywords')} canonicalPath="/image-tools/scan-enhance" jsonLd={[buildToolJsonLd({ name: t('scanEnhance.seoTitle'), description: t('scanEnhance.seoDescription'), url: '/image-tools/scan-enhance' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('scanEnhance.title'), path: '/image-tools/scan-enhance' }])]} />
       <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')} backTo="/image-tools">
-      <div className="space-y-5 tool-section-stagger">
+      <div className="space-y-5">
         <FileDropzone
           accept="image/*"
           onFiles={(files) => {

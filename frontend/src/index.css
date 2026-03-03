@@ -40,78 +40,12 @@ svg {
   }
 }
 
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0) scale(0.985);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-@keyframes bar-enter {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 100%, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes check-draw {
-  from {
-    stroke-dashoffset: 24;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes section-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes shimmer-sweep {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* ── Theme bridge: CSS vars → Tailwind utilities ──────────── */
+/* ── Theme bridge: CSS vars -> Tailwind utilities ──────────── */
 
 @theme inline {
   /* Custom animations */
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-delay-1: fade-in 0.4s ease-out 0.15s both;
-  --animate-card-in: card-in 0.35s ease-out both;
-  --animate-rise-in: rise-in 0.55s var(--ease-out) both;
-  --animate-bar-enter: bar-enter 0.4s var(--ease-out) both;
-  --animate-section-in: section-in 0.4s var(--ease-out) both;
 
   /* Radius scale */
   --radius-sm: calc(var(--radius) - 4px);
@@ -156,21 +90,6 @@ svg {
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Brand indigo scale (Logo #4F46E5, hue 264) */
-  --color-brand-50: var(--brand-50);
-  --color-brand-100: var(--brand-100);
-  --color-brand-200: var(--brand-200);
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-  --color-brand-700: var(--brand-700);
-  --color-brand-900: var(--brand-900);
-
-  /* Brand accent aliases */
-  --color-accent-brand: var(--accent-brand);
-  --color-accent-brand-light: var(--accent-brand-light);
-  --color-accent-brand-dark: var(--accent-brand-dark);
-
   /* Semantic status colors */
   --color-success: var(--success);
   --color-success-light: var(--success-light);
@@ -179,31 +98,15 @@ svg {
   --color-info: var(--info);
   --color-info-light: var(--info-light);
   --color-destructive-light: var(--destructive-light);
-
-  /* Tool category colors */
-  --color-cat-image: var(--cat-image);
-  --color-cat-image-light: var(--cat-image-light);
-  --color-cat-image-surface: var(--cat-image-surface);
-  --color-cat-pdf: var(--cat-pdf);
-  --color-cat-pdf-light: var(--cat-pdf-light);
-  --color-cat-pdf-surface: var(--cat-pdf-surface);
-  --color-cat-text: var(--cat-text);
-  --color-cat-text-light: var(--cat-text-light);
-  --color-cat-text-surface: var(--cat-text-surface);
-  --color-cat-idphoto: var(--cat-idphoto);
-  --color-cat-idphoto-light: var(--cat-idphoto-light);
-  --color-cat-idphoto-surface: var(--cat-idphoto-surface);
 }
 
 /* ── Light mode variables ─────────────────────────────────── */
 
 :root {
   /* Timing & easing */
-  --duration-fast: 170ms;
-  --duration-normal: 280ms;
-  --duration-slow: 450ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
 
   /* Radius */
   --radius: 0.625rem;
@@ -246,21 +149,6 @@ svg {
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* Brand indigo scale (Logo #4F46E5, hue 264) */
-  --brand-50: oklch(0.97 0.01 264);
-  --brand-100: oklch(0.92 0.04 264);
-  --brand-200: oklch(0.84 0.08 264);
-  --brand-400: oklch(0.65 0.20 264);
-  --brand-500: oklch(0.53 0.24 264);
-  --brand-600: oklch(0.45 0.24 264);
-  --brand-700: oklch(0.38 0.22 264);
-  --brand-900: oklch(0.25 0.14 264);
-
-  /* Brand accent aliases */
-  --accent-brand: var(--brand-600);
-  --accent-brand-light: var(--brand-100);
-  --accent-brand-dark: var(--brand-400);
-
   /* Semantic status colors */
   --destructive-light: oklch(0.94 0.03 27);
   --success: oklch(0.60 0.17 145);
@@ -270,20 +158,6 @@ svg {
   --info: oklch(0.55 0.18 250);
   --info-light: oklch(0.94 0.03 250);
 
-  /* Tool category colors */
-  --cat-image: oklch(0.78 0.10 55);
-  --cat-image-light: oklch(0.95 0.025 55);
-  --cat-image-surface: oklch(0.98 0.012 55);
-  --cat-pdf: oklch(0.75 0.09 15);
-  --cat-pdf-light: oklch(0.95 0.022 15);
-  --cat-pdf-surface: oklch(0.98 0.010 15);
-  --cat-text: oklch(0.72 0.08 280);
-  --cat-text-light: oklch(0.95 0.020 280);
-  --cat-text-surface: oklch(0.98 0.010 280);
-  --cat-idphoto: oklch(0.75 0.08 160);
-  --cat-idphoto-light: oklch(0.95 0.020 160);
-  --cat-idphoto-surface: oklch(0.98 0.010 160);
-
   /* Safe area insets (fallback 0px for non-notched devices) */
   --sai-top: env(safe-area-inset-top, 0px);
   --sai-right: env(safe-area-inset-right, 0px);
@@ -291,96 +165,7 @@ svg {
   --sai-left: env(safe-area-inset-left, 0px);
 }
 
-/* ── Custom utility classes ───────────────────────────────── */
-
-.animate-rise-in {
-  opacity: 0;
-  animation: rise-in 0.55s var(--ease-out) both;
-}
-
-.tool-section-stagger > * {
-  opacity: 0;
-  animation: section-in 0.4s var(--ease-out) both;
-}
-
-.tool-section-stagger > *:nth-child(1) {
-  animation-delay: 0.06s;
-}
-
-.tool-section-stagger > *:nth-child(2) {
-  animation-delay: 0.12s;
-}
-
-.tool-section-stagger > *:nth-child(3) {
-  animation-delay: 0.18s;
-}
-
-.tool-section-stagger > *:nth-child(4) {
-  animation-delay: 0.24s;
-}
-
-.tool-section-stagger > *:nth-child(5) {
-  animation-delay: 0.3s;
-}
-
-.tool-section-stagger > *:nth-child(n + 6) {
-  animation-delay: 0.34s;
-}
-
-.shimmer {
-  position: relative;
-  overflow: hidden;
-}
-
-.shimmer::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(255 255 255 / 40%) 50%,
-    transparent 100%
-  );
-  animation: shimmer-sweep 1.5s var(--ease-in-out) infinite;
-}
-
-.dark .shimmer::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgb(255 255 255 / 8%) 50%,
-    transparent 100%
-  );
-}
-
-.success-check svg {
-  stroke-dasharray: 24;
-  stroke-dashoffset: 24;
-  animation: check-draw 0.4s var(--ease-out) 0.15s both;
-}
-
-/* Hover-lift: only on devices with hover support (prevents sticky-hover on touch) */
-@media (hover: hover) and (pointer: fine) {
-  .hover-lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
-  .hover-lift-sm:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
-  }
-}
-
-.hover-lift,
-.hover-lift-sm {
-  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
-}
-
-.hover-lift:active,
-.hover-lift-sm:active {
-  transform: scale(0.98);
-}
+/* ── Utility classes ──────────────────────────────────────── */
 
 /* Hide scrollbar but keep scroll behavior */
 .no-scrollbar::-webkit-scrollbar {
@@ -442,11 +227,6 @@ svg {
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  /* Brand accent - dark mode override */
-  --accent-brand: var(--brand-400);
-  --accent-brand-light: var(--brand-900);
-  --accent-brand-dark: var(--brand-200);
-
   /* Semantic status - dark */
   --destructive-light: oklch(0.25 0.04 27);
   --success: oklch(0.70 0.15 145);
@@ -455,14 +235,4 @@ svg {
   --warning-light: oklch(0.25 0.03 85);
   --info: oklch(0.65 0.16 250);
   --info-light: oklch(0.25 0.03 250);
-
-  /* Tool category colors - dark (basic functional) */
-  --cat-image-light: oklch(0.25 0.025 55);
-  --cat-image-surface: oklch(0.20 0.012 55);
-  --cat-pdf-light: oklch(0.25 0.025 15);
-  --cat-pdf-surface: oklch(0.20 0.012 15);
-  --cat-text-light: oklch(0.25 0.025 280);
-  --cat-text-surface: oklch(0.20 0.012 280);
-  --cat-idphoto-light: oklch(0.25 0.025 160);
-  --cat-idphoto-surface: oklch(0.20 0.012 160);
 }

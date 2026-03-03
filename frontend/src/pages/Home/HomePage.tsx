@@ -80,17 +80,13 @@ export function HomePage() {
 
       {/* Tool category cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {TOOL_CATEGORIES.map((item, i) => (
+        {TOOL_CATEGORIES.map((item) => (
           <Link
             key={item.titleKey}
             to={item.to}
             className="group block h-full"
-            style={{ animationDelay: `${(i + 1) * 80}ms` }}
           >
-            <Card
-              className="animate-card-in h-full hover-lift"
-              style={{ animationDelay: `${(i + 1) * 80}ms` }}
-            >
+            <Card className="h-full transition-colors hover:bg-muted/50">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">{t(item.titleKey)}</CardTitle>
               </CardHeader>

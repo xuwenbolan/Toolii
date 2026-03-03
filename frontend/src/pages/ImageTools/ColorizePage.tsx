@@ -57,7 +57,7 @@ export function ColorizePage() {
     <>
       <SEOHead title={t('colorize.seoTitle')} description={t('colorize.seoDescription')} keywords={t('colorize.seoKeywords')} canonicalPath="/image-tools/colorize" jsonLd={[buildToolJsonLd({ name: t('colorize.seoTitle'), description: t('colorize.seoDescription'), url: '/image-tools/colorize' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('colorize.title'), path: '/image-tools/colorize' }])]} />
       <ToolPageShell title={t('colorize.title')} description={t('colorize.description')} backTo="/image-tools">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
             multiple={false}

@@ -60,7 +60,7 @@ export function UpscalePage() {
     <>
       <SEOHead title={t('upscale.seoTitle')} description={t('upscale.seoDescription')} keywords={t('upscale.seoKeywords')} canonicalPath="/image-tools/upscale" jsonLd={[buildToolJsonLd({ name: t('upscale.seoTitle'), description: t('upscale.seoDescription'), url: '/image-tools/upscale' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('upscale.title'), path: '/image-tools/upscale' }])]} />
       <ToolPageShell title={t('upscale.title')} description={t('upscale.description')} backTo="/image-tools">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <FileDropzone
             accept="image/*"
             onFiles={(files) => {

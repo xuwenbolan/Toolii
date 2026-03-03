@@ -310,7 +310,7 @@ export function SegmentPage() {
         jsonLd={[buildToolJsonLd({ name: t('segment.seoTitle'), description: t('segment.seoDescription'), url: '/image-tools/segment' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('segment.title'), path: '/image-tools/segment' }])]}
       />
       <ToolPageShell title={t('segment.title')} description={t('segment.description')} backTo="/image-tools" layout="workspace" width="wide">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
             multiple={false}

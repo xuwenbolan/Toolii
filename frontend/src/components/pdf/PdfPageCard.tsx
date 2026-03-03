@@ -42,7 +42,7 @@ export function PdfPageCard({
       role="button"
       tabIndex={0}
       className={cn(
-        'group relative cursor-pointer select-none rounded-lg border-2 bg-white duration-150 hover-lift-sm',
+        'group relative cursor-pointer select-none rounded-lg border-2 bg-white duration-150 hover:bg-muted/30',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         selected
           ? 'border-primary shadow-md shadow-primary/10 ring-1 ring-primary/30'

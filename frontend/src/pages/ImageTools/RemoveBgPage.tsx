@@ -67,7 +67,7 @@ export function RemoveBgPage() {
     <>
       <SEOHead title={t('removeBg.seoTitle')} description={t('removeBg.seoDescription')} keywords={t('removeBg.seoKeywords')} canonicalPath="/image-tools/remove-bg" jsonLd={[buildToolJsonLd({ name: t('removeBg.seoTitle'), description: t('removeBg.seoDescription'), url: '/image-tools/remove-bg' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('removeBg.title'), path: '/image-tools/remove-bg' }])]} />
       <ToolPageShell title={t('removeBg.title')} description={t('removeBg.description')} backTo="/image-tools" width="wide" layout="split">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
             multiple={false}

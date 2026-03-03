@@ -32,7 +32,7 @@ function FeatureCard({
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
       className={cn(
-        'cursor-pointer rounded-xl border bg-card p-3.5 space-y-2 h-full hover-lift-sm',
+        'cursor-pointer rounded-xl border bg-card p-3.5 space-y-2 h-full transition-colors hover:bg-muted/50',
         active && 'ring-2 ring-primary border-primary/50 shadow-md',
       )}
     >

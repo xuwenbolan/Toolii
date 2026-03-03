@@ -227,7 +227,7 @@ export function OcrPage() {
         jsonLd={[buildToolJsonLd({ name: t('ocr.seoTitle'), description: t('ocr.seoDescription'), url: '/image-tools/ocr' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('ocr.title'), path: '/image-tools/ocr' }])]}
       />
       <ToolPageShell title={t('ocr.title')} description={t('ocr.description')} backTo="/image-tools">
-        <div className="space-y-5 tool-section-stagger">
+        <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [], 'application/pdf': ['.pdf'] }}
             multiple={false}

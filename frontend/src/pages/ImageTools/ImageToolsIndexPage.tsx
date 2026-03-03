@@ -36,7 +36,7 @@ export function ImageToolsIndexPage() {
     <>
       <SEOHead title={t('seoTitle')} description={t('seoDescription')} keywords={t('seoKeywords')} canonicalPath="/image-tools" jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }])} />
       <div className="space-y-5">
-        <div className="animate-rise-in flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
             <Link to="/" className="inline-flex items-center gap-1.5">
               <ArrowLeft className="h-4 w-4" />
@@ -53,7 +53,7 @@ export function ImageToolsIndexPage() {
               <Link
                 key={item.key}
                 to={item.to}
-                className="block animate-rise-in"
+                className="block"
                 style={{ animationDelay: `${90 + index * 45}ms` }}
               >
                 <Card className="h-full transition hover:bg-accent/40">
@@ -76,7 +76,7 @@ export function ImageToolsIndexPage() {
           })}
         </div>
 
-        <div className="animate-rise-in space-y-1" style={{ animationDelay: '220ms' }}>
+        <div className="space-y-1" style={{ animationDelay: '220ms' }}>
           <h2 className="text-lg font-semibold tracking-tight">{t('convert.title')}</h2>
         </div>
 
@@ -85,7 +85,7 @@ export function ImageToolsIndexPage() {
             <Link
               key={pair.slug}
               to={`/image-tools/${pair.slug}`}
-              className="block animate-rise-in"
+              className="block"
               style={{ animationDelay: `${280 + index * 35}ms` }}
             >
               <Card className="h-full transition hover:bg-accent/40">
