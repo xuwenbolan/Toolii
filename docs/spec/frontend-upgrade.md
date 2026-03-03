@@ -1,6 +1,6 @@
 # Toolii 前端升级方案（基于 frontend-design-spec v0.4）
 
-更新时间：2026-02-27
+Status: draft | Updated: 2026-02-27
 适用范围：`frontend/` React + Tailwind + shadcn 前端
 依据文档：`docs/frontend-design-spec.md`
 
