@@ -26,3 +26,10 @@
 - **CAN** execute: `docker logs`, `docker compose logs`, `docker ps`, `docker inspect`
 - **DO NOT** debug or run programs inside Docker containers - always use local environment for development and testing
 - Docker is for production deployment only
+
+**Documentation:**
+- Specs live in `docs/spec/` — each file has `Status: draft|final|outdated | Updated: YYYY-MM-DD` after the title
+- Reference data lives in `docs/references/`
+- Plans live in `.claude/plans/`, move to `.claude/plans/archive/` when completed
+- `docs/spec/README.md` is the index — keep it in sync when adding/removing spec files
+- See `docs/CONTRIBUTING.md` for full documentation management rules
