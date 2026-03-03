@@ -1,9 +1,21 @@
 # Toolii Cortex GPU inference service
-FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
+#
+# Uses base CUDA image + only the CUDA libraries onnxruntime-gpu needs:
+#   libcublas, libcudnn9, libcufft, libcurand
+# Skips NCCL (~700MB), NPP (~500MB), cuSPARSE (~200MB) that runtime includes.
+FROM nvidia/cuda:12.8.1-base-ubuntu22.04
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive
+
+# Install CUDA libraries required by onnxruntime CUDA EP
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcublas-12-8 \
+    libcufft-12-8 \
+    libcurand-12-8 \
+    libcudnn9-cuda-12 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.13, runtime libs, and curl (for healthcheck)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -27,8 +39,9 @@ COPY cortex/pyproject.toml cortex/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev --extra ocr --no-install-project
 
-# Copy application code
-COPY cortex/ ./
+# Copy application code only (no .venv — excluded via .dockerignore)
+COPY cortex/app/ ./app/
+COPY cortex/scripts/ ./scripts/
 
 # Register the project itself (deps already installed, near-instant)
 RUN --mount=type=cache,target=/root/.cache/uv \
