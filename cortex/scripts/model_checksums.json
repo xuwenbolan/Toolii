@@ -1,5 +1,7 @@
 {
   "birefnet/birefnet-general.onnx": "58f621f00f5d756097615970a88a791584600dcf7c45b18a0a6267535a1ebd3c",
+  "birefnet/birefnet-lite.onnx": "5600024376f572a557870a5eb0afb1e5961636bef4e1e22132025467d0f03333",
+  "birefnet/birefnet-matting.onnx": "6065d27c615ea27308f5b88598dd8db116eb07436c7a323ca40d13b2866c309e",
   "birefnet/birefnet-portrait.onnx": "1ba1c8ff5a7bbfadc8d8d13fb11d7be793f91f23d9d466549e37a854f6668f99",
   "ddcolor/ddcolor-artistic.onnx": "adad4b897990d627e139e858e8a6552c1f99e39e49e811d21e8f591803c877f1",
   "ddcolor/ddcolor-modelscope.onnx": "dd6156f056d0690891ef35f9ee87176d4d976ab19bbd36e57d18e841e064d797",
@@ -14,6 +16,7 @@
   "rapidocr/rapidocr-cls.onnx": "70581b300b83babd9e0dd1d7d74c5b006869e8796da277a70c2e405bf9d77c82",
   "rapidocr/rapidocr-det.onnx": "d2a7720d45a54257208b1e13e36a8479894cb74155a5efe29462512d42f49da9",
   "rapidocr/rapidocr-rec.onnx": "48fc40f24f6d2a207a2b1091d3437eb3cc3eb6b676dc3ef9c37384005483683b",
+  "realesrgan/realesrgan-anime.onnx": "3d2dc0af5e2cdf3a31655c4c673df9ad74f14775d74237bd0dc68fc885bd6841",
   "realesrgan/realesrgan-x4plus.onnx": "afa7fa42eed0315a3d7b2a54e79e4e44a672d3c0889c2828c4f84c9ab91edb0b",
   "realesrgan/realesrgan-x4v3.onnx": "09b757accd747d7e423c1d352b3e8f23e77cc5742d04bae958d4eb8082b76fa4"
 }

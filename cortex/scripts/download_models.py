@@ -88,18 +88,24 @@ OPTIONAL: dict[str, Model] = {
     "birefnet/birefnet-portrait.onnx": Model(
         "https://huggingface.co/onnx-community/BiRefNet-portrait-ONNX/resolve/main/onnx/model.onnx",
     ),
-    "birefnet/birefnet-lite.onnx": Model(""),
-    "birefnet/birefnet-matting.onnx": Model(""),
-    "realesrgan/realesrgan-anime.onnx": Model(""),
+    "birefnet/birefnet-lite.onnx": Model(
+        "https://huggingface.co/onnx-community/BiRefNet_lite-ONNX/resolve/main/onnx/model.onnx",
+    ),
+    "birefnet/birefnet-matting.onnx": Model(
+        "https://github.com/ZhengPeng7/BiRefNet/releases/download/v1/BiRefNet-matting-epoch_100.onnx",
+    ),
+    "realesrgan/realesrgan-anime.onnx": Model(
+        "https://huggingface.co/T8RIN/ddcolor-onnx/resolve/main/upscalers/RealESR-AnimeVideo-x4v3.onnx",
+    ),
     "nafnet/nafnet-sidd-w32.onnx": Model(""),
     "nafnet/nafnet-gopro-w64.onnx": Model(
         "https://huggingface.co/deepghs/image_restoration/resolve/main/NAFNet-GoPro-width64.onnx",
     ),
-    "nafnet/nafnet-gopro-w32.onnx": Model(""),
+    "nafnet/nafnet-gopro-w32.onnx": Model(""),  # no ONNX available, needs PyTorch conversion
     "ddcolor/ddcolor-modelscope.onnx": Model(
         "https://huggingface.co/facefusion/models-3.0.0/resolve/main/ddcolor.onnx",
     ),
-    "ddcolor/ddcolor-tiny.onnx": Model(""),
+    "ddcolor/ddcolor-tiny.onnx": Model(""),  # no ONNX available, needs PyTorch conversion
 }
 
 
