@@ -13,6 +13,9 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 const HomePage = lazy(() => import('@/pages/Home/HomePage').then((m) => ({ default: m.HomePage })))
 const IdPhotoPage = lazy(() => import('@/pages/IdPhoto/IdPhotoPage').then((m) => ({ default: m.IdPhotoPage })))
 const FaceMapPage = lazy(() => import('@/pages/FaceMap/FaceMapPage').then((m) => ({ default: m.FaceMapPage })))
+const FaceMapSharePage = lazy(() => import('@/pages/FaceMap/FaceMapSharePage').then((m) => ({ default: m.FaceMapSharePage })))
+const FaceSimilarityPage = lazy(() => import('@/pages/FaceSimilarity/FaceSimilarityPage').then((m) => ({ default: m.FaceSimilarityPage })))
+const FaceSimilaritySharePage = lazy(() => import('@/pages/FaceSimilarity/FaceSimilaritySharePage').then((m) => ({ default: m.FaceSimilaritySharePage })))
 const PrivacyPolicyPage = lazy(() => import('@/pages/Legal/PrivacyPolicyPage').then((m) => ({ default: m.PrivacyPolicyPage })))
 const TermsPage = lazy(() => import('@/pages/Legal/TermsPage').then((m) => ({ default: m.TermsPage })))
 const ShareClaimPage = lazy(() => import('@/pages/Credits/ShareClaimPage').then((m) => ({ default: m.ShareClaimPage })))
@@ -61,6 +64,7 @@ const AdminUserDetailPage = lazy(() => import('@/pages/Admin/AdminUserDetailPage
 const AdminCardsPage = lazy(() => import('@/pages/Admin/AdminCardsPage').then((m) => ({ default: m.AdminCardsPage })))
 const AdminOperationsPage = lazy(() => import('@/pages/Admin/AdminOperationsPage').then((m) => ({ default: m.AdminOperationsPage })))
 const AdminFeedbackPage = lazy(() => import('@/pages/Admin/AdminFeedbackPage').then((m) => ({ default: m.AdminFeedbackPage })))
+const AdminToolsPage = lazy(() => import('@/pages/Admin/AdminToolsPage').then((m) => ({ default: m.AdminToolsPage })))
 
 export const router = createBrowserRouter([
   {
@@ -72,6 +76,9 @@ export const router = createBrowserRouter([
       { path: 'id-photo', element: <IdPhotoPage /> },
       { path: 'face-reading', element: <Navigate to="/facemap" replace /> },
       { path: 'facemap', element: <FaceMapPage /> },
+      { path: 'face-similarity', element: <FaceSimilarityPage /> },
+      { path: 'face-similarity/share/:token', element: <FaceSimilaritySharePage /> },
+      { path: 'facemap/share/:token', element: <FaceMapSharePage /> },
       { path: 'legal/privacy', element: <PrivacyPolicyPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'share/:token', element: <ShareClaimPage /> },
@@ -158,6 +165,7 @@ export const router = createBrowserRouter([
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'users/:id', element: <AdminUserDetailPage /> },
           { path: 'cards', element: <AdminCardsPage /> },
+          { path: 'tools', element: <AdminToolsPage /> },
           { path: 'operations', element: <AdminOperationsPage /> },
           { path: 'feedback', element: <AdminFeedbackPage /> },
         ],

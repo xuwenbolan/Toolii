@@ -103,9 +103,7 @@ export function RemoveBgPage() {
                     onPointerDown={() => setShowOriginalPreview(true)}
                     onPointerUp={() => setShowOriginalPreview(false)}
                     onPointerLeave={() => setShowOriginalPreview(false)}
-                    onTouchStart={() => setShowOriginalPreview(true)}
-                    onTouchEnd={() => setShowOriginalPreview(false)}
-                    onTouchCancel={() => setShowOriginalPreview(false)}
+                    onPointerCancel={() => setShowOriginalPreview(false)}
                   >
                     {t('removeBg.showOriginalHold')}
                   </Button>

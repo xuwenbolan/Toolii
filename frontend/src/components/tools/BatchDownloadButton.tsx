@@ -1,8 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-import { Button } from '@/components/ui/button'
 import { DownloadButton } from '@/components/tools/DownloadButton'
-import { useFileDownload } from '@/hooks/useFileDownload'
 import { formatBytes } from '@/lib/fileValidation'
 import type { FileResult } from '@/services/imageApi'
 
@@ -21,7 +19,6 @@ type Props = {
 }
 
 export function BatchDownloadButton({ batch }: Props) {
-  const download = useFileDownload()
   const { t } = useTranslation('common')
 
   return (
@@ -44,15 +41,13 @@ export function BatchDownloadButton({ batch }: Props) {
                   {item.input_filename} · {formatBytes(item.output.size)}
                 </p>
               </div>
-              <Button
-                type="button"
+              <DownloadButton
+                url={item.output.download_url}
+                label={t('actions.download')}
                 size="sm"
                 variant="outline"
                 className="mt-2 w-full sm:mt-3 sm:w-auto"
-                onClick={() => download(item.output.download_url)}
-              >
-                {t('actions.download')}
-              </Button>
+              />
             </div>
           ))}
         </div>

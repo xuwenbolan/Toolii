@@ -47,7 +47,9 @@
     "fileTransfer": "File Transfer",
     "fileTransferDesc": "Upload files and share via short link. Free for logged-in users.",
     "faceMap": "FaceMap",
-    "faceMapDesc": "AI face aesthetics consultant with personalized scoring and style recommendations."
+    "faceMapDesc": "AI face aesthetics consultant with personalized scoring and style recommendations.",
+    "faceSimilarity": "Who's Your Dad?",
+    "faceSimilarityDesc": "Upload two faces, AI analyzes facial similarity! Free, no login needed."
   },
   "notFound": {
     "title": "Page Not Found",
@@ -159,7 +161,14 @@
     "CARD_CODE_EXPIRED": "Card code expired",
     "CARD_REDEEM_FAILED": "Card redemption failed",
     "NO_FACE_DETECTED": "No face detected. Please upload a clear, front-facing photo.",
-    "FACE_QUALITY_POOR": "Photo does not meet analysis requirements. Please upload a close-up, front-facing, clear photo.",
+    "FACE_MULTI_DETECTED": "Multiple faces detected. Please upload a photo with only one person.",
+    "FACE_TOO_SMALL": "Face is too small in the frame. Please take a closer photo.",
+    "FACE_TILTED": "Face is tilted too much. Please hold the camera level and face forward.",
+    "FACE_LOW_RESOLUTION": "Face resolution is too low. Please move closer or use a higher-resolution photo.",
+    "FACE_SIDE_POSE": "Face is turned too far to the side. Please face the camera directly.",
+    "FACE_EYES_CLOSED": "Eyes appear closed. Please keep your eyes open for the photo.",
+    "FACE_EXTREME_EXPRESSION": "Extreme facial expression detected. Please maintain a natural, relaxed expression.",
+    "FACE_BLURRY": "Photo is too blurry. Please use a clearer, sharper photo.",
     "MODEL_UNAVAILABLE": "Face analysis model temporarily unavailable. Please try again later.",
     "IMAGE_PROCESS_FAILED": "Image processing failed",
     "INVALID_QUALITY": "Quality must be between 1 and 100",
@@ -214,7 +223,10 @@
     "IP_BANNED": "Temporarily banned due to abuse",
     "RATE_LIMITED": "Too many requests, please try again later",
     "HTTP_ERROR": "Request failed",
-    "INTERNAL_SERVER_ERROR": "Internal server error"
+    "INTERNAL_SERVER_ERROR": "Internal server error",
+    "TOOL_DISABLED": "This tool is currently unavailable",
+    "TOOL_ACCESS_DENIED": "You do not have permission to use this tool",
+    "TOOL_DAILY_LIMIT": "Daily usage limit reached, please try again tomorrow"
   },
   "apiMessages": {
     "LOGGED_OUT": "Logged out",

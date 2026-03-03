@@ -6,7 +6,8 @@
     "users": "Users",
     "cards": "Card Codes",
     "operations": "Operations",
-    "feedback": "Feedback"
+    "feedback": "Feedback",
+    "tools": "Tools"
   },
   "dashboard": {
     "totalUsers": "Total Users",
@@ -170,6 +171,29 @@
       "suggestion": "Suggestion",
       "other": "Other"
     }
+  },
+  "tools": {
+    "title": "Tool Management",
+    "toolName": "Tool",
+    "category": "Category",
+    "enabled": "Enabled",
+    "creditCost": "Credits",
+    "accessLevel": "Access",
+    "dailyLimitAnon": "Anon Limit",
+    "dailyLimitAuth": "Auth Limit",
+    "displayOrder": "Order",
+    "editMeta": "Edit Info",
+    "displayName": "Display Name",
+    "description": "Description",
+    "icon": "Icon",
+    "unlimited": "Unlimited",
+    "accessLevels": {
+      "public": "Public",
+      "auth": "Login Required",
+      "verified": "Verified",
+      "admin": "Admin Only"
+    },
+    "updateSuccess": "Tool updated"
   },
   "common": {
     "loading": "Loading...",

@@ -95,13 +95,30 @@
     "features": ["发型推荐", "眉型建议", "修容指南", "眼镜推荐", "深度洞察"]
   },
   "share": {
-    "button": "分享报告",
-    "generating": "生成中...",
+    "button": "分享",
+    "creating": "创建分享链接中...",
+    "createFailed": "创建分享链接失败",
     "saved": "已保存到相册",
     "failed": "生成分享卡片失败",
     "scoreLabel": "评分",
     "insightLabel": "面部美学洞察",
-    "watermark": "由 Toolii FaceMap 生成"
+    "watermark": "由 Toolii FaceMap 生成",
+    "dialogTitle": "分享 FaceMap 结果",
+    "copyLink": "复制链接",
+    "copied": "链接已复制!",
+    "downloadCard": "下载图片卡片",
+    "expiryNotice": "链接有效期 7 天"
+  },
+  "sharePage": {
+    "title": "FaceMap 分析结果",
+    "description": "查看分享的 FaceMap 面部分析结果",
+    "expired": "此分享链接已过期",
+    "notFound": "未找到分享链接",
+    "sharedProfile": "基础分析分享",
+    "sharedReport": "完整报告分享",
+    "cta": "来试试 FaceMap",
+    "ctaDescription": "上传你的照片，免费获取 AI 面部美学分析",
+    "expiresAt": "有效期至 {{date}}"
   },
   "physiognomy": {
     "templateBased": "基于模板分析",

@@ -47,7 +47,9 @@
     "fileTransfer": "文件快传",
     "fileTransferDesc": "上传文件生成短链分享，登录用户免费使用。",
     "faceMap": "FaceMap",
-    "faceMapDesc": "AI 面部美学顾问，个性化美学评分与风格推荐。"
+    "faceMapDesc": "AI 面部美学顾问，个性化美学评分与风格推荐。",
+    "faceSimilarity": "认贼做父",
+    "faceSimilarityDesc": "上传两张脸，AI 分析五官相似度！完全免费，无需登录。"
   },
   "notFound": {
     "title": "页面不存在",
@@ -159,7 +161,14 @@
     "CARD_CODE_EXPIRED": "卡密已过期",
     "CARD_REDEEM_FAILED": "卡密兑换失败",
     "NO_FACE_DETECTED": "未检测到人脸，请上传正面清晰照片",
-    "FACE_QUALITY_POOR": "照片不符合分析要求，请上传正面、清晰、脸部占比较大的近照",
+    "FACE_MULTI_DETECTED": "检测到多张人脸，请上传仅含一人的照片",
+    "FACE_TOO_SMALL": "脸部在画面中太小，请拍摄更近的照片",
+    "FACE_TILTED": "面部倾斜过大，请保持相机水平并正对镜头",
+    "FACE_LOW_RESOLUTION": "面部分辨率太低，请靠近拍摄或使用更高分辨率的照片",
+    "FACE_SIDE_POSE": "面部侧偏过大，请正对镜头",
+    "FACE_EYES_CLOSED": "检测到闭眼，请睁开眼睛拍照",
+    "FACE_EXTREME_EXPRESSION": "检测到夸张表情，请保持自然放松的表情",
+    "FACE_BLURRY": "照片太模糊，请使用更清晰的照片",
     "MODEL_UNAVAILABLE": "面部分析模型暂时不可用，请稍后重试",
     "IMAGE_PROCESS_FAILED": "图片处理失败",
     "INVALID_QUALITY": "质量值需在 1 到 100 之间",
@@ -214,7 +223,10 @@
     "IP_BANNED": "因滥用被临时封禁",
     "RATE_LIMITED": "请求过于频繁，请稍后再试",
     "HTTP_ERROR": "请求失败",
-    "INTERNAL_SERVER_ERROR": "服务器内部错误"
+    "INTERNAL_SERVER_ERROR": "服务器内部错误",
+    "TOOL_DISABLED": "该工具暂不可用",
+    "TOOL_ACCESS_DENIED": "暂无权限使用此工具",
+    "TOOL_DAILY_LIMIT": "今日使用次数已达上限，请明天再试"
   },
   "apiMessages": {
     "LOGGED_OUT": "已退出登录",

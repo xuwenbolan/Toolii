@@ -71,6 +71,7 @@ export function RegisterForm() {
         <Input
           id="name"
           autoComplete="name"
+          enterKeyHint="next"
           {...register('name')}
         />
       </div>
@@ -80,6 +81,7 @@ export function RegisterForm() {
           id="email"
           inputMode="email"
           autoComplete="email"
+          enterKeyHint="next"
           placeholder="name@example.com"
           {...register('email')}
         />
@@ -92,6 +94,7 @@ export function RegisterForm() {
         <PasswordInput
           id="password"
           autoComplete="new-password"
+          enterKeyHint="next"
           {...register('password')}
         />
         {errors.password ? (
@@ -105,6 +108,7 @@ export function RegisterForm() {
         <PasswordInput
           id="confirmPassword"
           autoComplete="new-password"
+          enterKeyHint="go"
           {...register('confirmPassword')}
         />
         {errors.confirmPassword ? (

@@ -360,6 +360,28 @@ svg {
   animation: check-draw 0.4s var(--ease-out) 0.15s both;
 }
 
+/* Hover-lift: only on devices with hover support (prevents sticky-hover on touch) */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .hover-lift-sm:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.hover-lift,
+.hover-lift-sm {
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+
+.hover-lift:active,
+.hover-lift-sm:active {
+  transform: scale(0.98);
+}
+
 /* Hide scrollbar but keep scroll behavior */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

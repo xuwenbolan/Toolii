@@ -9,6 +9,7 @@ import { Header } from '@/components/layout/Header'
 import { useAuth } from '@/hooks/useAuth'
 import { initAnalytics, trackPageView } from '@/lib/analytics'
 import { useConsentStore } from '@/stores/consentStore'
+import { useToolStore } from '@/stores/toolStore'
 
 const gaMeasurementId = import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined
 
@@ -26,9 +27,12 @@ export function RootLayout() {
     location.pathname.startsWith('/pdf-tools/') ||
     location.pathname === '/text-tools/word-counter'
 
+  const fetchToolConfigs = useToolStore((s) => s.fetchTools)
+
   useEffect(() => {
     bootstrap().finally(() => setIsBootstrapping(false))
-  }, [bootstrap])
+    fetchToolConfigs()
+  }, [bootstrap, fetchToolConfigs])
 
   useEffect(() => {
     if (cookieConsent === 'rejected') return

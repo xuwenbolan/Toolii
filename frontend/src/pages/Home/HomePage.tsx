@@ -36,6 +36,11 @@ const TOOL_CATEGORIES = [
     descKey: 'home.faceMapDesc',
     to: '/facemap',
   },
+  {
+    titleKey: 'home.faceSimilarity',
+    descKey: 'home.faceSimilarityDesc',
+    to: '/face-similarity',
+  },
 ]
 
 const TRUST_KEYS = ['home.trustLocal', 'home.trustFree', 'home.trustNoSignup'] as const
@@ -83,7 +88,7 @@ export function HomePage() {
             style={{ animationDelay: `${(i + 1) * 80}ms` }}
           >
             <Card
-              className="animate-card-in h-full transition-all duration-200 ease-out group-hover:-translate-y-1 group-hover:shadow-md"
+              className="animate-card-in h-full hover-lift"
               style={{ animationDelay: `${(i + 1) * 80}ms` }}
             >
               <CardHeader className="pb-2">

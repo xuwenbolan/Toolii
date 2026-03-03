@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/admin', labelKey: 'admin:nav.dashboard', end: true },
   { to: '/admin/users', labelKey: 'admin:nav.users' },
   { to: '/admin/cards', labelKey: 'admin:nav.cards' },
+  { to: '/admin/tools', labelKey: 'admin:nav.tools' },
   { to: '/admin/operations', labelKey: 'admin:nav.operations' },
   { to: '/admin/feedback', labelKey: 'admin:nav.feedback' },
 ]
@@ -61,7 +62,7 @@ export function AdminLayout() {
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3 [&>a]:motion-safe:animate-[section-in_0.25s_var(--ease-out)_both] [&>a:nth-child(1)]:motion-safe:[animation-delay:50ms] [&>a:nth-child(2)]:motion-safe:[animation-delay:100ms] [&>a:nth-child(3)]:motion-safe:[animation-delay:150ms] [&>a:nth-child(4)]:motion-safe:[animation-delay:200ms] [&>a:nth-child(5)]:motion-safe:[animation-delay:250ms]">
+        <nav className="flex-1 space-y-1 p-3 [&>a]:motion-safe:animate-[section-in_0.25s_var(--ease-out)_both] [&>a:nth-child(1)]:motion-safe:[animation-delay:50ms] [&>a:nth-child(2)]:motion-safe:[animation-delay:100ms] [&>a:nth-child(3)]:motion-safe:[animation-delay:150ms] [&>a:nth-child(4)]:motion-safe:[animation-delay:200ms] [&>a:nth-child(5)]:motion-safe:[animation-delay:250ms] [&>a:nth-child(6)]:motion-safe:[animation-delay:300ms]">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}

@@ -71,12 +71,16 @@ export function deriveToolErrorMeta(error: unknown, fallbackMessage: string): To
     return { kind: 'auth_required', message, status, code, recoverable: false }
   }
 
-  if (code === 'NO_FACE_DETECTED') {
+  if (code === 'NO_FACE_DETECTED' || code === 'NO_FACE_IN_IMAGE1' || code === 'NO_FACE_IN_IMAGE2') {
     return { kind: 'invalid_input', message, status, code, recoverable: true }
   }
 
   if (code === 'MODEL_UNAVAILABLE') {
     return { kind: 'processing_failed', message, status, code, recoverable: true }
+  }
+
+  if (code?.startsWith('FACE_')) {
+    return { kind: 'invalid_input', message, status, code, recoverable: true }
   }
 
   if (

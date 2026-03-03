@@ -34,6 +34,10 @@ function normalizeAdjust(adjust: PhotoAdjustControl): PhotoAdjustControl {
   }
 }
 
+function pointerDistance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
 export function PhotoPreview({
   src,
   title,
@@ -53,6 +57,10 @@ export function PhotoPreview({
     latest: PhotoAdjustControl
   } | null>(null)
 
+  // Multi-touch pinch-to-zoom tracking
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const pinchRef = useRef<{ initialDist: number; initialScale: number } | null>(null)
+
   const topLine = guide ? clamp(guide.topMarginRatio * 100, 6, 82) : null
   const chinLine = guide ? clamp((guide.topMarginRatio + guide.faceHeightRatio) * 100, 16, 92) : null
   const interactionEnabled = Boolean(adjust && onAdjustChange)
@@ -67,18 +75,53 @@ export function PhotoPreview({
     if (!interactionEnabled || !adjust) return
     const target = event.currentTarget
     target.setPointerCapture(event.pointerId)
-    dragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      startOffsetX: adjust.offsetX,
-      startOffsetY: adjust.offsetY,
-      latest: adjust,
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    // Two fingers down: start pinch, cancel any drag
+    if (pointersRef.current.size === 2) {
+      dragRef.current = null
+      setDragging(false)
+      const pts = [...pointersRef.current.values()]
+      pinchRef.current = {
+        initialDist: pointerDistance(pts[0], pts[1]),
+        initialScale: adjust.scale,
+      }
+      return
     }
-    setDragging(true)
+
+    // Single finger: start drag
+    if (pointersRef.current.size === 1) {
+      dragRef.current = {
+        startX: event.clientX,
+        startY: event.clientY,
+        startOffsetX: adjust.offsetX,
+        startOffsetY: adjust.offsetY,
+        latest: adjust,
+      }
+      setDragging(true)
+    }
   }, [adjust, interactionEnabled])
 
   const handlePointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (!interactionEnabled || !dragRef.current) return
+    if (!interactionEnabled || !adjust) return
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    // Pinch-to-zoom with two fingers
+    if (pinchRef.current && pointersRef.current.size === 2) {
+      const pts = [...pointersRef.current.values()]
+      const currentDist = pointerDistance(pts[0], pts[1])
+      const ratio = currentDist / pinchRef.current.initialDist
+      const next = normalizeAdjust({
+        offsetX: adjust.offsetX,
+        offsetY: adjust.offsetY,
+        scale: pinchRef.current.initialScale * ratio,
+      })
+      onAdjustChange?.(next)
+      return
+    }
+
+    // Single finger drag
+    if (!dragRef.current) return
     const rect = event.currentTarget.getBoundingClientRect()
     if (rect.width <= 0 || rect.height <= 0) return
 
@@ -87,19 +130,32 @@ export function PhotoPreview({
     const next = normalizeAdjust({
       offsetX: dragRef.current.startOffsetX + (dx / rect.width) * 0.9,
       offsetY: dragRef.current.startOffsetY + (dy / rect.height) * 0.9,
-      scale: adjust?.scale ?? 1,
+      scale: adjust.scale,
     })
     dragRef.current.latest = next
     onAdjustChange?.(next)
-  }, [adjust?.scale, interactionEnabled, onAdjustChange])
+  }, [adjust, interactionEnabled, onAdjustChange])
 
-  const handlePointerUp = useCallback(() => {
-    if (!interactionEnabled || !dragRef.current) return
+  const handlePointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (!interactionEnabled) return
+    pointersRef.current.delete(event.pointerId)
+
+    // End pinch
+    if (pinchRef.current) {
+      if (pointersRef.current.size < 2) {
+        pinchRef.current = null
+        if (adjust) onAdjustCommit?.(adjust)
+      }
+      return
+    }
+
+    // End drag
+    if (!dragRef.current) return
     setDragging(false)
     const latest = dragRef.current.latest
     dragRef.current = null
     onAdjustCommit?.(latest)
-  }, [interactionEnabled, onAdjustCommit])
+  }, [adjust, interactionEnabled, onAdjustCommit])
 
   const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
     if (!interactionEnabled || !adjust) return
@@ -131,6 +187,7 @@ export function PhotoPreview({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onLostPointerCapture={handlePointerUp}
           onWheel={handleWheel}
           style={interactionEnabled ? { touchAction: 'none' } : undefined}
         >

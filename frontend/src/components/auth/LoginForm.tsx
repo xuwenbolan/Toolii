@@ -56,6 +56,7 @@ export function LoginForm() {
           id="email"
           inputMode="email"
           autoComplete="email"
+          enterKeyHint="next"
           placeholder="name@example.com"
           {...register('email')}
         />
@@ -76,6 +77,7 @@ export function LoginForm() {
         <PasswordInput
           id="password"
           autoComplete="current-password"
+          enterKeyHint="go"
           {...register('password')}
         />
         {errors.password ? (

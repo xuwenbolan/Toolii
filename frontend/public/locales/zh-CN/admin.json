@@ -6,7 +6,8 @@
     "users": "用户管理",
     "cards": "卡密管理",
     "operations": "运营数据",
-    "feedback": "用户反馈"
+    "feedback": "用户反馈",
+    "tools": "工具管理"
   },
   "dashboard": {
     "totalUsers": "用户总数",
@@ -170,6 +171,29 @@
       "suggestion": "建议",
       "other": "其他"
     }
+  },
+  "tools": {
+    "title": "工具管理",
+    "toolName": "工具",
+    "category": "分类",
+    "enabled": "启用",
+    "creditCost": "积分消耗",
+    "accessLevel": "访问权限",
+    "dailyLimitAnon": "匿名限次",
+    "dailyLimitAuth": "登录限次",
+    "displayOrder": "排序",
+    "editMeta": "编辑信息",
+    "displayName": "显示名称",
+    "description": "描述",
+    "icon": "图标",
+    "unlimited": "不限",
+    "accessLevels": {
+      "public": "公开",
+      "auth": "需登录",
+      "verified": "需验证",
+      "admin": "仅管理员"
+    },
+    "updateSuccess": "工具已更新"
   },
   "common": {
     "loading": "加载中...",

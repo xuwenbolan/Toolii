@@ -42,12 +42,11 @@ export function PdfPageCard({
       role="button"
       tabIndex={0}
       className={cn(
-        'group relative cursor-pointer select-none rounded-lg border-2 bg-white transition-all duration-150',
-        'hover:shadow-md hover:-translate-y-0.5',
+        'group relative cursor-pointer select-none rounded-lg border-2 bg-white duration-150 hover-lift-sm',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         selected
           ? 'border-primary shadow-md shadow-primary/10 ring-1 ring-primary/30'
-          : 'border-transparent shadow-sm hover:border-border/60',
+          : 'border-transparent shadow-sm',
       )}
       onClick={handleCardClick}
       onKeyDown={(e) => {
@@ -65,7 +64,7 @@ export function PdfPageCard({
       {/* Selection circle: always visible on mobile, hover-visible on desktop */}
       <div
         className={cn(
-          'absolute left-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full transition-all',
+          'absolute left-1.5 top-1.5 z-10 flex h-7 w-7 sm:h-5 sm:w-5 items-center justify-center rounded-full transition-all',
           selected
             ? 'bg-primary text-[10px] font-bold text-primary-foreground shadow-sm'
             : 'border border-white/70 bg-black/15 sm:opacity-0 sm:group-hover:opacity-100',
@@ -121,7 +120,7 @@ export function PdfPageCard({
         <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
           {pageIndex + 1}
         </span>
-        <div className="flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex gap-0.5 sm:opacity-0 transition-opacity sm:group-hover:opacity-100">
           <button
             type="button"
             className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"

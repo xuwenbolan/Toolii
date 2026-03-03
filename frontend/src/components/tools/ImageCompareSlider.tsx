@@ -60,6 +60,7 @@ export function ImageCompareSlider({
       <div
         ref={frameRef}
         className="relative overflow-hidden rounded-xl border border-border/70 bg-muted/20 select-none"
+        style={{ touchAction: 'pan-y' }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -93,7 +94,7 @@ export function ImageCompareSlider({
           aria-hidden="true"
         >
           <div className="h-full w-0.5 -translate-x-1/2 bg-white/95 shadow-[0_0_0_1px_rgba(0,0,0,0.18)]" />
-          <div className="absolute left-1/2 top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background shadow-md transition-[box-shadow] duration-[var(--duration-fast)] hover:shadow-lg" />
+          <div className="absolute left-1/2 top-1/2 h-10 w-10 sm:h-7 sm:w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background shadow-md transition-[box-shadow] duration-[var(--duration-fast)] hover:shadow-lg" />
         </div>
 
         <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-end justify-between text-xs">

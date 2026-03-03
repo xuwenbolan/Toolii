@@ -11,6 +11,8 @@ type Props = {
   onChange: (regions: Region[]) => void
 }
 
+const isCoarsePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+
 export function RegionSelector({ imageUrl, regions, onChange }: Props) {
   const { t } = useTranslation('tools')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -66,14 +68,14 @@ export function RegionSelector({ imageUrl, regions, onChange }: Props) {
       ctx.textBaseline = 'middle'
       ctx.fillText(String(i + 1), rx + labelSize / 2, ry + labelSize / 2)
 
-      // Delete button (top-right corner)
-      const btnSize = 18
+      // Delete button (top-right corner, larger on touch devices)
+      const btnSize = isCoarsePointer ? 26 : 18
       const btnX = rx + rw - btnSize
       const btnY = ry
       ctx.fillStyle = 'rgba(239, 68, 68, 0.9)'
       ctx.fillRect(btnX, btnY, btnSize, btnSize)
       ctx.fillStyle = '#fff'
-      ctx.font = '13px sans-serif'
+      ctx.font = `${isCoarsePointer ? 18 : 13}px sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText('\u00d7', btnX + btnSize / 2, btnY + btnSize / 2)
@@ -123,17 +125,18 @@ export function RegionSelector({ imageUrl, regions, onChange }: Props) {
       const pos = getRelativePos(e.clientX, e.clientY)
       if (!pos) return
 
-      // Check if clicking a delete button
+      // Check if clicking a delete button (expanded hit area on touch)
       const canvas = canvasRef.current
       if (canvas) {
+        const btnSize = isCoarsePointer ? 26 : 18
+        const hitPad = isCoarsePointer ? 8 : 0
         for (let i = regions.length - 1; i >= 0; i--) {
           const r = regions[i]
-          const btnSize = 18
           const btnX = (r.x + r.w) * canvas.width - btnSize
           const btnY = r.y * canvas.height
           const cx = pos.x * canvas.width
           const cy = pos.y * canvas.height
-          if (cx >= btnX && cx <= btnX + btnSize && cy >= btnY && cy <= btnY + btnSize) {
+          if (cx >= btnX - hitPad && cx <= btnX + btnSize + hitPad && cy >= btnY - hitPad && cy <= btnY + btnSize + hitPad) {
             onChange(regions.filter((_, idx) => idx !== i))
             return
           }
