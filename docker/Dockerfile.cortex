@@ -1,0 +1,39 @@
+# Toolii Cortex GPU inference service
+FROM nvidia/cuda:12.8.1-runtime-ubuntu22.04
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Install Python 3.13, runtime libs, and curl (for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.13 python3.13-venv \
+    libgl1 libglib2.0-0 curl \
+    && apt-get purge -y software-properties-common \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:0.7 /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# Copy dependency files first for Docker layer caching
+COPY cortex/pyproject.toml cortex/uv.lock ./
+
+# Install dependencies with cache mount (survives across builds)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev --extra ocr --no-install-project
+
+# Copy application code
+COPY cortex/ ./
+
+# Register the project itself (deps already installed, near-instant)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --no-dev --extra ocr
+
+EXPOSE 9100
+
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9100"]
