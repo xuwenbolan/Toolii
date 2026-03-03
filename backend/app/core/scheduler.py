@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.core.database import SessionLocal
 from app.core.login_guard import login_guard
 from app.core.token_blacklist import token_blacklist
+from app.services.facemap_share_service import FaceMapShareService
 from app.services.file_service import FileService
 from app.services.photo_service import cleanup_expired_sessions
 from app.services.share_service import ShareService
@@ -80,6 +81,19 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         misfire_grace_time=60,
     )
 
+    async def _expire_facemap_shares() -> None:
+        async with SessionLocal() as db:
+            await FaceMapShareService(db).expire_shares()
+
+    scheduler.add_job(
+        _expire_facemap_shares,
+        "interval",
+        hours=1,
+        id="expire_facemap_shares",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
+
     async def _anonymize_deleted_accounts() -> None:
         import logging
         import uuid
@@ -129,6 +143,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
 
         from app.models.credit_transaction import CreditTransaction
         from app.models.email_verification import EmailVerificationToken
+        from app.models.facemap_share import FaceMapShare
         from app.models.file_transfer import FileTransfer
         from app.models.login_history import LoginHistory
         from app.models.password_reset import PasswordResetToken
@@ -169,6 +184,11 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
             await db.execute(
                 update(ProcessingHistory)
                 .where(ProcessingHistory.user_id.in_(user_ids))
+                .values(user_id=None)
+            )
+            await db.execute(
+                update(FaceMapShare)
+                .where(FaceMapShare.user_id.in_(user_ids))
                 .values(user_id=None)
             )
             # CASCADE on transfer_files handles child rows

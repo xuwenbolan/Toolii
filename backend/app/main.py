@@ -45,7 +45,8 @@ import logging
 
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
-from app.routers import auth, credits, download, face_reading, feedback, history, image, pdf, photo, share, transfer, users
+from app.processing.face_similarity import prewarm_facenet
+from app.routers import auth, credits, download, face_reading, feedback, history, image, pdf, photo, share, tools, transfer, users
 from app.routers.admin import router as admin_router
 from app.services import cortex_client, llm_client
 
@@ -79,7 +80,9 @@ def create_app() -> FastAPI:
     app.include_router(download.router)
     app.include_router(history.router)
     app.include_router(face_reading.router)
+    app.include_router(face_reading.share_page_router)
     app.include_router(feedback.router)
+    app.include_router(tools.router)
     app.include_router(transfer.router)
     app.include_router(admin_router)
 
@@ -93,6 +96,7 @@ def create_app() -> FastAPI:
         with _suppress_native_stderr():
             prewarm_background_models(["silueta"])
             prewarm_face_landmarker()
+            prewarm_facenet()
         # Cortex GPU service connectivity check
         try:
             health = await cortex_client.health_check()
