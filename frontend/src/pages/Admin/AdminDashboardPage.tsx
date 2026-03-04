@@ -12,18 +12,31 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
+import { AdminErrorState } from '@/components/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { fetchDashboardStats } from '@/services/adminApi'
 import type { DashboardStats } from '@/services/adminApi'
 
+// Format date label: show only MM-DD on mobile, full date on desktop
+function formatDateTick(value: string, isMobile: boolean) {
+  if (!isMobile) return value
+  // "2026-03-04" -> "03-04"
+  const parts = value.split('-')
+  return parts.length === 3 ? `${parts[1]}-${parts[2]}` : value
+}
+
 export function AdminDashboardPage() {
   const { t } = useTranslation('admin')
+  const isMobile = useIsMobile()
 
-  const { data, isLoading } = useQuery<DashboardStats>({
+  const { data, isLoading, isError, refetch } = useQuery<DashboardStats>({
     queryKey: ['admin', 'dashboard-stats'],
     queryFn: () => fetchDashboardStats(),
   })
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   if (isLoading || !data) {
     return (
@@ -76,16 +89,24 @@ export function AdminDashboardPage() {
             </TabsList>
             {trendTabs.map((tab) => (
               <TabsContent key={tab.key} value={tab.key}>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
                   <LineChart data={tab.data}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: isMobile ? 10 : 12 }}
+                      tickFormatter={(v) => formatDateTick(v, isMobile)}
+                      interval={isMobile ? 'preserveStartEnd' : undefined}
+                      angle={isMobile ? -45 : 0}
+                      textAnchor={isMobile ? 'end' : 'middle'}
+                      height={isMobile ? 50 : 30}
+                    />
+                    <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} />
                     <Tooltip />
                     <Line
                       type="monotone"
                       dataKey="value"
-                      stroke="hsl(var(--primary))"
+                      stroke="var(--foreground)"
                       strokeWidth={2}
                       dot={false}
                     />
@@ -108,13 +129,21 @@ export function AdminDashboardPage() {
               {t('common.noData')}
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={data.tool_ranking.length * 40 + 20}>
+            <ResponsiveContainer
+              width="100%"
+              height={data.tool_ranking.length * (isMobile ? 36 : 40) + 20}
+            >
               <BarChart data={data.tool_ranking} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="tool_name" tick={{ fontSize: 12 }} width={120} />
+                <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                <YAxis
+                  type="category"
+                  dataKey="tool_name"
+                  tick={{ fontSize: isMobile ? 10 : 12 }}
+                  width={isMobile ? 80 : 120}
+                />
                 <Tooltip />
-                <Bar dataKey="count" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" fill="var(--muted-foreground)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

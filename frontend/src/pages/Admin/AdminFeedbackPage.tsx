@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/admin'
+import { AdminErrorState, AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import {
@@ -33,7 +33,7 @@ export function AdminFeedbackPage() {
   const [editNote, setEditNote] = useState('')
 
   const queryKey = ['admin', 'feedback', { status: statusFilter, offset }]
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey,
     queryFn: () =>
       fetchAllFeedback({
@@ -42,6 +42,8 @@ export function AdminFeedbackPage() {
         limit: PAGE_SIZE,
       }),
   })
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   const updateMutation = useMutation({
     mutationFn: (args: { id: number; body: { status?: FeedbackStatus; admin_note?: string } }) =>
@@ -91,10 +93,11 @@ export function AdminFeedbackPage() {
 
   const columns: Column<AdminFeedbackItem>[] = useMemo(
     () => [
-      { key: 'id', header: 'ID', render: (fb) => fb.id },
+      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (fb) => fb.id },
       {
         key: 'user',
         header: t('feedback.user'),
+        hiddenOnMobile: true,
         render: (fb) => (
           <div>
             <div>{fb.user_name ?? '-'}</div>
@@ -128,6 +131,7 @@ export function AdminFeedbackPage() {
         key: 'time',
         header: t('feedback.time'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (fb) => new Date(fb.created_at).toLocaleString(),
       },
     ],
@@ -173,6 +177,7 @@ export function AdminFeedbackPage() {
             onChange={(e) => setEditNote(e.target.value)}
             maxLength={1000}
             rows={2}
+            aria-label={t('feedback.adminNote')}
             className="mt-1 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -194,7 +199,7 @@ export function AdminFeedbackPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">{t('feedback.title')}</h2>
+      <h1 className="text-xl font-semibold">{t('feedback.title')}</h1>
 
       <div className="flex items-center gap-3">
         <AdminFilter

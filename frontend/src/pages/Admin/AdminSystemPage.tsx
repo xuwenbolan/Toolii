@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { DataTable, StatusBadge } from '@/components/admin'
+import { AdminErrorState, DataTable, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,12 +15,27 @@ import {
 import type {
   CortexModelItem,
   CortexModelCheckResult,
+  CortexModelEvent,
 } from '@/services/adminApi'
 
 const MODEL_STATUS_COLORS: Record<string, string> = {
   loaded: 'bg-success-light text-success border-success/20',
   available: 'bg-info-light text-info border-info/20',
   missing: 'bg-destructive-light text-destructive border-destructive/20',
+}
+
+const EVENT_COLORS: Record<string, string> = {
+  loaded: 'bg-success-light text-success border-success/20',
+  evicted_lru: 'bg-warning-light text-warning border-warning/20',
+  evicted_idle: 'bg-warning-light text-warning border-warning/20',
+  evicted_budget: 'bg-warning-light text-warning border-warning/20',
+  oom_retry: 'bg-destructive-light text-destructive border-destructive/20',
+}
+
+// Display MB values, switching to GB when >= 1024 MB
+function formatMB(mb: number): string {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
+  return `${mb} MB`
 }
 
 function formatUptime(seconds: number): string {
@@ -38,24 +53,46 @@ function formatIdleTime(seconds: number): string {
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
 }
 
+function formatRelativeTime(timestamp: number): string {
+  const delta = Math.floor(Date.now() / 1000 - timestamp)
+  if (delta < 60) return `${delta}s ago`
+  if (delta < 3600) return `${Math.floor(delta / 60)}m ago`
+  if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`
+  return `${Math.floor(delta / 86400)}d ago`
+}
+
+function formatEventTime(timestamp: number): string {
+  const d = new Date(timestamp * 1000)
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  if (d.toDateString() === now.toDateString()) return time
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
+}
+
 export function AdminSystemPage() {
   const { t } = useTranslation('admin')
   const queryClient = useQueryClient()
   const [checkResults, setCheckResults] = useState<Record<string, CortexModelCheckResult>>({})
   const [checkingModel, setCheckingModel] = useState<string | null>(null)
   const [checkingAll, setCheckingAll] = useState(false)
+  const [eventsExpanded, setEventsExpanded] = useState(false)
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['admin', 'cortex-status'],
     queryFn: fetchCortexStatus,
     refetchInterval: 30_000,
   })
 
   const online = data?.online ?? false
+  const health = data?.health
   const models = data?.models
   const gpu = models?.gpu
   const summary = models?.summary
   const modelList = models?.models ?? []
+  const events = models?.events ?? []
+  const inferenceStats = models?.inference_stats ?? {}
+  const queue = health?.queue
   const uptime = models?.uptime_seconds ?? 0
 
   const handleRefresh = () => {
@@ -93,6 +130,8 @@ export function AdminSystemPage() {
     }
   }
 
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground">
@@ -111,7 +150,9 @@ export function AdminSystemPage() {
       ? Math.round(summary.vram_utilization * 100)
       : 0
 
-  const columns: Column<CortexModelItem>[] = [
+  // -- Model table columns --
+
+  const modelColumns: Column<CortexModelItem>[] = [
     {
       key: 'name',
       header: t('system.model'),
@@ -141,6 +182,7 @@ export function AdminSystemPage() {
     {
       key: 'required',
       header: t('system.required'),
+      hiddenOnMobile: true,
       render: (row) => (
         <span className="text-sm">{row.required ? t('system.yes') : t('system.no')}</span>
       ),
@@ -149,15 +191,49 @@ export function AdminSystemPage() {
       key: 'vram_mb',
       header: 'VRAM',
       align: 'right',
-      render: (row) => <span className="text-sm">{row.vram_mb} MB</span>,
+      render: (row) => <span className="text-sm">{formatMB(row.vram_mb)}</span>,
+    },
+    {
+      key: 'vram_delta',
+      header: t('system.vramDelta'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.vram_delta_mb != null ? formatMB(row.vram_delta_mb) : '-'}
+        </span>
+      ),
     },
     {
       key: 'file_size',
       header: t('system.fileSize'),
       align: 'right',
+      hiddenOnMobile: true,
       render: (row) => (
         <span className="text-sm">
-          {row.file_size_mb != null ? `${row.file_size_mb} MB` : '-'}
+          {row.file_size_mb != null ? formatMB(row.file_size_mb) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'load_time',
+      header: t('system.loadTime'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.load_time_ms != null ? `${row.load_time_ms}ms` : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'loaded_at',
+      header: t('system.loadedAt'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.loaded_at != null ? formatRelativeTime(row.loaded_at) : '-'}
         </span>
       ),
     },
@@ -165,6 +241,7 @@ export function AdminSystemPage() {
       key: 'idle',
       header: t('system.idle'),
       align: 'right',
+      hiddenOnMobile: true,
       render: (row) => (
         <span className="text-sm">
           {row.idle_seconds != null ? formatIdleTime(row.idle_seconds) : '-'}
@@ -184,6 +261,119 @@ export function AdminSystemPage() {
         >
           {checkingModel === row.name ? '...' : t('system.check')}
         </Button>
+      ),
+    },
+  ]
+
+  // -- Inference stats as array --
+
+  const inferenceEntries = Object.entries(inferenceStats).map(([ep, s]) => ({
+    endpoint: ep,
+    ...s,
+  }))
+
+  type InferenceRow = (typeof inferenceEntries)[number]
+
+  const inferenceColumns: Column<InferenceRow>[] = [
+    {
+      key: 'endpoint',
+      header: t('system.endpoint'),
+      render: (row) => <span className="font-mono text-sm">{row.endpoint}</span>,
+    },
+    {
+      key: 'calls',
+      header: t('system.calls'),
+      align: 'right',
+      render: (row) => <span className="text-sm">{row.calls}</span>,
+    },
+    {
+      key: 'errors',
+      header: t('system.errors'),
+      align: 'right',
+      render: (row) => (
+        <span className={`text-sm ${row.errors > 0 ? 'text-destructive' : ''}`}>
+          {row.errors}
+        </span>
+      ),
+    },
+    {
+      key: 'avg_ms',
+      header: t('system.avgLatency'),
+      align: 'right',
+      render: (row) => <span className="text-sm">{row.avg_ms}ms</span>,
+    },
+    {
+      key: 'min_ms',
+      header: t('system.minLatency'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => <span className="text-sm">{row.min_ms}ms</span>,
+    },
+    {
+      key: 'max_ms',
+      header: t('system.maxLatency'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => <span className="text-sm">{row.max_ms}ms</span>,
+    },
+    {
+      key: 'last_call',
+      header: t('system.lastCall'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.last_call > 0 ? formatRelativeTime(row.last_call) : '-'}
+        </span>
+      ),
+    },
+  ]
+
+  // -- Event log columns --
+
+  const recentEvents = [...events].reverse().slice(0, 50)
+
+  const eventColumns: Column<CortexModelEvent>[] = [
+    {
+      key: 'timestamp',
+      header: t('system.eventTime'),
+      render: (row) => <span className="font-mono text-sm">{formatEventTime(row.timestamp)}</span>,
+    },
+    {
+      key: 'event',
+      header: t('system.eventType'),
+      render: (row) => (
+        <StatusBadge
+          status={row.event}
+          colorMap={EVENT_COLORS}
+          label={t(`system.eventTypes.${row.event}`)}
+        />
+      ),
+    },
+    {
+      key: 'model',
+      header: t('system.eventModel'),
+      render: (row) => <span className="font-mono text-sm">{row.model}</span>,
+    },
+    {
+      key: 'vram_before',
+      header: t('system.eventVramBefore'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => <span className="text-sm">{formatMB(row.vram_before_mb)}</span>,
+    },
+    {
+      key: 'vram_after',
+      header: t('system.eventVramAfter'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => <span className="text-sm">{formatMB(row.vram_after_mb)}</span>,
+    },
+    {
+      key: 'detail',
+      header: t('system.eventDetail'),
+      render: (row) => (
+        <span className="text-sm text-muted-foreground">{row.detail || '-'}</span>
       ),
     },
   ]
@@ -225,22 +415,55 @@ export function AdminSystemPage() {
 
       {online && gpu && summary && (
         <>
-          {/* GPU + VRAM cards */}
+          {/* GPU overview cards */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {/* Card 1: GPU info */}
             <Card>
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">{t('system.gpu')}</div>
                 <div className="mt-1 text-lg font-semibold">{gpu.name}</div>
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {(gpu.driver_version != null || gpu.cuda_version != null) && (
+                    <div>
+                      {gpu.driver_version != null && (
+                        <span>{t('system.driverVersion')} {gpu.driver_version}</span>
+                      )}
+                      {gpu.driver_version != null && gpu.cuda_version != null && (
+                        <span className="mx-1.5">|</span>
+                      )}
+                      {gpu.cuda_version != null && (
+                        <span>{t('system.cudaVersion')} {gpu.cuda_version}</span>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-4">
+                    {gpu.gpu_utilization_pct != null && (
+                      <span>{t('system.gpuUtilization')} {gpu.gpu_utilization_pct}%</span>
+                    )}
+                    {gpu.memory_utilization_pct != null && (
+                      <span>{t('system.memoryUtilization')} {gpu.memory_utilization_pct}%</span>
+                    )}
+                  </div>
+                  <div className="flex gap-4">
+                    {gpu.temperature_c != null && (
+                      <span>{t('system.temperature')} {gpu.temperature_c}C</span>
+                    )}
+                    {gpu.power_watts != null && (
+                      <span>{t('system.power')} {gpu.power_watts}W</span>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
+            {/* Card 2: GPU VRAM */}
             <Card>
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">{t('system.gpuVram')}</div>
                 <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-lg font-semibold">{gpu.vram_used_mb}</span>
+                  <span className="text-lg font-semibold">{formatMB(gpu.vram_used_mb)}</span>
                   <span className="text-sm text-muted-foreground">
-                    / {gpu.vram_total_mb} MB
+                    / {formatMB(gpu.vram_total_mb)}
                   </span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
@@ -253,13 +476,14 @@ export function AdminSystemPage() {
               </CardContent>
             </Card>
 
+            {/* Card 3: Model budget */}
             <Card>
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">{t('system.modelBudget')}</div>
                 <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-lg font-semibold">{summary.vram_used_mb}</span>
+                  <span className="text-lg font-semibold">{formatMB(summary.vram_real_mb)}</span>
                   <span className="text-sm text-muted-foreground">
-                    / {summary.vram_budget_mb} MB
+                    / {formatMB(summary.vram_budget_mb)}
                   </span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
@@ -268,26 +492,41 @@ export function AdminSystemPage() {
                     style={{ width: `${budgetPercent}%` }}
                   />
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground text-right">{budgetPercent}%</div>
+                <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    {summary.loaded} / {summary.registered} {t('system.modelsLoaded')}
+                  </span>
+                  <span>{budgetPercent}%</span>
+                </div>
               </CardContent>
             </Card>
 
+            {/* Card 4: Queue */}
             <Card>
               <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">{t('system.modelsLoaded')}</div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-lg font-semibold">{summary.loaded}</span>
-                  <span className="text-sm text-muted-foreground">
-                    / {summary.registered}
-                  </span>
-                </div>
+                <div className="text-sm text-muted-foreground">{t('system.queue')}</div>
+                {queue ? (
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-lg font-semibold">{queue.active}</span>
+                      <span className="text-sm text-muted-foreground">
+                        / {queue.max_concurrent}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t('system.queueTimeout')}: {queue.timeout_seconds}s
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-muted-foreground">--</div>
+                )}
               </CardContent>
             </Card>
           </div>
 
           {/* Models table */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>{t('system.modelRegistry')}</CardTitle>
               <Button
                 variant="outline"
@@ -300,11 +539,70 @@ export function AdminSystemPage() {
             </CardHeader>
             <CardContent>
               <DataTable
-                columns={columns}
+                columns={modelColumns}
                 data={modelList}
                 rowKey={(row) => row.name}
               />
             </CardContent>
+          </Card>
+
+          {/* Inference statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('system.inferenceStats')}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {inferenceEntries.length > 0 ? (
+                <DataTable
+                  columns={inferenceColumns}
+                  data={inferenceEntries}
+                  rowKey={(row) => row.endpoint}
+                />
+              ) : (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  {t('system.noInferenceData')}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Model events log */}
+          <Card>
+            <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>
+                {t('system.modelEvents')}
+                {events.length > 0 && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({events.length})
+                  </span>
+                )}
+              </CardTitle>
+              {events.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEventsExpanded(!eventsExpanded)}
+                >
+                  {eventsExpanded ? t('system.hideEvents') : t('system.showEvents')}
+                </Button>
+              )}
+            </CardHeader>
+            {eventsExpanded && (
+              <CardContent>
+                <DataTable
+                  columns={eventColumns}
+                  data={recentEvents}
+                  rowKey={(row) => `${row.timestamp}-${row.model}-${row.event}`}
+                />
+              </CardContent>
+            )}
+            {!eventsExpanded && events.length === 0 && (
+              <CardContent>
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  {t('system.noEvents')}
+                </div>
+              </CardContent>
+            )}
           </Card>
         </>
       )}

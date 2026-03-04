@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { AdminFilter, ConfirmDialog, DataTable, Pagination, StatusBadge } from '@/components/admin'
+import { AdminErrorState, AdminFilter, ConfirmDialog, DataTable, Pagination, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,7 +59,7 @@ export function AdminCardsPage() {
   })
 
   const cardsQueryKey = ['admin', 'cards', { status: filterStatus, cardType: filterType, offset }]
-  const { data: cardsData, isLoading } = useQuery({
+  const { data: cardsData, isLoading, isError, refetch } = useQuery({
     queryKey: cardsQueryKey,
     queryFn: () => {
       const params: Parameters<typeof fetchAdminCards>[0] = { limit: PAGE_SIZE, offset }
@@ -68,6 +68,8 @@ export function AdminCardsPage() {
       return fetchAdminCards(params)
     },
   })
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   // Mutations
   const generateMutation = useMutation({
@@ -163,9 +165,9 @@ export function AdminCardsPage() {
 
   const columns: Column<AdminCardItem>[] = useMemo(
     () => [
-      { key: 'id', header: t('cards.id'), render: (c) => c.id },
+      { key: 'id', header: t('cards.id'), hiddenOnMobile: true, render: (c) => c.id },
       { key: 'credits', header: t('cards.credits'), render: (c) => c.credits },
-      { key: 'type', header: t('cards.cardType'), render: (c) => c.card_type },
+      { key: 'type', header: t('cards.cardType'), hiddenOnMobile: true, render: (c) => c.card_type },
       {
         key: 'status',
         header: t('cards.status'),
@@ -180,18 +182,21 @@ export function AdminCardsPage() {
         key: 'expiresAt',
         header: t('cards.expiresAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (c) => formatDate(c.expires_at),
       },
       {
         key: 'redeemedAt',
         header: t('cards.redeemedAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (c) => formatDate(c.redeemed_at),
       },
       {
         key: 'createdAt',
         header: t('cards.createdAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (c) => formatDate(c.created_at),
       },
       {
@@ -218,7 +223,7 @@ export function AdminCardsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t('cards.title')}</h1>
+      <h1 className="text-xl font-semibold">{t('cards.title')}</h1>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

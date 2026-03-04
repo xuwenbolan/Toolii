@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { ConfirmDialog, DataTable, Pagination, StatusBadge } from '@/components/admin'
+import { AdminErrorState, ConfirmDialog, DataTable, Pagination, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +28,7 @@ export function AdminUsersPage() {
   const [confirmUser, setConfirmUser] = useState<AdminUserItem | null>(null)
 
   const queryKey = ['admin', 'users', { search, status: statusFilter, offset }]
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey,
     queryFn: () => {
       const params: Parameters<typeof fetchAdminUsers>[0] = {
@@ -41,6 +41,8 @@ export function AdminUsersPage() {
       return fetchAdminUsers(params)
     },
   })
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   const toggleMutation = useMutation({
     mutationFn: (user: AdminUserItem) => updateUserStatus(user.id, !user.is_active),
@@ -76,9 +78,9 @@ export function AdminUsersPage() {
 
   const columns: Column<AdminUserItem>[] = useMemo(
     () => [
-      { key: 'id', header: t('users.id'), render: (u) => u.id },
+      { key: 'id', header: t('users.id'), hiddenOnMobile: true, render: (u) => u.id },
       { key: 'email', header: t('users.email'), render: (u) => u.email },
-      { key: 'name', header: t('users.name'), render: (u) => u.name ?? '-' },
+      { key: 'name', header: t('users.name'), hiddenOnMobile: true, render: (u) => u.name ?? '-' },
       { key: 'balance', header: t('users.balance'), render: (u) => u.balance },
       {
         key: 'status',
@@ -94,6 +96,7 @@ export function AdminUsersPage() {
         key: 'createdAt',
         header: t('users.createdAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (u) => new Date(u.created_at).toLocaleString(),
       },
       {
@@ -127,7 +130,7 @@ export function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">{t('users.title')}</h1>
+      <h1 className="text-xl font-semibold">{t('users.title')}</h1>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input

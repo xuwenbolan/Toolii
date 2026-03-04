@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Menu, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -25,16 +26,11 @@ export function AdminLayout() {
       {/* Mobile sidebar toggle */}
       <button
         type="button"
+        aria-label={sidebarOpen ? t('common.close') : t('nav.menu')}
         className="fixed bottom-4 right-4 z-50 rounded-full bg-primary p-3 text-primary-foreground shadow-lg lg:hidden"
         onClick={() => setSidebarOpen(!sidebarOpen)}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {sidebarOpen ? (
-            <path d="M18 6 6 18M6 6l12 12" />
-          ) : (
-            <path d="M3 12h18M3 6h18M3 18h18" />
-          )}
-        </svg>
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {/* Sidebar overlay for mobile */}
@@ -63,7 +59,7 @@ export function AdminLayout() {
           </Link>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3 [&>a]:motion-safe:animate-[section-in_0.25s_var(--ease-out)_both] [&>a:nth-child(1)]:motion-safe:[animation-delay:50ms] [&>a:nth-child(2)]:motion-safe:[animation-delay:100ms] [&>a:nth-child(3)]:motion-safe:[animation-delay:150ms] [&>a:nth-child(4)]:motion-safe:[animation-delay:200ms] [&>a:nth-child(5)]:motion-safe:[animation-delay:250ms] [&>a:nth-child(6)]:motion-safe:[animation-delay:300ms] [&>a:nth-child(7)]:motion-safe:[animation-delay:350ms]">
+        <nav className="flex-1 space-y-1 p-3">
           {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
@@ -94,7 +90,7 @@ export function AdminLayout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-4 lg:p-6">
-        <div className="motion-safe:animate-[section-in_0.3s_var(--ease-out)_both]">
+        <div className="motion-safe:animate-fade-in">
           <Outlet />
         </div>
       </main>

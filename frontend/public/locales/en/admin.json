@@ -8,7 +8,8 @@
     "operations": "Operations",
     "feedback": "Feedback",
     "tools": "Tools",
-    "system": "System"
+    "system": "System",
+    "menu": "Menu"
   },
   "dashboard": {
     "totalUsers": "Total Users",
@@ -124,7 +125,14 @@
       "balanceBefore": "Before",
       "balanceAfter": "After",
       "description": "Description",
-      "time": "Time"
+      "time": "Time",
+      "types": {
+        "redeem": "Redeem",
+        "consume": "Consume",
+        "admin_adjust": "Admin Adjust",
+        "share_send": "Share Send",
+        "share_receive": "Share Receive"
+      }
     },
     "shareLinks": {
       "allStatus": "All Status",
@@ -194,7 +202,14 @@
       "verified": "Verified",
       "admin": "Admin Only"
     },
-    "updateSuccess": "Tool updated"
+    "updateSuccess": "Tool updated",
+    "on": "ON",
+    "off": "OFF",
+    "categories": {
+      "image": "Image",
+      "pdf": "PDF",
+      "facemap": "FaceMap"
+    }
   },
   "system": {
     "title": "System Status",
@@ -219,10 +234,51 @@
     "unhealthy": "Unhealthy",
     "yes": "Yes",
     "no": "No",
+    "gpuUtilization": "GPU Utilization",
+    "memoryUtilization": "Memory Utilization",
+    "driverVersion": "Driver",
+    "cudaVersion": "CUDA",
+    "temperature": "Temperature",
+    "power": "Power",
+    "vramEstimated": "Estimated",
+    "vramReal": "Actual",
+    "queue": "Inference Queue",
+    "queueActive": "Active",
+    "queueMax": "Max Concurrent",
+    "queueTimeout": "Queue Timeout",
+    "inferenceStats": "Inference Statistics",
+    "endpoint": "Endpoint",
+    "calls": "Calls",
+    "errors": "Errors",
+    "avgLatency": "Avg",
+    "minLatency": "Min",
+    "maxLatency": "Max",
+    "lastCall": "Last Call",
+    "noInferenceData": "No inference data yet",
+    "modelEvents": "Model Events",
+    "showEvents": "Show Events",
+    "hideEvents": "Hide Events",
+    "noEvents": "No events recorded",
+    "eventType": "Event",
+    "eventModel": "Model",
+    "eventTime": "Time",
+    "eventVramBefore": "VRAM Before",
+    "eventVramAfter": "VRAM After",
+    "eventDetail": "Detail",
+    "loadedAt": "Loaded At",
+    "loadTime": "Load Time",
+    "vramDelta": "VRAM Delta",
     "modelStatus": {
       "loaded": "Loaded",
       "available": "Available",
       "missing": "Missing"
+    },
+    "eventTypes": {
+      "loaded": "Loaded",
+      "evicted_lru": "Evicted (LRU)",
+      "evicted_idle": "Evicted (Idle)",
+      "evicted_budget": "Evicted (Budget)",
+      "oom_retry": "OOM Retry"
     }
   },
   "common": {
@@ -235,6 +291,8 @@
     "cancel": "Cancel",
     "success": "Operation successful",
     "error": "Operation failed",
+    "loadError": "Failed to load data",
+    "retry": "Retry",
     "confirmAction": "Confirm Action"
   }
 }

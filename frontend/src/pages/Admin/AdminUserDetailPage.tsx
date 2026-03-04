@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { ConfirmDialog, DataTable, StatusBadge } from '@/components/admin'
+import { AdminErrorState, ConfirmDialog, DataTable, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,7 +31,7 @@ export function AdminUserDetailPage() {
   const [showConfirm, setShowConfirm] = useState(false)
 
   const queryKey = ['admin', 'user-detail', id]
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading, isError, refetch } = useQuery({
     queryKey,
     queryFn: () => fetchAdminUserDetail(Number(id)),
     enabled: !!id,
@@ -142,6 +142,8 @@ export function AdminUserDetailPage() {
     ],
     [t],
   )
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   if (isLoading) {
     return (

@@ -1,11 +1,16 @@
+import { useRef, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+
+import { cn } from '@/lib/utils'
 
 export type Column<T> = {
   key: string
   header: string
   align?: 'left' | 'right' | 'center'
   className?: string
+  // Hide this column on mobile (< sm breakpoint) to reduce horizontal overflow
+  hiddenOnMobile?: boolean
   render: (row: T, index: number) => ReactNode
 }
 
@@ -37,60 +42,92 @@ export function DataTable<T>({
   renderExpanded,
 }: Props<T>) {
   const { t } = useTranslation('admin')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const check = () => {
+      setCanScrollRight(el.scrollWidth - el.scrollLeft - el.clientWidth > 1)
+    }
+    check()
+    el.addEventListener('scroll', check, { passive: true })
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', check)
+      ro.disconnect()
+    }
+  }, [data, columns])
 
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                className={`whitespace-nowrap px-3 py-2 font-medium text-muted-foreground ${ALIGN_CLASS[col.align ?? 'left']} ${col.className ?? ''}`}
-              >
-                {col.header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            <tr>
-              <td
-                colSpan={columns.length}
-                className="px-4 py-10 text-center text-muted-foreground"
-              >
-                {t('common.loading')}
-              </td>
+    <div className="relative rounded-xl border bg-card">
+      <div ref={scrollRef} className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/50">
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  className={cn(
+                    'whitespace-nowrap px-3 py-2.5 font-medium text-muted-foreground',
+                    ALIGN_CLASS[col.align ?? 'left'],
+                    col.hiddenOnMobile && 'hidden sm:table-cell',
+                    col.className,
+                  )}
+                >
+                  {col.header}
+                </th>
+              ))}
             </tr>
-          ) : data.length === 0 ? (
-            <tr>
-              <td
-                colSpan={columns.length}
-                className="px-4 py-10 text-center text-muted-foreground"
-              >
-                {emptyText ?? t('common.noData')}
-              </td>
-            </tr>
-          ) : (
-            data.map((row, i) => {
-              const key = rowKey(row)
-              const isExpanded = expandedRowKey != null && expandedRowKey === key
-              return (
-                <DataTableRow
-                  key={key}
-                  row={row}
-                  index={i}
-                  columns={columns}
-                  isExpanded={isExpanded}
-                  onRowClick={onRowClick}
-                  renderExpanded={renderExpanded}
-                />
-              )
-            })
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  {t('common.loading')}
+                </td>
+              </tr>
+            ) : data.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
+                  {emptyText ?? t('common.noData')}
+                </td>
+              </tr>
+            ) : (
+              data.map((row, i) => {
+                const key = rowKey(row)
+                const isExpanded = expandedRowKey != null && expandedRowKey === key
+                return (
+                  <DataTableRow
+                    key={key}
+                    row={row}
+                    index={i}
+                    columns={columns}
+                    isExpanded={isExpanded}
+                    onRowClick={onRowClick}
+                    renderExpanded={renderExpanded}
+                  />
+                )
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      {/* Scroll hint gradient on right edge */}
+      {canScrollRight && (
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent"
+          aria-hidden="true"
+        />
+      )}
     </div>
   )
 }
@@ -115,13 +152,34 @@ function DataTableRow<T>({
   return (
     <>
       <tr
-        className={`border-b last:border-b-0 ${index % 2 !== 0 ? 'bg-muted/30' : ''} ${onRowClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+        className={cn(
+          'border-b last:border-b-0',
+          index % 2 !== 0 && 'bg-muted/30',
+          onRowClick && 'cursor-pointer hover:bg-muted/50 transition-colors',
+        )}
+        tabIndex={onRowClick ? 0 : undefined}
+        role={onRowClick ? 'button' : undefined}
         onClick={onRowClick ? () => onRowClick(row) : undefined}
+        onKeyDown={
+          onRowClick
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onRowClick(row)
+                }
+              }
+            : undefined
+        }
       >
         {columns.map((col) => (
           <td
             key={col.key}
-            className={`px-3 py-2 ${ALIGN_CLASS[col.align ?? 'left']} ${col.className ?? ''}`}
+            className={cn(
+              'px-3 py-2.5',
+              ALIGN_CLASS[col.align ?? 'left'],
+              col.hiddenOnMobile && 'hidden sm:table-cell',
+              col.className,
+            )}
           >
             {col.render(row, index)}
           </td>

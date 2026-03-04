@@ -180,6 +180,12 @@ export type CortexGpuInfo = {
   vram_total_mb: number
   vram_used_mb: number
   vram_free_mb: number
+  gpu_utilization_pct: number | null
+  memory_utilization_pct: number | null
+  driver_version: string | null
+  cuda_version: string | null
+  temperature_c: number | null
+  power_watts: number | null
 }
 
 export type CortexModelItem = {
@@ -191,20 +197,50 @@ export type CortexModelItem = {
   path: string
   last_used?: number
   idle_seconds?: number
+  loaded_at?: number
+  load_time_ms?: number
+  vram_delta_mb?: number
 }
 
 export type CortexModelsSummary = {
   registered: number
   loaded: number
-  vram_used_mb: number
+  vram_estimated_mb: number
+  vram_real_mb: number
   vram_budget_mb: number
   vram_utilization: number
+}
+
+export type CortexQueueInfo = {
+  max_concurrent: number
+  active: number
+  timeout_seconds: number
+}
+
+export type CortexModelEvent = {
+  timestamp: number
+  event: 'loaded' | 'evicted_lru' | 'evicted_idle' | 'evicted_budget' | 'oom_retry'
+  model: string
+  vram_before_mb: number
+  vram_after_mb: number
+  detail: string
+}
+
+export type CortexEndpointStats = {
+  calls: number
+  errors: number
+  avg_ms: number
+  min_ms: number
+  max_ms: number
+  last_call: number
 }
 
 export type CortexModelsResponse = {
   summary: CortexModelsSummary
   models: CortexModelItem[]
+  events: CortexModelEvent[]
   gpu: CortexGpuInfo
+  inference_stats: Record<string, CortexEndpointStats>
   uptime_seconds: number
 }
 
@@ -215,7 +251,10 @@ export type CortexHealthResponse = {
     loaded: string[]
     available: string[]
     vram_estimated_mb: number
+    vram_real_mb: number
+    vram_budget_mb: number
   }
+  queue: CortexQueueInfo
   uptime_seconds: number
 }
 

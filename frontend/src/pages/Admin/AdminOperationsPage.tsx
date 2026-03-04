@@ -18,6 +18,7 @@ import { AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/ad
 import type { Column } from '@/components/admin'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useIsMobile } from '@/hooks/useIsMobile'
 import {
   fetchToolUsage,
   fetchGlobalTransactions,
@@ -37,6 +38,7 @@ const PAGE_SIZE = 20
 
 function ToolUsageTab() {
   const { t } = useTranslation('admin')
+  const isMobile = useIsMobile()
   const [days, setDays] = useState(30)
   const [toolName, setToolName] = useState('')
 
@@ -122,15 +124,22 @@ function ToolUsageTab() {
 
       {!isLoading && items.length > 0 && (
         <div className="rounded-xl border bg-card p-4">
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: isMobile ? 10 : 12 }}
+                interval={isMobile ? 'preserveStartEnd' : undefined}
+                angle={isMobile ? -45 : 0}
+                textAnchor={isMobile ? 'end' : 'middle'}
+                height={isMobile ? 50 : 30}
+              />
+              <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 30 : 60} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="success" stackId="a" fill="#22c55e" name={t('operations.toolUsage.success')} />
-              <Bar dataKey="fail" stackId="a" fill="#ef4444" name={t('operations.toolUsage.fail')} />
+              <Bar dataKey="success" stackId="a" fill="var(--success)" name={t('operations.toolUsage.success')} />
+              <Bar dataKey="fail" stackId="a" fill="var(--destructive)" name={t('operations.toolUsage.fail')} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -170,19 +179,19 @@ function TransactionsTab() {
   const filterOptions = useMemo(
     () => [
       { value: 'all', label: t('operations.transactions.allTypes') },
-      ...TX_TYPES.map((tp) => ({ value: tp, label: tp })),
+      ...TX_TYPES.map((tp) => ({ value: tp, label: t(`operations.transactions.types.${tp}`) })),
     ],
     [t],
   )
 
   const columns: Column<GlobalTransactionItem>[] = useMemo(
     () => [
-      { key: 'id', header: 'ID', render: (i) => i.id },
+      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
       { key: 'user', header: t('operations.transactions.user'), render: (i) => i.user_email ?? '-' },
       {
         key: 'type',
         header: t('operations.transactions.type'),
-        render: (i) => <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{i.tx_type}</span>,
+        render: (i) => <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{t(`operations.transactions.types.${i.tx_type}`)}</span>,
       },
       {
         key: 'amount',
@@ -198,18 +207,21 @@ function TransactionsTab() {
         key: 'before',
         header: t('operations.transactions.balanceBefore'),
         align: 'right',
+        hiddenOnMobile: true,
         render: (i) => i.balance_before,
       },
       {
         key: 'after',
         header: t('operations.transactions.balanceAfter'),
         align: 'right',
+        hiddenOnMobile: true,
         render: (i) => i.balance_after,
       },
       {
         key: 'desc',
         header: t('operations.transactions.description'),
         className: 'max-w-[200px] truncate',
+        hiddenOnMobile: true,
         render: (i) => i.description ?? '-',
       },
       {
@@ -267,9 +279,9 @@ function ShareLinksTab() {
 
   const columns: Column<AdminShareLinkItem>[] = useMemo(
     () => [
-      { key: 'id', header: 'ID', render: (i) => i.id },
+      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
       { key: 'from', header: t('operations.shareLinks.from'), render: (i) => i.from_user_email ?? '-' },
-      { key: 'to', header: t('operations.shareLinks.to'), render: (i) => i.to_user_email ?? '-' },
+      { key: 'to', header: t('operations.shareLinks.to'), hiddenOnMobile: true, render: (i) => i.to_user_email ?? '-' },
       { key: 'amount', header: t('operations.shareLinks.amount'), align: 'right', render: (i) => i.amount },
       {
         key: 'status',
@@ -280,18 +292,21 @@ function ShareLinksTab() {
         key: 'expiresAt',
         header: t('operations.shareLinks.expiresAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (i) => i.expires_at ? new Date(i.expires_at).toLocaleString() : '-',
       },
       {
         key: 'claimedAt',
         header: t('operations.shareLinks.claimedAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (i) => i.claimed_at ? new Date(i.claimed_at).toLocaleString() : '-',
       },
       {
         key: 'createdAt',
         header: t('operations.shareLinks.createdAt'),
         className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
         render: (i) => new Date(i.created_at).toLocaleString(),
       },
     ],
@@ -316,6 +331,7 @@ function ShareLinksTab() {
 
 function RevenueTab() {
   const { t } = useTranslation('admin')
+  const isMobile = useIsMobile()
   const [granularity, setGranularity] = useState('day')
   const [days, setDays] = useState(30)
 
@@ -367,17 +383,24 @@ function RevenueTab() {
       {!isLoading && data && items.length > 0 && (
         <>
           <div className="rounded-xl border bg-card p-4">
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
               <LineChart data={items}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
+                <XAxis
+                  dataKey="period"
+                  tick={{ fontSize: isMobile ? 10 : 12 }}
+                  interval={isMobile ? 'preserveStartEnd' : undefined}
+                  angle={isMobile ? -45 : 0}
+                  textAnchor={isMobile ? 'end' : 'middle'}
+                  height={isMobile ? 50 : 30}
+                />
+                <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} />
                 <Tooltip />
                 <Legend />
                 <Line
                   type="monotone"
                   dataKey="total_credits"
-                  stroke="#22c55e"
+                  stroke="var(--foreground)"
                   strokeWidth={2}
                   dot={false}
                   name={t('operations.revenue.credits')}
@@ -411,15 +434,17 @@ export function AdminOperationsPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">{t('operations.title')}</h2>
+      <h1 className="text-xl font-semibold">{t('operations.title')}</h1>
 
       <Tabs defaultValue="toolUsage">
-        <TabsList>
-          <TabsTrigger value="toolUsage">{t('operations.tabs.toolUsage')}</TabsTrigger>
-          <TabsTrigger value="transactions">{t('operations.tabs.transactions')}</TabsTrigger>
-          <TabsTrigger value="shareLinks">{t('operations.tabs.shareLinks')}</TabsTrigger>
-          <TabsTrigger value="revenue">{t('operations.tabs.revenue')}</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto no-scrollbar">
+          <TabsList>
+            <TabsTrigger value="toolUsage">{t('operations.tabs.toolUsage')}</TabsTrigger>
+            <TabsTrigger value="transactions">{t('operations.tabs.transactions')}</TabsTrigger>
+            <TabsTrigger value="shareLinks">{t('operations.tabs.shareLinks')}</TabsTrigger>
+            <TabsTrigger value="revenue">{t('operations.tabs.revenue')}</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="toolUsage"><ToolUsageTab /></TabsContent>
         <TabsContent value="transactions"><TransactionsTab /></TabsContent>

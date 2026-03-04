@@ -8,7 +8,8 @@
     "operations": "运营数据",
     "feedback": "用户反馈",
     "tools": "工具管理",
-    "system": "系统状态"
+    "system": "系统状态",
+    "menu": "菜单"
   },
   "dashboard": {
     "totalUsers": "用户总数",
@@ -124,7 +125,14 @@
       "balanceBefore": "变动前",
       "balanceAfter": "变动后",
       "description": "说明",
-      "time": "时间"
+      "time": "时间",
+      "types": {
+        "redeem": "兑换",
+        "consume": "消费",
+        "admin_adjust": "管理员调整",
+        "share_send": "分享转出",
+        "share_receive": "分享收入"
+      }
     },
     "shareLinks": {
       "allStatus": "全部状态",
@@ -194,7 +202,14 @@
       "verified": "需验证",
       "admin": "仅管理员"
     },
-    "updateSuccess": "工具已更新"
+    "updateSuccess": "工具已更新",
+    "on": "开启",
+    "off": "关闭",
+    "categories": {
+      "image": "图片",
+      "pdf": "PDF",
+      "facemap": "面部分析"
+    }
   },
   "system": {
     "title": "系统状态",
@@ -219,10 +234,51 @@
     "unhealthy": "异常",
     "yes": "是",
     "no": "否",
+    "gpuUtilization": "GPU 利用率",
+    "memoryUtilization": "显存利用率",
+    "driverVersion": "驱动版本",
+    "cudaVersion": "CUDA",
+    "temperature": "温度",
+    "power": "功耗",
+    "vramEstimated": "估算",
+    "vramReal": "实际",
+    "queue": "推理队列",
+    "queueActive": "进行中",
+    "queueMax": "最大并发",
+    "queueTimeout": "排队超时",
+    "inferenceStats": "推理统计",
+    "endpoint": "端点",
+    "calls": "调用次数",
+    "errors": "错误次数",
+    "avgLatency": "平均",
+    "minLatency": "最小",
+    "maxLatency": "最大",
+    "lastCall": "最后调用",
+    "noInferenceData": "暂无推理数据",
+    "modelEvents": "模型事件",
+    "showEvents": "展开事件",
+    "hideEvents": "收起事件",
+    "noEvents": "暂无事件记录",
+    "eventType": "事件",
+    "eventModel": "模型",
+    "eventTime": "时间",
+    "eventVramBefore": "VRAM(前)",
+    "eventVramAfter": "VRAM(后)",
+    "eventDetail": "详情",
+    "loadedAt": "加载时间",
+    "loadTime": "加载耗时",
+    "vramDelta": "VRAM 增量",
     "modelStatus": {
       "loaded": "已加载",
       "available": "可用",
       "missing": "缺失"
+    },
+    "eventTypes": {
+      "loaded": "加载",
+      "evicted_lru": "淘汰(LRU)",
+      "evicted_idle": "淘汰(空闲)",
+      "evicted_budget": "淘汰(预算)",
+      "oom_retry": "OOM 重试"
     }
   },
   "common": {
@@ -235,6 +291,8 @@
     "cancel": "取消",
     "success": "操作成功",
     "error": "操作失败",
+    "loadError": "数据加载失败",
+    "retry": "重试",
     "confirmAction": "确认操作"
   }
 }

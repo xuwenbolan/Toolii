@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { AdminFilter, DataTable } from '@/components/admin'
+import { AdminErrorState, AdminFilter, DataTable } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,20 +31,9 @@ import {
   type AdminToolUpdateRequest,
 } from '@/services/toolsApi'
 
-const CATEGORY_OPTIONS = [
-  { value: 'all', label: 'all' },
-  { value: 'image', label: 'Image' },
-  { value: 'pdf', label: 'PDF' },
-  { value: 'facemap', label: 'FaceMap' },
-]
-
+const CATEGORY_KEYS = ['image', 'pdf', 'facemap'] as const
 const ACCESS_LEVELS = ['public', 'auth', 'verified', 'admin'] as const
 
-const CATEGORY_COLORS: Record<string, string> = {
-  image: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  pdf: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  facemap: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-}
 
 export function AdminToolsPage() {
   const { t } = useTranslation('admin')
@@ -53,10 +42,12 @@ export function AdminToolsPage() {
   const [filterCategory, setFilterCategory] = useState('all')
   const [editingTool, setEditingTool] = useState<AdminToolItem | null>(null)
 
-  const { data: tools = [], isLoading } = useQuery({
+  const { data: tools = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'tools'],
     queryFn: fetchAdminTools,
   })
+
+  if (isError) return <AdminErrorState onRetry={() => refetch()} />
 
   const updateMutation = useMutation({
     mutationFn: ({ name, updates }: { name: string; updates: AdminToolUpdateRequest }) =>
@@ -114,7 +105,7 @@ export function AdminToolsPage() {
       key: 'category',
       header: t('tools.category'),
       render: (row) => (
-        <Badge variant="secondary" className={CATEGORY_COLORS[row.category] ?? ''}>
+        <Badge variant="secondary">
           {row.category}
         </Badge>
       ),
@@ -130,7 +121,7 @@ export function AdminToolsPage() {
           className="h-7 min-w-[52px] text-xs"
           onClick={() => handleToggleEnabled(row)}
         >
-          {row.is_enabled ? 'ON' : 'OFF'}
+          {row.is_enabled ? t('tools.on') : t('tools.off')}
         </Button>
       ),
     },
@@ -230,10 +221,10 @@ export function AdminToolsPage() {
         <h1 className="text-xl font-semibold">{t('tools.title')}</h1>
         <AdminFilter
           value={filterCategory}
-          options={CATEGORY_OPTIONS.map((o) => ({
-            value: o.value,
-            label: o.value === 'all' ? t('users.filterAll') : o.label,
-          }))}
+          options={[
+            { value: 'all', label: t('users.filterAll') },
+            ...CATEGORY_KEYS.map((k) => ({ value: k, label: t(`tools.categories.${k}`) })),
+          ]}
           onChange={(v) => setFilterCategory(v)}
         />
       </div>
@@ -298,7 +289,7 @@ function InlineNumberEditor({
     return (
       <Input
         type="number"
-        className="h-7 w-16 text-center text-xs"
+        className="h-8 w-20 text-center text-xs"
         value={draft}
         min={min}
         autoFocus
@@ -315,7 +306,8 @@ function InlineNumberEditor({
   return (
     <button
       type="button"
-      className="inline-flex h-7 min-w-[40px] items-center justify-center rounded border border-transparent px-1.5 text-xs hover:border-border hover:bg-accent"
+      aria-label={`${value ?? placeholder ?? '-'}`}
+      className="inline-flex h-8 min-w-[44px] items-center justify-center rounded border border-transparent px-2 text-xs hover:border-border hover:bg-accent"
       onClick={startEdit}
     >
       {value !== null && value !== undefined ? value : (
@@ -368,7 +360,7 @@ function MetadataDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs">{t('tools.displayName')} (ZH)</Label>
               <Input value={nameZh} onChange={(e) => setNameZh(e.target.value)} className="mt-1" />
@@ -379,7 +371,7 @@ function MetadataDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label className="text-xs">{t('tools.description')} (ZH)</Label>
               <Input value={descZh} onChange={(e) => setDescZh(e.target.value)} className="mt-1" />

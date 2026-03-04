@@ -1,3 +1,4 @@
+export { AdminErrorState } from './AdminErrorState'
 export { AdminFilter } from './AdminFilter'
 export { ConfirmDialog } from './ConfirmDialog'
 export { DataTable } from './DataTable'
