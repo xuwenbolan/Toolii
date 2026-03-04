@@ -99,7 +99,13 @@ class AdminService:
         )).all()
         tool_ranking = [{"tool_name": r[0], "count": r[1]} for r in ranking_rows]
 
-        # Trends (last N days)
+        # Build full date range for trend charts
+        all_dates = [
+            (period_start + timedelta(days=i)).strftime("%Y-%m-%d")
+            for i in range(days + 1)
+        ]
+
+        # Trends (last N days) — fill missing dates with 0
         date_col = func.date(User.created_at)
         user_trend_rows = (await self._db.execute(
             select(date_col.label("d"), func.count().label("c"))
@@ -107,7 +113,8 @@ class AdminService:
             .group_by(date_col)
             .order_by(date_col)
         )).all()
-        user_trend = [{"date": str(r[0]), "value": r[1]} for r in user_trend_rows]
+        user_map = {str(r[0]): r[1] for r in user_trend_rows}
+        user_trend = [{"date": d, "value": user_map.get(d, 0)} for d in all_dates]
 
         tool_date_col = func.date(ProcessingHistory.created_at)
         tool_trend_rows = (await self._db.execute(
@@ -116,7 +123,8 @@ class AdminService:
             .group_by(tool_date_col)
             .order_by(tool_date_col)
         )).all()
-        tool_trend = [{"date": str(r[0]), "value": r[1]} for r in tool_trend_rows]
+        tool_map = {str(r[0]): r[1] for r in tool_trend_rows}
+        tool_trend = [{"date": d, "value": tool_map.get(d, 0)} for d in all_dates]
 
         rev_date_col = func.date(CreditTransaction.created_at)
         revenue_trend_rows = (await self._db.execute(
@@ -125,7 +133,8 @@ class AdminService:
             .group_by(rev_date_col)
             .order_by(rev_date_col)
         )).all()
-        revenue_trend = [{"date": str(r[0]), "value": int(r[1])} for r in revenue_trend_rows]
+        rev_map = {str(r[0]): int(r[1]) for r in revenue_trend_rows}
+        revenue_trend = [{"date": d, "value": rev_map.get(d, 0)} for d in all_dates]
 
         return {
             "total_users": total_users,
