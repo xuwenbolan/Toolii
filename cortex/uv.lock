@@ -584,6 +584,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "numpy" },
     { name = "nvidia-ml-py" },
     { name = "onnxruntime-gpu" },
@@ -596,7 +597,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
@@ -608,7 +608,7 @@ ocr = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.110.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "nvidia-ml-py", specifier = ">=12.0.0" },
     { name = "onnxruntime-gpu", specifier = ">=1.21.0" },

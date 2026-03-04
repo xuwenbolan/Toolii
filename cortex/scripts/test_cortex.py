@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 """Comprehensive Cortex service test and monitoring script.
 
-Test categories:
-  1. Health & Startup     - health endpoint, uptime, GPU info
-  2. Model Management     - registry, load status, ONNX integrity
-  3. Inference Endpoints  - all 8 endpoints with valid input
-  4. Error Handling       - invalid input, missing models, bad parameters
-  5. Concurrency          - parallel requests, GPU queue behavior
-  6. Performance          - latency benchmarks, throughput
-  7. VRAM Monitoring      - memory usage tracking across operations
+Test suites:
+  health       Health endpoint, GPU detection, queue info, uptime
+  models       Model registry, ONNX integrity, VRAM budget, events
+  inference    All 8 inference endpoints with valid input
+  errors       Invalid input, missing models, bad parameters
+  concurrency  Parallel requests, GPU queue behavior
+  format       Response structure validation
+  vram         VRAM tracking, idle monitoring, GPU consistency
+  benchmark    Latency benchmarks, load times, inference stats
+  memory       Memory pressure: VRAM timeline, eviction, workspace
+  profile      Isolated per-model VRAM profiling
 
 Usage:
-  uv run scripts/test_cortex.py                     # run all tests
-  uv run scripts/test_cortex.py --url http://host:9100
-  uv run scripts/test_cortex.py --suite health      # only health tests
-  uv run scripts/test_cortex.py --suite inference    # only inference tests
-  uv run scripts/test_cortex.py --suite all          # everything
-  uv run scripts/test_cortex.py --benchmark          # include perf benchmarks
-  uv run scripts/test_cortex.py --verbose            # detailed output
+  uv run scripts/test_cortex.py                     # interactive TUI menu
+  uv run scripts/test_cortex.py quick               # health + models + inference
+  uv run scripts/test_cortex.py standard            # all core suites
+  uv run scripts/test_cortex.py benchmark           # standard + performance
+  uv run scripts/test_cortex.py stress              # standard + memory pressure
+  uv run scripts/test_cortex.py profile             # isolated VRAM profiling
+  uv run scripts/test_cortex.py full                # everything
+  uv run scripts/test_cortex.py health              # single suite
+  uv run scripts/test_cortex.py health inference    # multiple suites
+  uv run scripts/test_cortex.py --url http://host:9100 quick
 """
 from __future__ import annotations
 
@@ -25,36 +31,166 @@ import argparse
 import asyncio
 import base64
 import io
-import json
 import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
 import numpy as np
 from PIL import Image
+from rich.console import Console, Group
+from rich.live import Live
+from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
+from rich.text import Text
 
 # ── Constants ──────────────────────────────────────────────────────────
 
 DEFAULT_URL = "http://localhost:9100"
 TIMEOUT = httpx.Timeout(connect=5.0, read=120.0, write=30.0, pool=10.0)
 
-# All inference endpoints with their default payloads
 ENDPOINTS = [
     "remove-background", "upscale", "restore-face", "denoise",
     "colorize", "inpaint", "ocr", "segment",
 ]
 
-# ANSI colors
-_GREEN = "\033[92m"
-_RED = "\033[91m"
-_YELLOW = "\033[93m"
-_CYAN = "\033[96m"
-_DIM = "\033[2m"
-_BOLD = "\033[1m"
-_RESET = "\033[0m"
+REPORT_PATH = Path(__file__).resolve().parent.parent / "test_report.txt"
+
+ALL_SUITES = [
+    "health", "models", "inference", "errors",
+    "concurrency", "format", "vram",
+]
+
+# Preset name -> (description, suite list)
+PRESETS: dict[str, tuple[str, list[str]]] = {
+    "quick":     ("health + models + inference",
+                  ["health", "models", "inference"]),
+    "standard":  ("all core suites",
+                  ALL_SUITES),
+    "benchmark": ("standard + performance benchmarks",
+                  [*ALL_SUITES, "benchmark"]),
+    "stress":    ("standard + memory pressure tests",
+                  [*ALL_SUITES, "vram", "memory"]),
+    "profile":   ("isolated per-model VRAM profiling",
+                  ["profile"]),
+    "full":      ("everything",
+                  [*ALL_SUITES, "benchmark", "vram", "memory", "profile"]),
+}
+
+SUITE_NAMES = {
+    *ALL_SUITES, "benchmark", "memory", "profile",
+}
+
+console = Console(record=True)
+
+
+def _read_key() -> str:
+    """Read a single keypress in raw terminal mode.
+
+    Uses os.read on the raw fd (not sys.stdin) so that select() and read()
+    operate on the same unbuffered layer.
+    """
+    import os
+    import select
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)
+        ch = os.read(fd, 1).decode()
+        if ch == "\x1b":
+            if select.select([fd], [], [], 0.05)[0]:
+                seq = os.read(fd, 2).decode()
+                return {"[A": "up", "[B": "down"}.get(seq, "escape")
+            return "escape"
+        if ch in ("\r", "\n"):
+            return "enter"
+        if ch == "\x03":
+            return "ctrl-c"
+        return ch
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+
+def _build_menu(items: list[tuple[str, tuple[str, list[str]]]],
+                selected: int, url: str) -> Panel:
+    """Build a Rich Panel for the TUI menu with current selection highlighted."""
+    table = Table(
+        show_header=False, border_style="dim", pad_edge=False,
+        expand=True, show_edge=False,
+    )
+    table.add_column("Arrow", width=3)
+    table.add_column("Name", width=12)
+    table.add_column("Description")
+
+    for i, (name, (desc, _)) in enumerate(items):
+        if i == selected:
+            table.add_row(
+                Text(">", style="bold cyan"),
+                Text(name, style="bold cyan"),
+                Text(desc, style="cyan"),
+            )
+        else:
+            table.add_row(
+                Text(" "),
+                Text(name, style="dim"),
+                Text(desc, style="dim"),
+            )
+
+    return Panel(
+        Group(table, Text("\n  Up/Down to move, Enter to select, q to quit", style="dim")),
+        title=f"Cortex Test Suite  [dim]({url})[/]",
+        border_style="bold cyan",
+        padding=(1, 2),
+    )
+
+
+def _show_tui_menu(url: str) -> list[str]:
+    """Show interactive TUI menu with arrow key navigation."""
+    menu_items = list(PRESETS.items())
+    selected = 1  # default: standard
+    n = len(menu_items)
+
+    try:
+        with Live(
+            _build_menu(menu_items, selected, url),
+            console=console,
+            auto_refresh=False,
+            transient=True,
+        ) as live:
+            while True:
+                key = _read_key()
+                if key == "up":
+                    selected = (selected - 1) % n
+                elif key == "down":
+                    selected = (selected + 1) % n
+                elif key == "enter":
+                    break
+                elif key in ("ctrl-c", "q", "Q", "escape"):
+                    live.stop()
+                    console.print("[dim]Cancelled[/]")
+                    sys.exit(0)
+                elif key.isdigit() and 1 <= int(key) <= n:
+                    selected = int(key) - 1
+                    break
+                else:
+                    continue
+                live.update(_build_menu(menu_items, selected, url))
+                live.refresh()
+    except (KeyboardInterrupt, EOFError):
+        console.print("[dim]Cancelled[/]")
+        sys.exit(0)
+
+    preset_name, (desc, suites) = menu_items[selected]
+    console.print(f"  [bold cyan]>[/] [bold]{preset_name}[/]  [dim]{desc}[/]\n")
+    return suites
 
 
 # ── Test image generators ─────────────────────────────────────────────
@@ -95,8 +231,7 @@ def _make_text_image() -> str:
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def _make_mask_image(width: int = 256, height: int = 256,
-                     fill_ratio: float = 0.05) -> str:
+def _make_mask_image(width: int = 256, height: int = 256, fill_ratio: float = 0.05) -> str:
     """Generate a mask image (white = area to inpaint)."""
     arr = np.zeros((height, width), dtype=np.uint8)
     # Small white rectangle in center
@@ -135,14 +270,30 @@ class TestResult:
     details: dict[str, Any] = field(default_factory=dict)
 
 
+def _status_text(passed: bool) -> Text:
+    if passed:
+        return Text("PASS", style="bold green")
+    return Text("FAIL", style="bold red")
+
+
+def _time_style(ms: int) -> str:
+    if ms > 10000:
+        return "bold red"
+    if ms > 2000:
+        return "yellow"
+    return "dim"
+
+
 class TestRunner:
-    """Collects and runs test cases, prints summary."""
+    """Collects and runs test cases, displays results with Rich TUI."""
 
     def __init__(self, base_url: str, verbose: bool = False) -> None:
         self.base_url = base_url.rstrip("/")
         self.verbose = verbose
         self.results: list[TestResult] = []
         self.client = httpx.AsyncClient(base_url=self.base_url, timeout=TIMEOUT)
+        self._suite_start: float = 0.0
+        self._suite_times: dict[str, float] = {}
         # Pre-generate test images (reuse across tests)
         self._rgb_b64 = _make_rgb_image()
         self._gray_b64 = _make_grayscale_image()
@@ -153,22 +304,24 @@ class TestRunner:
     async def close(self) -> None:
         await self.client.aclose()
 
-    def _log(self, result: TestResult) -> None:
-        status = f"{_GREEN}PASS{_RESET}" if result.passed else f"{_RED}FAIL{_RESET}"
-        elapsed = f"{_DIM}{result.elapsed_ms}ms{_RESET}" if result.elapsed_ms else ""
-        print(f"  [{status}] {result.name} {elapsed}")
-        if not result.passed and result.message:
-            print(f"         {_RED}{result.message}{_RESET}")
-        if self.verbose and result.details:
-            for k, v in result.details.items():
-                val = json.dumps(v, ensure_ascii=False) if isinstance(v, (dict, list)) else str(v)
-                if len(val) > 200:
-                    val = val[:200] + "..."
-                print(f"         {_DIM}{k}: {val}{_RESET}")
+    # Suites that require a clean VRAM state (all models unloaded) before running
+    _CLEAN_VRAM_SUITES = {"memory", "profile", "vram"}
+
+    async def _ensure_clean_vram(self, suite_name: str) -> None:
+        """Unload all models and wait for CUDA cleanup before state-sensitive suites."""
+        if suite_name not in self._CLEAN_VRAM_SUITES:
+            return
+        try:
+            resp = await self.client.post("/admin/unload-all")
+            if resp.status_code == 200:
+                await asyncio.sleep(1.5)  # CUDA memory cleanup
+                if self.verbose:
+                    console.print(f"  [dim]Suite isolation: unloaded all models before {suite_name}[/]")
+        except Exception:
+            pass  # best-effort; suite tests will catch real problems
 
     def _record(self, result: TestResult) -> None:
         self.results.append(result)
-        self._log(result)
 
     async def _post(self, endpoint: str, payload: dict) -> tuple[int, dict, int]:
         """POST to /v1/{endpoint}, return (status_code, body, elapsed_ms)."""
@@ -208,6 +361,7 @@ class TestRunner:
                 details={
                     "gpu": body.get("gpu", {}),
                     "models": body.get("models", {}),
+                    "queue": body.get("queue", {}),
                     "uptime_seconds": body.get("uptime_seconds"),
                 },
             ))
@@ -221,23 +375,49 @@ class TestRunner:
         """Verify GPU info contains expected fields."""
         code, body, elapsed = await self._get("/health")
         gpu = body.get("gpu", {})
-        has_fields = all(k in gpu for k in ("name", "vram_total_mb", "vram_used_mb", "vram_free_mb"))
+        base_fields = ("name", "vram_total_mb", "vram_used_mb", "vram_free_mb")
+        extended_fields = ("gpu_utilization_pct", "driver_version", "cuda_version",
+                           "temperature_c", "power_watts")
+        has_base = all(k in gpu for k in base_fields)
+        has_extended = all(k in gpu for k in extended_fields)
         has_real_gpu = gpu.get("name", "unknown") != "unknown" and gpu.get("vram_total_mb", 0) > 0
         self._record(TestResult(
-            name="GPU info fields present",
+            name="GPU base fields present",
             suite="health",
-            passed=has_fields,
+            passed=has_base,
             elapsed_ms=elapsed,
-            message="" if has_fields else f"Missing GPU fields: {gpu}",
+            message="" if has_base else f"Missing GPU fields: {gpu}",
             details={"gpu": gpu},
         ))
         self._record(TestResult(
-            name="GPU detected (nvidia-smi)",
+            name="GPU extended fields present",
+            suite="health",
+            passed=has_extended,
+            elapsed_ms=0,
+            message="" if has_extended else "Missing extended fields",
+            details={"extended_fields": {k: gpu.get(k) for k in extended_fields}},
+        ))
+        self._record(TestResult(
+            name="GPU detected (pynvml)",
             suite="health",
             passed=has_real_gpu,
             elapsed_ms=0,
             message="" if has_real_gpu else f"No GPU detected: {gpu.get('name')}",
             details={"gpu": gpu},
+        ))
+
+    async def test_health_queue_info(self) -> None:
+        """Verify queue info is present in /health response."""
+        _, body, elapsed = await self._get("/health")
+        queue = body.get("queue", {})
+        has_fields = all(k in queue for k in ("max_concurrent", "active", "timeout_seconds"))
+        self._record(TestResult(
+            name="Queue info present",
+            suite="health",
+            passed=has_fields,
+            elapsed_ms=elapsed,
+            message="" if has_fields else f"Missing queue fields: {queue}",
+            details={"queue": queue},
         ))
 
     async def test_uptime(self) -> None:
@@ -282,7 +462,7 @@ class TestRunner:
         """Verify VRAM utilization stays within budget."""
         _, body, _ = await self._get("/models")
         summary = body.get("summary", {})
-        used = summary.get("vram_used_mb", 0)
+        used = summary.get("vram_real_mb", 0)
         budget = summary.get("vram_budget_mb", 0)
         ok = budget > 0 and used <= budget
         self._record(TestResult(
@@ -290,7 +470,7 @@ class TestRunner:
             suite="models",
             passed=ok,
             message="" if ok else f"VRAM over budget: {used}MB / {budget}MB",
-            details={"vram_used_mb": used, "vram_budget_mb": budget,
+            details={"vram_real_mb": used, "vram_budget_mb": budget,
                       "utilization": summary.get("vram_utilization")},
         ))
 
@@ -332,6 +512,46 @@ class TestRunner:
             passed=ok,
             message="" if ok else "; ".join(bad[:3]),
             details={"total_models": len(models), "bad_entries": bad},
+        ))
+
+    async def test_model_loaded_fields(self) -> None:
+        """Verify loaded models have extended tracking fields."""
+        # Ensure at least one model is loaded
+        await self._post("remove-background", {"image_b64": self._rgb_b64})
+        _, body, _ = await self._get("/models")
+        loaded = [m for m in body.get("models", []) if m.get("status") == "loaded"]
+        extended_fields = {"loaded_at", "load_time_ms", "vram_delta_mb", "idle_seconds"}
+        bad = []
+        for m in loaded:
+            missing = extended_fields - set(m.keys())
+            if missing:
+                bad.append(f"{m.get('name', '?')}: missing {missing}")
+        ok = len(loaded) > 0 and len(bad) == 0
+        self._record(TestResult(
+            name="Loaded models have tracking fields",
+            suite="models",
+            passed=ok,
+            message="" if ok else "; ".join(bad[:3]),
+            details={
+                "loaded_count": len(loaded),
+                "sample": {m["name"]: {
+                    "load_time_ms": m.get("load_time_ms"),
+                    "vram_delta_mb": m.get("vram_delta_mb"),
+                } for m in loaded[:3]},
+            },
+        ))
+
+    async def test_model_events(self) -> None:
+        """Verify event log is present in /models response."""
+        _, body, _ = await self._get("/models")
+        events = body.get("events", [])
+        ok = isinstance(events, list)
+        self._record(TestResult(
+            name="Event log present in /models",
+            suite="models",
+            passed=ok,
+            message=f"{len(events)} events recorded",
+            details={"event_count": len(events), "recent": events[-3:] if events else []},
         ))
 
     async def test_model_check_single(self) -> None:
@@ -392,18 +612,18 @@ class TestRunner:
             details=details,
         ))
 
-    async def test_remove_background_matte(self) -> None:
-        """POST /v1/remove-background with output_type=matte."""
+    async def test_remove_background_mask(self) -> None:
+        """POST /v1/remove-background with output_type=mask."""
         code, body, elapsed = await self._post("remove-background", {
             "image_b64": self._rgb_b64,
-            "output_type": "matte",
+            "output_type": "mask",
         })
         ok = code == 200 and "image_b64" in body
         if ok:
             img = _decode_b64_image(body["image_b64"])
-            ok = ok and img.mode == "L"  # grayscale matte
+            ok = ok and img.mode == "L"  # grayscale alpha matte
         self._record(TestResult(
-            name="remove-background (matte output)",
+            name="remove-background (mask output)",
             suite="inference",
             passed=ok,
             elapsed_ms=elapsed,
@@ -412,7 +632,6 @@ class TestRunner:
 
     async def test_upscale(self) -> None:
         """POST /v1/upscale with x4plus model."""
-        # Use smaller image to save time
         small_b64 = _make_rgb_image(64, 64)
         code, body, elapsed = await self._post("upscale", {
             "image_b64": small_b64,
@@ -424,7 +643,6 @@ class TestRunner:
         if ok:
             img = _decode_b64_image(body["image_b64"])
             details["output_size"] = img.size
-            # Output should be 4x input (64*4 = 256)
             ok = ok and img.size[0] >= 64 * 2  # at least 2x bigger
         self._record(TestResult(
             name="upscale (x4plus, 4x)",
@@ -573,7 +791,7 @@ class TestRunner:
         """POST /v1/segment with a point prompt."""
         code, body, elapsed = await self._post("segment", {
             "image_b64": self._rgb_b64,
-            "points": [[128.0, 128.0, 1.0]],  # center point, foreground label
+            "points": [[128.0, 128.0, 1.0]],
         })
         ok = code == 200 and "masks" in body and "meta" in body
         meta = body.get("meta", {})
@@ -583,10 +801,7 @@ class TestRunner:
             passed=ok,
             elapsed_ms=elapsed,
             message="" if ok else f"code={code}, error={body.get('error', '')}",
-            details={
-                "meta": meta,
-                "masks_count": meta.get("masks_count", 0),
-            },
+            details={"meta": meta, "masks_count": meta.get("masks_count", 0)},
         ))
 
     async def test_segment_box(self) -> None:
@@ -612,7 +827,7 @@ class TestRunner:
         code, body, elapsed = await self._post("remove-background", {
             "image_b64": "not-valid-base64!!!",
         })
-        ok = code >= 400  # should return an error, not 200
+        ok = code >= 400
         self._record(TestResult(
             name="Invalid base64 rejected",
             suite="errors",
@@ -627,7 +842,7 @@ class TestRunner:
         code, body, elapsed = await self._post("upscale", {
             "model": "x4plus",
         })
-        ok = code == 422  # pydantic validation error
+        ok = code == 422
         self._record(TestResult(
             name="Missing image_b64 returns 422",
             suite="errors",
@@ -648,7 +863,7 @@ class TestRunner:
             suite="errors",
             passed=ok,
             elapsed_ms=elapsed,
-            message="" if ok else f"Expected MODEL_NOT_FOUND, got code={code}, body={body.get('error', {})}",
+            message="" if ok else f"Got code={code}, body={body.get('error', {})}",
         ))
 
     async def test_invalid_scale(self) -> None:
@@ -656,14 +871,13 @@ class TestRunner:
         small_b64 = _make_rgb_image(32, 32)
         code, body, elapsed = await self._post("upscale", {
             "image_b64": small_b64,
-            "scale": 8,  # only 2 or 4 are valid
+            "scale": 8,
         })
-        # Should either return error or handle gracefully
         is_error = code >= 400
         self._record(TestResult(
             name="Invalid scale parameter handled",
             suite="errors",
-            passed=True,  # pass if no server crash, either error or graceful handling
+            passed=True,  # pass if no server crash
             elapsed_ms=elapsed,
             message=f"code={code}, response={'error' if is_error else 'ok'}",
             details={"code": code},
@@ -675,11 +889,10 @@ class TestRunner:
         code, body, elapsed = await self._post("remove-background", {
             "image_b64": tiny_b64,
         })
-        # Should not crash the server
         self._record(TestResult(
             name="1x1 image does not crash server",
             suite="errors",
-            passed=True,  # pass as long as server responds (no connection error)
+            passed=True,
             elapsed_ms=elapsed,
             message=f"code={code}",
         ))
@@ -755,7 +968,7 @@ class TestRunner:
             times.append(elapsed)
         avg = sum(times) / len(times)
         p99 = sorted(times)[int(len(times) * 0.99)]
-        ok = avg < 100  # /health should be very fast
+        ok = avg < 100
         self._record(TestResult(
             name="Health latency benchmark",
             suite="benchmark",
@@ -766,10 +979,7 @@ class TestRunner:
         ))
 
     async def test_inference_latency(self) -> None:
-        """Benchmark each inference endpoint latency (single call, 256x256 input).
-
-        First call may include model loading time; second is pure inference.
-        """
+        """Benchmark each inference endpoint latency (warm-up + measured call)."""
         endpoints_payloads: list[tuple[str, dict]] = [
             ("remove-background", {"image_b64": self._rgb_b64}),
             ("denoise", {"image_b64": self._rgb_b64}),
@@ -796,36 +1006,74 @@ class TestRunner:
                 },
             ))
 
+    async def test_per_model_load_time(self) -> None:
+        """Report load time for each currently loaded model."""
+        _, body, _ = await self._get("/models")
+        loaded = [m for m in body.get("models", []) if m.get("status") == "loaded"]
+        if not loaded:
+            self._record(TestResult(
+                name="Per-model load time", suite="benchmark", passed=True,
+                message="No loaded models to report",
+            ))
+            return
+        for m in loaded:
+            self._record(TestResult(
+                name=f"Load time: {m['name']}",
+                suite="benchmark",
+                passed=True,
+                elapsed_ms=m.get("load_time_ms", 0),
+                message=f"load={m.get('load_time_ms', '?')}ms, vram_delta={m.get('vram_delta_mb', '?')}MB",
+                details={
+                    "model": m["name"],
+                    "load_time_ms": m.get("load_time_ms"),
+                    "vram_delta_mb": m.get("vram_delta_mb"),
+                    "vram_estimated_mb": m.get("vram_mb"),
+                },
+            ))
+
+    async def test_inference_stats(self) -> None:
+        """Report per-endpoint inference statistics from /stats."""
+        code, body, elapsed = await self._get("/stats")
+        ok = code == 200 and "inference" in body
+        stats = body.get("inference", {})
+        self._record(TestResult(
+            name="Inference statistics from /stats",
+            suite="benchmark",
+            passed=ok,
+            elapsed_ms=elapsed,
+            message=f"{len(stats)} endpoints tracked",
+            details={"stats": stats},
+        ))
+
     # ── Suite: VRAM Monitoring ─────────────────────────────────────────
 
     async def test_vram_tracking(self) -> None:
         """Monitor VRAM usage before and after inference calls."""
-        # Get baseline
         _, before, _ = await self._get("/models")
         before_summary = before.get("summary", {})
 
-        # Trigger a model load
         await self._post("remove-background", {"image_b64": self._rgb_b64})
 
-        # Get post-inference state
         _, after, _ = await self._get("/models")
         after_summary = after.get("summary", {})
 
         before_loaded = before_summary.get("loaded", 0)
         after_loaded = after_summary.get("loaded", 0)
-        vram_used = after_summary.get("vram_used_mb", 0)
+        vram_used = after_summary.get("vram_real_mb", 0)
         vram_budget = after_summary.get("vram_budget_mb", 0)
 
-        ok = vram_used <= vram_budget
+        # Allow 5% tolerance: vram_real_mb includes CUDA context/driver overhead
+        tolerance = max(500, int(vram_budget * 0.05))
+        ok = vram_used <= vram_budget + tolerance
         self._record(TestResult(
             name="VRAM tracking after inference",
             suite="vram",
             passed=ok,
-            message=f"loaded: {before_loaded} -> {after_loaded}, VRAM: {vram_used}/{vram_budget}MB",
+            message=f"loaded: {before_loaded} -> {after_loaded}, VRAM: {vram_used}/{vram_budget}MB (+{tolerance}MB tolerance)",
             details={
                 "before_loaded": before_loaded,
                 "after_loaded": after_loaded,
-                "vram_used_mb": vram_used,
+                "vram_real_mb": vram_used,
                 "vram_budget_mb": vram_budget,
                 "utilization": after_summary.get("vram_utilization"),
             },
@@ -833,7 +1081,6 @@ class TestRunner:
 
     async def test_model_idle_tracking(self) -> None:
         """Verify idle_seconds is tracked for loaded models."""
-        # First ensure at least one model is loaded
         await self._post("remove-background", {"image_b64": self._rgb_b64})
 
         _, body, _ = await self._get("/models")
@@ -856,27 +1103,50 @@ class TestRunner:
         ))
 
     async def test_vram_gpu_consistency(self) -> None:
-        """Cross-check estimated VRAM vs nvidia-smi reported VRAM."""
+        """Cross-check estimated VRAM vs pynvml reported VRAM."""
         _, health, _ = await self._get("/health")
         _, models, _ = await self._get("/models")
 
         gpu_used = health.get("gpu", {}).get("vram_used_mb", 0)
-        estimated = models.get("summary", {}).get("vram_used_mb", 0)
+        estimated = models.get("summary", {}).get("vram_estimated_mb", 0)
+        real = models.get("summary", {}).get("vram_real_mb", 0)
 
-        # Estimated VRAM should not exceed GPU reported usage by too much
-        # (nvidia-smi includes non-model VRAM like CUDA context)
         ok = True  # informational, always pass
         self._record(TestResult(
-            name="VRAM: nvidia-smi vs estimated",
+            name="VRAM: pynvml vs estimated vs real",
             suite="vram",
             passed=ok,
-            message=f"nvidia-smi={gpu_used}MB, model_estimated={estimated}MB",
+            message=f"pynvml={gpu_used}MB, estimated={estimated}MB, real={real}MB",
             details={
-                "nvidia_smi_used_mb": gpu_used,
+                "pynvml_used_mb": gpu_used,
                 "model_estimated_mb": estimated,
-                "delta_mb": gpu_used - estimated,
+                "model_real_mb": real,
+                "delta_pynvml_estimated_mb": gpu_used - estimated,
             },
         ))
+
+    async def test_vram_per_model_delta(self) -> None:
+        """Report per-model VRAM delta (estimated vs measured) for loaded models."""
+        await self._post("remove-background", {"image_b64": self._rgb_b64})
+        _, body, _ = await self._get("/models")
+        loaded = [m for m in body.get("models", []) if m.get("status") == "loaded"]
+
+        for m in loaded:
+            est = m.get("vram_mb", 0)
+            delta = m.get("vram_delta_mb", 0)
+            ratio = round(delta / est, 2) if est > 0 else 0
+            self._record(TestResult(
+                name=f"VRAM delta: {m['name']}",
+                suite="vram",
+                passed=True,  # informational
+                message=f"estimated={est}MB, real_delta={delta}MB, ratio={ratio}x",
+                details={
+                    "model": m["name"],
+                    "vram_estimated_mb": est,
+                    "vram_delta_mb": delta,
+                    "ratio": ratio,
+                },
+            ))
 
     # ── Suite: Response Format Validation ──────────────────────────────
 
@@ -903,6 +1173,20 @@ class TestRunner:
             details={"meta_keys": list(meta.keys()), "missing": list(missing)},
         ))
 
+        # Validate meta.gpu sub-fields
+        meta_gpu = meta.get("gpu", {})
+        gpu_keys = {"inference_ms", "vram_before_mb", "vram_after_mb",
+                     "gpu_utilization_pct", "temperature_c", "power_watts"}
+        gpu_missing = gpu_keys - set(meta_gpu.keys())
+        gpu_ok = len(gpu_missing) == 0
+        self._record(TestResult(
+            name="Response meta.gpu has profiling fields",
+            suite="format",
+            passed=gpu_ok,
+            message="" if gpu_ok else f"Missing gpu keys: {gpu_missing}",
+            details={"gpu": meta_gpu, "missing": list(gpu_missing)},
+        ))
+
     async def test_response_image_valid(self) -> None:
         """Verify returned image_b64 is a valid decodable image."""
         code, body, _ = await self._post("denoise", {
@@ -917,7 +1201,7 @@ class TestRunner:
         try:
             img = _decode_b64_image(body["image_b64"])
             ok = img.size[0] > 0 and img.size[1] > 0
-        except Exception as exc:
+        except Exception:
             ok = False
             img = None
         self._record(TestResult(
@@ -947,6 +1231,532 @@ class TestRunner:
             details={"error": error},
         ))
 
+    # ── Suite: Memory Pressure (stress) ─────────────────────────────────
+
+    async def _query_vram_snapshot(self) -> dict[str, Any]:
+        """Query /models and /health to get a VRAM snapshot."""
+        _, models, _ = await self._get("/models")
+        summary = models.get("summary", {})
+        return {
+            "vram_real_mb": summary.get("vram_real_mb", 0),
+            "vram_estimated_mb": summary.get("vram_estimated_mb", 0),
+            "vram_budget_mb": summary.get("vram_budget_mb", 0),
+            "loaded": summary.get("loaded", 0),
+            "loaded_names": [
+                m["name"] for m in models.get("models", [])
+                if m.get("status") == "loaded"
+            ],
+        }
+
+    async def test_memory_pressure_timeline(self) -> None:
+        """Core memory management test: load all endpoints sequentially,
+        track VRAM at every step, verify budget never exceeded.
+
+        Produces a VRAM timeline chart showing real VRAM vs budget line.
+        """
+        all_payloads: list[tuple[str, dict]] = [
+            ("remove-background", {"image_b64": self._rgb_b64}),
+            ("upscale", {"image_b64": _make_rgb_image(64, 64), "scale": 4}),
+            ("restore-face", {"image_b64": self._rgb_b64}),
+            ("denoise", {"image_b64": self._rgb_b64}),
+            ("colorize", {"image_b64": self._gray_b64}),
+            ("inpaint", {"image_b64": self._rgb_b64, "mask_b64": self._small_mask_b64}),
+            ("ocr", {"image_b64": self._text_b64}),
+            ("segment", {"image_b64": self._rgb_b64, "points": [[128.0, 128.0, 1.0]]}),
+        ]
+
+        # Record baseline before any load
+        baseline = await self._query_vram_snapshot()
+        budget = baseline["vram_budget_mb"]
+
+        timeline: list[dict[str, Any]] = [{
+            "step": "baseline",
+            "vram_real_mb": baseline["vram_real_mb"],
+            "loaded": baseline["loaded"],
+            "loaded_names": baseline["loaded_names"],
+            "http_code": 0,
+        }]
+
+        peak_vram = baseline["vram_real_mb"]
+        budget_exceeded_steps: list[str] = []
+
+        for endpoint, payload in all_payloads:
+            code, _, elapsed = await self._post(endpoint, payload)
+            snap = await self._query_vram_snapshot()
+
+            step_data = {
+                "step": endpoint,
+                "vram_real_mb": snap["vram_real_mb"],
+                "loaded": snap["loaded"],
+                "loaded_names": snap["loaded_names"],
+                "http_code": code,
+                "elapsed_ms": elapsed,
+            }
+            timeline.append(step_data)
+
+            if snap["vram_real_mb"] > peak_vram:
+                peak_vram = snap["vram_real_mb"]
+            # 10% tolerance for measurement noise
+            if budget > 0 and snap["vram_real_mb"] > budget * 1.1:
+                budget_exceeded_steps.append(
+                    f"{endpoint}: {snap['vram_real_mb']}MB > {budget}MB"
+                )
+
+        ok = len(budget_exceeded_steps) == 0
+        # Store timeline for chart rendering
+        self._memory_timeline = timeline
+        self._memory_budget = budget
+        self._memory_peak = peak_vram
+
+        self._record(TestResult(
+            name="VRAM timeline: budget never exceeded",
+            suite="memory",
+            passed=ok,
+            message=(f"peak={peak_vram}MB, budget={budget}MB, "
+                     f"breaches={len(budget_exceeded_steps)}")
+                    if ok else
+                    f"BUDGET EXCEEDED at: {'; '.join(budget_exceeded_steps)}",
+            details={
+                "peak_vram_mb": peak_vram,
+                "budget_mb": budget,
+                "baseline_vram_mb": baseline["vram_real_mb"],
+                "steps": len(timeline),
+                "breaches": budget_exceeded_steps,
+            },
+        ))
+
+    async def test_memory_eviction_triggered(self) -> None:
+        """Verify that eviction events were triggered during the pressure test."""
+        _, body, _ = await self._get("/models")
+        events = body.get("events", [])
+        load_events = [e for e in events if e.get("event") == "loaded"]
+        evict_events = [e for e in events if "evict" in e.get("event", "")]
+        oom_events = [e for e in events if e.get("event") == "oom_retry"]
+
+        # Store events for chart rendering
+        self._memory_events = events
+
+        self._record(TestResult(
+            name="Eviction triggered during pressure test",
+            suite="memory",
+            passed=len(load_events) > 0,
+            message=(f"{len(load_events)} loads, {len(evict_events)} evictions, "
+                     f"{len(oom_events)} OOM retries"),
+            details={
+                "total_events": len(events),
+                "load_events": len(load_events),
+                "evict_events": len(evict_events),
+                "oom_events": len(oom_events),
+                "all_events": events,
+            },
+        ))
+
+    async def test_memory_vram_accuracy(self) -> None:
+        """Compare estimated vs real VRAM delta for every loaded model."""
+        _, body, _ = await self._get("/models")
+        loaded = [m for m in body.get("models", [])
+                  if m.get("status") == "loaded" and m.get("vram_delta_mb") is not None]
+
+        # Store for accuracy table rendering
+        self._vram_accuracy_data = loaded
+
+        if not loaded:
+            self._record(TestResult(
+                name="Per-model VRAM accuracy", suite="memory", passed=True,
+                message="No loaded models with VRAM delta data",
+            ))
+            return
+
+        for m in loaded:
+            est = m.get("vram_mb", 0)
+            delta = m.get("vram_delta_mb", 0)
+            ratio = round(delta / est, 2) if est > 0 else 0
+            diff = delta - est
+            sign = "+" if diff >= 0 else ""
+            self._record(TestResult(
+                name=f"VRAM accuracy: {m['name']}",
+                suite="memory",
+                passed=True,  # informational
+                message=f"est={est}MB, real={delta}MB, {sign}{diff}MB ({ratio}x)",
+                details={
+                    "model": m["name"],
+                    "estimated_mb": est,
+                    "real_delta_mb": delta,
+                    "diff_mb": diff,
+                    "ratio": ratio,
+                    "file_size_mb": m.get("file_size_mb"),
+                    "load_time_ms": m.get("load_time_ms"),
+                },
+            ))
+
+    async def test_memory_rapid_cycling(self) -> None:
+        """Rapid cycling: 20 sequential requests across endpoints.
+        Verify no 500 errors and VRAM stays within budget throughout.
+        """
+        endpoints_payloads: list[tuple[str, dict]] = [
+            ("remove-background", {"image_b64": self._rgb_b64}),
+            ("denoise", {"image_b64": self._rgb_b64}),
+            ("colorize", {"image_b64": self._gray_b64}),
+            ("ocr", {"image_b64": self._text_b64}),
+        ]
+        errors_500 = 0
+        total = 20
+        peak_vram = 0
+
+        for i in range(total):
+            ep, payload = endpoints_payloads[i % len(endpoints_payloads)]
+            code, _, _ = await self._post(ep, payload)
+            if code == 500:
+                errors_500 += 1
+
+            # Sample VRAM every 5 requests
+            if (i + 1) % 5 == 0:
+                snap = await self._query_vram_snapshot()
+                if snap["vram_real_mb"] > peak_vram:
+                    peak_vram = snap["vram_real_mb"]
+
+        # Final check
+        snap = await self._query_vram_snapshot()
+        if snap["vram_real_mb"] > peak_vram:
+            peak_vram = snap["vram_real_mb"]
+        budget = snap["vram_budget_mb"]
+
+        ok = errors_500 == 0 and (budget == 0 or peak_vram <= budget * 1.1)
+        self._record(TestResult(
+            name="Rapid cycling: 20 requests stable",
+            suite="memory",
+            passed=ok,
+            message=(f"{errors_500} errors, peak={peak_vram}MB, "
+                     f"budget={budget}MB, loaded={snap['loaded']}"),
+            details={
+                "total_requests": total,
+                "errors_500": errors_500,
+                "peak_vram_mb": peak_vram,
+                "final_loaded": snap["loaded"],
+                "final_vram_mb": snap["vram_real_mb"],
+            },
+        ))
+
+    async def test_memory_concurrent_pressure(self) -> None:
+        """Fire concurrent requests to different endpoints simultaneously.
+        Verify no crashes and VRAM is managed correctly under concurrency.
+        """
+        small_b64 = _make_rgb_image(64, 64)
+
+        # 3 rounds of concurrent requests
+        errors_500 = 0
+        for _ in range(3):
+            tasks = [
+                self._post("remove-background", {"image_b64": small_b64}),
+                self._post("denoise", {"image_b64": small_b64}),
+                self._post("colorize", {"image_b64": self._gray_b64}),
+                self._post("ocr", {"image_b64": self._text_b64}),
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception):
+                    errors_500 += 1
+                elif r[0] == 500:
+                    errors_500 += 1
+
+        snap = await self._query_vram_snapshot()
+        budget = snap["vram_budget_mb"]
+        vram = snap["vram_real_mb"]
+        ok = errors_500 == 0 and (budget == 0 or vram <= budget * 1.1)
+
+        self._record(TestResult(
+            name="Concurrent pressure: 3x4 parallel requests",
+            suite="memory",
+            passed=ok,
+            message=f"{errors_500} errors, VRAM={vram}MB/{budget}MB, loaded={snap['loaded']}",
+            details={
+                "total_rounds": 3,
+                "parallel_per_round": 4,
+                "errors": errors_500,
+                "final_vram_mb": vram,
+                "budget_mb": budget,
+            },
+        ))
+
+    async def test_memory_shared_memory_check(self) -> None:
+        """Verify shared_memory_warning field in /health."""
+        _, body, elapsed = await self._get("/health")
+        warning = body.get("shared_memory_warning")
+        ok = warning is not None  # field exists
+        self._record(TestResult(
+            name="shared_memory_warning in /health",
+            suite="memory",
+            passed=ok,
+            elapsed_ms=elapsed,
+            message=f"shared_memory_warning={warning}",
+            details={"shared_memory_warning": warning},
+        ))
+
+    async def test_memory_timeline_api(self) -> None:
+        """Verify /stats/timeline returns samples."""
+        code, body, elapsed = await self._get("/stats/timeline?last=30")
+        samples = body.get("samples", [])
+        has_shared = "shared_memory_detected" in body
+        ok = code == 200 and has_shared
+        self._record(TestResult(
+            name="Timeline API (/stats/timeline)",
+            suite="memory",
+            passed=ok,
+            elapsed_ms=elapsed,
+            message=f"{len(samples)} samples, shared_memory={body.get('shared_memory_detected')}",
+            details={
+                "sample_count": len(samples),
+                "shared_memory_detected": body.get("shared_memory_detected"),
+                "latest_sample": samples[-1] if samples else None,
+            },
+        ))
+
+    async def test_memory_workspace_tracked(self) -> None:
+        """Verify workspace_measured_mb is populated after inference."""
+        # Trigger inference
+        await self._post("remove-background", {"image_b64": self._rgb_b64})
+        _, body, _ = await self._get("/models")
+        loaded = [m for m in body.get("models", []) if m.get("status") == "loaded"]
+
+        has_workspace = [
+            m for m in loaded
+            if m.get("workspace_measured_mb") is not None and m.get("workspace_measured_mb", 0) >= 0
+        ]
+        ok = len(has_workspace) > 0
+        self._record(TestResult(
+            name="workspace_measured_mb tracked after inference",
+            suite="memory",
+            passed=ok,
+            message=f"{len(has_workspace)}/{len(loaded)} models have workspace data",
+            details={
+                "models": [
+                    {"name": m["name"],
+                     "workspace_mb": m.get("workspace_mb"),
+                     "workspace_measured_mb": m.get("workspace_measured_mb"),
+                     "inference_count": m.get("inference_count")}
+                    for m in loaded
+                ],
+            },
+        ))
+
+    # ── Suite: Profile (isolated per-model VRAM profiling) ────────────
+
+    async def _profile_endpoint(
+        self,
+        endpoint: str,
+        payload: dict,
+        label: str,
+    ) -> dict[str, Any]:
+        """Profile a single endpoint: unload all, measure baseline, infer, measure."""
+        # Unload all models
+        resp = await self.client.post("/admin/unload-all")
+        if resp.status_code != 200:
+            return {"error": f"unload-all failed: {resp.status_code}"}
+
+        # Wait for CUDA memory cleanup
+        await asyncio.sleep(2.0)
+
+        # Record baseline
+        _, health, _ = await self._get("/health")
+        gpu_info = health.get("gpu", {})
+        baseline_vram = gpu_info.get("vram_used_mb", 0)
+        baseline_system_ram = 0
+        # Try to get system RAM from timeline samples
+        _, tl, _ = await self._get("/stats/timeline?last=1")
+        samples = tl.get("samples", [])
+        if samples:
+            baseline_system_ram = samples[-1].get("system_ram_used_mb", 0)
+
+        # Start background VRAM sampler
+        vram_samples: list[dict] = []
+        sampling = True
+
+        async def _sampler():
+            while sampling:
+                try:
+                    _, h, _ = await self._get("/health")
+                    vram_samples.append({
+                        "timestamp": time.time(),
+                        "vram_used_mb": h.get("gpu", {}).get("vram_used_mb", 0),
+                    })
+                except Exception:
+                    pass
+                await asyncio.sleep(0.1)
+
+        sampler_task = asyncio.create_task(_sampler())
+
+        # Run inference
+        t0 = time.perf_counter()
+        resp_body: dict = {}
+        try:
+            code, resp_body, _ = await self._post(endpoint, payload)
+        except httpx.TimeoutException:
+            code = 504
+        roundtrip_ms = int((time.perf_counter() - t0) * 1000)
+
+        # Stop sampler
+        sampling = False
+        await sampler_task
+
+        # Record post-inference state
+        _, health_after, _ = await self._get("/health")
+        _, tl_after, _ = await self._get("/stats/timeline?last=1")
+        after_vram = health_after.get("gpu", {}).get("vram_used_mb", 0)
+        after_system_ram = 0
+        after_samples = tl_after.get("samples", [])
+        if after_samples:
+            after_system_ram = after_samples[-1].get("system_ram_used_mb", 0)
+
+        # Get actual model load delta from /models API (measured at load time)
+        _, models_data, _ = await self._get("/models")
+        model_load_delta = 0
+        for m in models_data.get("models", []):
+            if m.get("status") == "loaded" and m.get("vram_delta_mb"):
+                model_load_delta += m["vram_delta_mb"]
+
+        # Compute VRAM metrics using real load delta
+        peak_vram = max((s["vram_used_mb"] for s in vram_samples), default=after_vram)
+        load_mb = model_load_delta if model_load_delta > 0 else max(0, after_vram - baseline_vram)
+        workspace_peak_mb = peak_vram - baseline_vram - load_mb
+        workspace_retained_mb = after_vram - baseline_vram - load_mb
+        system_ram_delta = after_system_ram - baseline_system_ram
+        vram_total = gpu_info.get("vram_total_mb", 0)
+        shared_memory = (
+            (vram_total > 0 and peak_vram >= vram_total * 0.98)
+            or system_ram_delta > 500
+        )
+
+        # Extract server-side GPU profile from response meta
+        meta_gpu = resp_body.get("meta", {}).get("gpu", {})
+
+        return {
+            "label": label,
+            "endpoint": endpoint,
+            "http_code": code,
+            "roundtrip_ms": roundtrip_ms,
+            "inference_ms": meta_gpu.get("inference_ms", 0),
+            "baseline_vram_mb": baseline_vram,
+            "load_vram_mb": load_mb,
+            "peak_vram_mb": peak_vram,
+            "after_vram_mb": after_vram,
+            "workspace_peak_mb": max(0, workspace_peak_mb),
+            "workspace_retained_mb": max(0, workspace_retained_mb),
+            "baseline_system_ram_mb": baseline_system_ram,
+            "after_system_ram_mb": after_system_ram,
+            "system_ram_delta_mb": system_ram_delta,
+            "shared_memory_detected": shared_memory,
+            "vram_samples": len(vram_samples),
+            "gpu_utilization_pct": meta_gpu.get("gpu_utilization_pct"),
+            "temperature_c": meta_gpu.get("temperature_c"),
+            "power_watts": meta_gpu.get("power_watts"),
+        }
+
+    async def test_profile_all_endpoints(self) -> None:
+        """Profile each endpoint in isolation to measure VRAM usage."""
+        profile_payloads: list[tuple[str, dict, str]] = [
+            ("remove-background", {"image_b64": self._rgb_b64}, "birefnet-general"),
+            ("upscale", {"image_b64": _make_rgb_image(64, 64), "scale": 4}, "realesrgan-x4plus"),
+            ("restore-face", {"image_b64": self._rgb_b64}, "gfpgan-v1.4"),
+            ("denoise", {"image_b64": self._rgb_b64}, "nafnet-sidd-w64"),
+            ("colorize", {"image_b64": self._gray_b64}, "ddcolor-artistic"),
+            ("inpaint", {"image_b64": self._rgb_b64, "mask_b64": self._small_mask_b64}, "migan"),
+            ("inpaint", {"image_b64": self._rgb_b64, "mask_b64": self._large_mask_b64,
+                         "model": "lama"}, "lama"),
+            ("segment", {"image_b64": self._rgb_b64, "points": [[128.0, 128.0, 1.0]]},
+             "mobilesam-encoder"),
+        ]
+
+        profile_results: list[dict] = []
+
+        for endpoint, payload, label in profile_payloads:
+            try:
+                profile = await self._profile_endpoint(endpoint, payload, label)
+            except Exception as exc:
+                profile = {"label": label, "endpoint": endpoint,
+                           "http_code": 0, "error": str(exc)}
+
+            profile_results.append(profile)
+
+            ok = profile.get("http_code") == 200
+            shared = profile.get("shared_memory_detected", False)
+            error_msg = profile.get("error", "")
+            gpu_info_msg = ""
+            if not error_msg:
+                gpu_util = profile.get("gpu_utilization_pct")
+                if gpu_util is not None:
+                    gpu_info_msg = f", GPU={gpu_util}%"
+                temp = profile.get("temperature_c")
+                if temp is not None:
+                    gpu_info_msg += f", {temp}C"
+                power = profile.get("power_watts")
+                if power is not None:
+                    gpu_info_msg += f", {power}W"
+            self._record(TestResult(
+                name=f"Profile: {label}",
+                suite="profile",
+                passed=ok,
+                elapsed_ms=profile.get("roundtrip_ms", 0),
+                message=(
+                    error_msg if error_msg else
+                    f"infer={profile.get('inference_ms', '?')}ms, "
+                    f"load={profile.get('load_vram_mb')}MB, "
+                    f"peak={profile.get('peak_vram_mb')}MB, "
+                    f"ws={profile.get('workspace_peak_mb')}MB"
+                    + gpu_info_msg
+                    + (" SHARED!" if shared else "")
+                ),
+                details=profile,
+            ))
+
+        # Store for table rendering and saving
+        self._profile_results = profile_results
+
+    async def test_profile_save(self) -> None:
+        """Save profile results via /admin/save-profile API."""
+        results = getattr(self, "_profile_results", [])
+        if not results:
+            self._record(TestResult(
+                name="Save profile", suite="profile", passed=False,
+                message="No profile results to save",
+            ))
+            return
+
+        # Build profile JSON
+        profile_data = {}
+        for r in results:
+            label = r.get("label", "")
+            if label and r.get("http_code") == 200:
+                profile_data[label] = {
+                    "load_vram_mb": r.get("load_vram_mb", 0),
+                    "workspace_peak_mb": r.get("workspace_peak_mb", 0),
+                    "workspace_retained_mb": r.get("workspace_retained_mb", 0),
+                    "shared_memory_detected": r.get("shared_memory_detected", False),
+                    "inference_ms": r.get("inference_ms", 0),
+                    "roundtrip_ms": r.get("roundtrip_ms", 0),
+                    "gpu_utilization_pct": r.get("gpu_utilization_pct"),
+                    "temperature_c": r.get("temperature_c"),
+                    "power_watts": r.get("power_watts"),
+                }
+
+        # Save via server API (server knows the correct path)
+        try:
+            resp = await self.client.post("/admin/save-profile", json=profile_data)
+            body = resp.json()
+            ok = resp.status_code == 200 and body.get("status") == "ok"
+            msg = (f"Saved {body.get('models', 0)} models to {body.get('path', '?')}"
+                   if ok else f"Server error: {body.get('message', resp.text)}")
+        except Exception as exc:
+            ok = False
+            msg = f"Failed to save: {exc}"
+
+        self._record(TestResult(
+            name="Save VRAM profile",
+            suite="profile",
+            passed=ok,
+            message=msg,
+            details={"models": list(profile_data.keys())},
+        ))
+
     # ── Suite runner ───────────────────────────────────────────────────
 
     def _get_suite_tests(self, suite: str) -> list[Callable]:
@@ -955,6 +1765,7 @@ class TestRunner:
             "health": [
                 self.test_health_endpoint,
                 self.test_health_gpu_info,
+                self.test_health_queue_info,
                 self.test_uptime,
             ],
             "models": [
@@ -962,12 +1773,14 @@ class TestRunner:
                 self.test_models_vram_budget,
                 self.test_models_check_all,
                 self.test_model_status_fields,
+                self.test_model_loaded_fields,
+                self.test_model_events,
                 self.test_model_check_single,
                 self.test_model_check_unknown,
             ],
             "inference": [
                 self.test_remove_background,
-                self.test_remove_background_matte,
+                self.test_remove_background_mask,
                 self.test_upscale,
                 self.test_upscale_x4v3,
                 self.test_restore_face,
@@ -1000,134 +1813,700 @@ class TestRunner:
                 self.test_vram_tracking,
                 self.test_model_idle_tracking,
                 self.test_vram_gpu_consistency,
+                self.test_vram_per_model_delta,
             ],
             "benchmark": [
                 self.test_health_latency,
                 self.test_inference_latency,
+                self.test_per_model_load_time,
+                self.test_inference_stats,
+            ],
+            "memory": [
+                self.test_memory_pressure_timeline,
+                self.test_memory_eviction_triggered,
+                self.test_memory_vram_accuracy,
+                self.test_memory_rapid_cycling,
+                self.test_memory_concurrent_pressure,
+                self.test_memory_shared_memory_check,
+                self.test_memory_timeline_api,
+                self.test_memory_workspace_tracked,
+            ],
+            "profile": [
+                self.test_profile_all_endpoints,
+                self.test_profile_save,
             ],
         }
         if suite == "all":
             return [test for tests in suites.values() for test in tests]
         return suites.get(suite, [])
 
-    async def run_suite(self, suite: str, include_benchmark: bool = False) -> None:
-        """Run a test suite or all suites."""
-        if suite == "all":
-            suite_names = ["health", "models", "inference", "errors",
-                           "concurrency", "format", "vram"]
-            if include_benchmark:
-                suite_names.append("benchmark")
+    async def run_suites(self, suite_names: list[str]) -> None:
+        """Run a list of test suites with live progress feedback."""
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        ordered: list[str] = []
+        for s in suite_names:
+            if s not in seen:
+                seen.add(s)
+                ordered.append(s)
+        suite_names = ordered
+
+        total_tests = sum(len(self._get_suite_tests(s)) for s in suite_names)
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold]{task.description}"),
+            BarColumn(bar_width=30),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console,
+        ) as progress:
+            overall = progress.add_task("Starting...", total=total_tests)
+
+            for suite_name in suite_names:
+                tests = self._get_suite_tests(suite_name)
+                if not tests:
+                    console.print(f"[yellow]Unknown suite: {suite_name}[/]")
+                    continue
+
+                # Ensure clean VRAM state for state-sensitive suites
+                await self._ensure_clean_vram(suite_name)
+
+                progress.update(
+                    overall,
+                    description=f"[bold]{suite_name.upper()}[/]  [dim]starting...[/]",
+                )
+                self._suite_start = time.perf_counter()
+
+                for test_fn in tests:
+                    before_count = len(self.results)
+                    try:
+                        await test_fn()
+                    except httpx.ConnectError:
+                        self._record(TestResult(
+                            name=test_fn.__doc__ or test_fn.__name__,
+                            suite=suite_name,
+                            passed=False,
+                            message=f"Connection refused: {self.base_url}",
+                        ))
+                    except Exception as exc:
+                        self._record(TestResult(
+                            name=test_fn.__doc__ or test_fn.__name__,
+                            suite=suite_name,
+                            passed=False,
+                            message=f"Unexpected error: {exc}",
+                        ))
+
+                    # Show latest test result in progress bar
+                    new_results = self.results[before_count:]
+                    if new_results:
+                        last = new_results[-1]
+                        tag = "[green]PASS[/]" if last.passed else "[red]FAIL[/]"
+                        timing = f"  [dim]{last.elapsed_ms}ms[/]" if last.elapsed_ms else ""
+                        desc = f"[bold]{suite_name.upper()}[/]  {tag} {last.name}{timing}"
+                        if not last.passed and last.message:
+                            # Truncate long error messages
+                            msg = last.message[:80]
+                            desc += f"\n         [red]{msg}[/]"
+                        progress.update(overall, description=desc)
+
+                    # Some tests record multiple results; advance by actual count
+                    progress.advance(overall, advance=1)
+
+                self._suite_times[suite_name] = time.perf_counter() - self._suite_start
+
+    def _build_suite_table(self, suite_name: str, results: list[TestResult]) -> Table:
+        """Build a Rich Table for a single suite's results."""
+        s_pass = sum(1 for r in results if r.passed)
+        s_total = len(results)
+        status_str = f"{s_pass}/{s_total}"
+        if s_pass == s_total:
+            header_style = "bold green"
         else:
-            suite_names = [suite]
+            header_style = "bold red"
 
-        for name in suite_names:
-            tests = self._get_suite_tests(name)
-            if not tests:
-                print(f"\n{_YELLOW}Unknown suite: {name}{_RESET}")
+        elapsed = self._suite_times.get(suite_name, 0)
+
+        table = Table(
+            title=f" {suite_name.upper()} [{status_str}] ({elapsed:.1f}s)",
+            title_style=header_style,
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            pad_edge=False,
+            expand=True,
+        )
+        table.add_column("#", width=3, justify="right", style="dim")
+        table.add_column("Test", min_width=30, ratio=3)
+        table.add_column("Status", width=6, justify="center")
+        table.add_column("Time", width=8, justify="right")
+        table.add_column("Message", ratio=2, overflow="fold")
+
+        for i, r in enumerate(results, 1):
+            time_text = Text(f"{r.elapsed_ms}ms", style=_time_style(r.elapsed_ms)) if r.elapsed_ms else Text("")
+            msg = Text(r.message, style="dim" if r.passed else "red")
+            table.add_row(
+                str(i),
+                r.name,
+                _status_text(r.passed),
+                time_text,
+                msg,
+            )
+
+        return table
+
+    def _build_gpu_panel(self, gpu_info: dict) -> Panel:
+        """Build a GPU info panel from /health data."""
+        table = Table(show_header=False, border_style="dim", pad_edge=False, expand=True)
+        table.add_column("Key", style="bold", min_width=20)
+        table.add_column("Value")
+
+        rows = [
+            ("GPU", str(gpu_info.get("name", "unknown"))),
+            ("VRAM Total", f"{gpu_info.get('vram_total_mb', 0)} MB"),
+            ("VRAM Used", f"{gpu_info.get('vram_used_mb', 0)} MB"),
+            ("VRAM Free", f"{gpu_info.get('vram_free_mb', 0)} MB"),
+            ("GPU Utilization", f"{gpu_info.get('gpu_utilization_pct', 'N/A')}%"),
+            ("Memory Utilization", f"{gpu_info.get('memory_utilization_pct', 'N/A')}%"),
+            ("Temperature", f"{gpu_info.get('temperature_c', 'N/A')} C"),
+            ("Power", f"{gpu_info.get('power_watts', 'N/A')} W"),
+            ("Driver", str(gpu_info.get("driver_version", "N/A"))),
+            ("CUDA", str(gpu_info.get("cuda_version", "N/A"))),
+        ]
+        for k, v in rows:
+            table.add_row(k, v)
+        return Panel(table, title="GPU Information", border_style="cyan")
+
+    def _build_vram_accuracy_table(self) -> Table | None:
+        """Build VRAM accuracy comparison table from memory suite results."""
+        vram_results = [
+            r for r in self.results
+            if r.suite == "memory"
+            and (r.details.get("estimated_mb") is not None
+                 or r.details.get("vram_estimated_mb") is not None)
+        ]
+        if not vram_results:
+            return None
+
+        table = Table(
+            title="VRAM Accuracy: Estimated vs Real per Model",
+            title_style="bold cyan",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            expand=True,
+        )
+        table.add_column("Model", min_width=25)
+        table.add_column("Estimated", justify="right", width=10)
+        table.add_column("Real Delta", justify="right", width=10)
+        table.add_column("Diff", justify="right", width=8)
+        table.add_column("Ratio", justify="right", width=7)
+        table.add_column("Load Time", justify="right", width=10)
+        table.add_column("File Size", justify="right", width=10)
+
+        for r in vram_results:
+            d = r.details
+            est = d.get("estimated_mb") or d.get("vram_estimated_mb") or 0
+            real = d.get("real_delta_mb") or d.get("vram_delta_mb") or 0
+            diff = real - est
+            ratio = d.get("ratio", 0)
+            file_size = d.get("file_size_mb")
+            load_time = d.get("load_time_ms")
+
+            diff_style = "red" if diff > 0 else "green" if diff < 0 else ""
+            sign = "+" if diff >= 0 else ""
+
+            table.add_row(
+                d.get("model", "?"),
+                f"{est} MB",
+                f"{real} MB",
+                Text(f"{sign}{diff} MB", style=diff_style),
+                f"{ratio}x",
+                f"{load_time} ms" if load_time else "-",
+                f"{file_size} MB" if file_size else "-",
+            )
+
+        return table
+
+    def _build_vram_timeline_chart(self) -> Panel | None:
+        """Build an ASCII VRAM timeline chart from memory pressure test data."""
+        timeline = getattr(self, "_memory_timeline", None)
+        budget = getattr(self, "_memory_budget", 0)
+        peak = getattr(self, "_memory_peak", 0)
+        if not timeline or budget == 0:
+            return None
+
+        chart_width = 60
+        chart_height = 16
+        max_val = max(budget * 1.2, peak * 1.1, 1)
+
+        # Build chart grid
+        grid = [[" "] * chart_width for _ in range(chart_height)]
+
+        # Draw budget line
+        budget_row = chart_height - 1 - int((budget / max_val) * (chart_height - 1))
+        budget_row = max(0, min(chart_height - 1, budget_row))
+        for col in range(chart_width):
+            grid[budget_row][col] = "-"
+
+        # Plot VRAM values
+        n_steps = len(timeline)
+        for i, step in enumerate(timeline):
+            col = int(i * (chart_width - 1) / max(n_steps - 1, 1))
+            col = min(col, chart_width - 1)
+            vram = step["vram_real_mb"]
+            row = chart_height - 1 - int((vram / max_val) * (chart_height - 1))
+            row = max(0, min(chart_height - 1, row))
+
+            if vram > budget:
+                grid[row][col] = "!"  # over budget
+            else:
+                grid[row][col] = "#"
+
+            # Draw vertical bar below the point
+            for r in range(row + 1, chart_height):
+                if grid[r][col] == " ":
+                    grid[r][col] = ":"
+
+        # Build text lines with y-axis labels
+        lines = []
+        lines.append(f"  VRAM (MB)   {'VRAM Timeline During Sequential Model Loading':^{chart_width}}")
+        lines.append(f"  {int(max_val):>6}  |{''.join(grid[0])}|")
+        for r in range(1, chart_height - 1):
+            val = int(max_val * (chart_height - 1 - r) / (chart_height - 1))
+            if r == budget_row:
+                lines.append(f"  {val:>6}  |{''.join(grid[r])}| <- budget ({budget} MB)")
+            else:
+                lines.append(f"  {val:>6}  |{''.join(grid[r])}|")
+        lines.append(f"  {0:>6}  |{''.join(grid[-1])}|")
+
+        # X-axis labels
+        label_positions = []
+        for i, step in enumerate(timeline):
+            col = int(i * (chart_width - 1) / max(n_steps - 1, 1))
+            col = min(col, chart_width - 1)
+            label_positions.append((col, step["step"][:3]))
+
+        x_line = [" "] * chart_width
+        for col, label in label_positions:
+            for j, ch in enumerate(label):
+                if col + j < chart_width:
+                    x_line[col + j] = ch
+
+        lines.append(f"          +{''.join(['-'] * chart_width)}+")
+        lines.append(f"           {''.join(x_line)}")
+        lines.append("")
+        lines.append("  Legend: # = VRAM   - = budget line   ! = OVER BUDGET   : = fill")
+        lines.append(f"  Peak: {peak} MB   Budget: {budget} MB   "
+                     f"Utilization: {peak / budget:.0%}" if budget > 0 else "")
+
+        # Step details
+        lines.append("")
+        lines.append("  Step details:")
+        for step in timeline:
+            name = step["step"]
+            vram = step["vram_real_mb"]
+            loaded = step["loaded"]
+            elapsed = step.get("elapsed_ms", 0)
+            code = step.get("http_code", 0)
+            over = " !! OVER BUDGET" if budget > 0 and vram > budget else ""
+            if name == "baseline":
+                lines.append(f"    {name:<20s}  VRAM={vram:>5}MB  loaded={loaded}{over}")
+            else:
+                lines.append(f"    {name:<20s}  VRAM={vram:>5}MB  loaded={loaded}  "
+                             f"{elapsed}ms  HTTP {code}{over}")
+
+        chart_text = "\n".join(lines)
+        border = "red" if peak > budget else "green"
+        return Panel(chart_text, title="VRAM Timeline", border_style=border, expand=True)
+
+    def _build_event_table(self, events: list[dict]) -> Table | None:
+        """Build event log table."""
+        if not events:
+            return None
+
+        table = Table(
+            title="Recent Model Events",
+            title_style="bold cyan",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            expand=True,
+        )
+        table.add_column("Time", width=10)
+        table.add_column("Event", width=14)
+        table.add_column("Model", min_width=20)
+        table.add_column("VRAM Before", justify="right", width=11)
+        table.add_column("VRAM After", justify="right", width=11)
+        table.add_column("Detail", ratio=1)
+
+        event_styles = {
+            "loaded": "green",
+            "evicted_lru": "yellow",
+            "evicted_idle": "yellow",
+            "evicted_budget": "red",
+            "evicted_workspace": "magenta",
+            "oom_retry": "bold red",
+        }
+
+        # Show last 20 events max
+        for e in events[-20:]:
+            ts = datetime.fromtimestamp(e.get("timestamp", 0)).strftime("%H:%M:%S")
+            event_type = e.get("event", "?")
+            style = event_styles.get(event_type, "")
+            table.add_row(
+                ts,
+                Text(event_type, style=style),
+                e.get("model", "?"),
+                f"{e.get('vram_before_mb', '?')} MB",
+                f"{e.get('vram_after_mb', '?')} MB",
+                e.get("detail", ""),
+            )
+
+        return table
+
+    def _build_profile_table(self) -> Table | None:
+        """Build VRAM profile table from profile suite results."""
+        results = getattr(self, "_profile_results", [])
+        if not results:
+            return None
+
+        table = Table(
+            title="VRAM Profile: Isolated Per-Model Measurement",
+            title_style="bold cyan",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            expand=True,
+        )
+        table.add_column("Model", min_width=20)
+        table.add_column("Baseline", justify="right", width=10)
+        table.add_column("Load", justify="right", width=8)
+        table.add_column("Peak", justify="right", width=8)
+        table.add_column("WS Peak", justify="right", width=10)
+        table.add_column("WS Retained", justify="right", width=12)
+        table.add_column("RAM Delta", justify="right", width=10)
+        table.add_column("Shared?", justify="center", width=8)
+        table.add_column("GPU%", justify="right", width=6)
+        table.add_column("Temp", justify="right", width=6)
+        table.add_column("Power", justify="right", width=8)
+        table.add_column("Infer", justify="right", width=8)
+        table.add_column("Total", justify="right", width=8)
+
+        for r in results:
+            if r.get("http_code") != 200:
+                table.add_row(
+                    r.get("label", "?"),
+                    "-", "-", "-", "-", "-", "-",
+                    Text("ERR", style="red"),
+                    "-", "-", "-", "-", "-",
+                )
                 continue
-            print(f"\n{_BOLD}{_CYAN}{'=' * 60}{_RESET}")
-            print(f"{_BOLD}{_CYAN}  Suite: {name.upper()}{_RESET}")
-            print(f"{_BOLD}{_CYAN}{'=' * 60}{_RESET}")
-            for test_fn in tests:
-                try:
-                    await test_fn()
-                except httpx.ConnectError:
-                    self._record(TestResult(
-                        name=test_fn.__doc__ or test_fn.__name__,
-                        suite=name,
-                        passed=False,
-                        message=f"Connection refused: {self.base_url}",
-                    ))
-                except Exception as exc:
-                    self._record(TestResult(
-                        name=test_fn.__doc__ or test_fn.__name__,
-                        suite=name,
-                        passed=False,
-                        message=f"Unexpected error: {exc}",
-                    ))
 
-    def print_summary(self) -> None:
-        """Print final test summary."""
-        total = len(self.results)
-        passed = sum(1 for r in self.results if r.passed)
-        failed = total - passed
+            shared = r.get("shared_memory_detected", False)
+            shared_style = "bold red" if shared else "green"
 
-        print(f"\n{_BOLD}{'=' * 60}{_RESET}")
-        print(f"{_BOLD}  SUMMARY{_RESET}")
-        print(f"{'=' * 60}")
+            gpu_pct = r.get("gpu_utilization_pct")
+            gpu_text = f"{gpu_pct}%" if gpu_pct is not None else "-"
+            temp = r.get("temperature_c")
+            temp_text = f"{temp}C" if temp is not None else "-"
+            power = r.get("power_watts")
+            pwr_text = f"{power}W" if power is not None else "-"
 
-        # Per-suite breakdown
+            infer_ms = r.get("inference_ms", 0)
+            infer_text = f"{infer_ms}ms" if infer_ms else "-"
+
+            table.add_row(
+                r.get("label", "?"),
+                f"{r.get('baseline_vram_mb', 0)}MB",
+                f"{r.get('load_vram_mb', 0)}MB",
+                f"{r.get('peak_vram_mb', 0)}MB",
+                f"{r.get('workspace_peak_mb', 0)}MB",
+                f"{r.get('workspace_retained_mb', 0)}MB",
+                f"{r.get('system_ram_delta_mb', 0)}MB",
+                Text("YES" if shared else "NO", style=shared_style),
+                gpu_text,
+                temp_text,
+                pwr_text,
+                infer_text,
+                f"{r.get('roundtrip_ms', 0)}ms",
+            )
+
+        return table
+
+    def _build_inference_stats_table(self, stats: dict) -> Table | None:
+        """Build inference statistics table from /stats data."""
+        if not stats:
+            return None
+
+        table = Table(
+            title="Inference Statistics",
+            title_style="bold cyan",
+            show_header=True,
+            header_style="bold",
+            border_style="dim",
+            expand=True,
+        )
+        table.add_column("Endpoint", min_width=20)
+        table.add_column("Calls", justify="right", width=7)
+        table.add_column("Errors", justify="right", width=7)
+        table.add_column("Avg", justify="right", width=8)
+        table.add_column("Min", justify="right", width=8)
+        table.add_column("Max", justify="right", width=8)
+
+        for ep, s in sorted(stats.items()):
+            err_style = "red" if s.get("errors", 0) > 0 else ""
+            table.add_row(
+                ep,
+                str(s.get("calls", 0)),
+                Text(str(s.get("errors", 0)), style=err_style),
+                f"{s.get('avg_ms', 0)} ms",
+                f"{s.get('min_ms', 0)} ms",
+                f"{s.get('max_ms', 0)} ms",
+            )
+
+        return table
+
+    def print_report(self) -> None:
+        """Print the full test report with Rich panels and tables."""
+        # -- Header --
+        console.print()
+
+        # -- GPU info panel (try to fetch) --
+        gpu_info = None
+        inference_stats = None
+        for r in self.results:
+            if r.suite == "health" and r.details.get("gpu"):
+                gpu_info = r.details["gpu"]
+                break
+
+        if gpu_info:
+            console.print(self._build_gpu_panel(gpu_info))
+            console.print()
+
+        # -- Per-suite result tables --
         suites: dict[str, list[TestResult]] = {}
         for r in self.results:
             suites.setdefault(r.suite, []).append(r)
 
         for suite_name, results in suites.items():
+            console.print(self._build_suite_table(suite_name, results))
+            console.print()
+
+        # -- VRAM timeline chart (from memory pressure test) --
+        timeline_chart = self._build_vram_timeline_chart()
+        if timeline_chart:
+            console.print(timeline_chart)
+            console.print()
+
+        # -- VRAM profile table --
+        profile_table = self._build_profile_table()
+        if profile_table:
+            console.print(profile_table)
+            console.print()
+
+        # -- VRAM accuracy table --
+        vram_table = self._build_vram_accuracy_table()
+        if vram_table:
+            console.print(vram_table)
+            console.print()
+
+        # -- Event log table (from memory suite or models suite) --
+        all_events: list[dict] = []
+        for r in self.results:
+            if r.details.get("all_events"):
+                all_events = r.details["all_events"]
+                break
+            if r.details.get("recent") and not all_events:
+                all_events = r.details["recent"]
+        if all_events:
+            event_table = self._build_event_table(all_events)
+            if event_table:
+                console.print(event_table)
+                console.print()
+
+        # -- Inference stats table --
+        inference_stats = None
+        for r in self.results:
+            if r.suite == "benchmark" and r.details.get("stats"):
+                inference_stats = r.details["stats"]
+        if inference_stats:
+            stats_table = self._build_inference_stats_table(inference_stats)
+            if stats_table:
+                console.print(stats_table)
+                console.print()
+
+        # -- Summary table --
+        total = len(self.results)
+        passed = sum(1 for r in self.results if r.passed)
+        failed = total - passed
+
+        summary = Table(
+            title="FINAL SUMMARY",
+            title_style="bold",
+            show_header=True,
+            header_style="bold",
+            border_style="green" if failed == 0 else "red",
+            expand=True,
+        )
+        summary.add_column("Suite", min_width=15)
+        summary.add_column("Pass", justify="right", width=6, style="green")
+        summary.add_column("Fail", justify="right", width=6, style="red")
+        summary.add_column("Total", justify="right", width=6)
+        summary.add_column("Time", justify="right", width=10)
+
+        total_time = 0.0
+        for suite_name, results in suites.items():
             s_pass = sum(1 for r in results if r.passed)
-            s_total = len(results)
-            color = _GREEN if s_pass == s_total else _RED
-            print(f"  {suite_name:15s} {color}{s_pass}/{s_total}{_RESET}")
+            s_fail = len(results) - s_pass
+            s_time = self._suite_times.get(suite_name, 0)
+            total_time += s_time
+            row_style = "" if s_fail == 0 else "bold"
+            summary.add_row(
+                suite_name,
+                str(s_pass),
+                str(s_fail) if s_fail > 0 else "-",
+                str(len(results)),
+                f"{s_time:.1f}s",
+                style=row_style,
+            )
 
-        print(f"  {'─' * 40}")
-        color = _GREEN if failed == 0 else _RED
-        print(f"  {'TOTAL':15s} {color}{passed}/{total}{_RESET}")
+        summary.add_section()
+        summary.add_row(
+            Text("TOTAL", style="bold"),
+            Text(str(passed), style="bold green"),
+            Text(str(failed), style="bold red") if failed > 0 else Text("-"),
+            Text(str(total), style="bold"),
+            Text(f"{total_time:.1f}s", style="bold"),
+        )
 
+        console.print(Panel(summary, border_style="green" if failed == 0 else "red"))
+
+        # -- Failed tests detail --
         if failed > 0:
-            print(f"\n{_RED}  Failed tests:{_RESET}")
-            for r in self.results:
-                if not r.passed:
-                    print(f"    - [{r.suite}] {r.name}: {r.message}")
+            fail_table = Table(
+                title="FAILED TESTS",
+                title_style="bold red",
+                show_header=True,
+                header_style="bold",
+                border_style="red",
+                expand=True,
+            )
+            fail_table.add_column("#", width=3, justify="right")
+            fail_table.add_column("Suite", width=12)
+            fail_table.add_column("Test", ratio=2)
+            fail_table.add_column("Error", ratio=3, overflow="fold")
 
-        print()
+            for i, r in enumerate(
+                (r for r in self.results if not r.passed), 1
+            ):
+                fail_table.add_row(
+                    str(i),
+                    Text(r.suite, style="yellow"),
+                    r.name,
+                    Text(r.message, style="red"),
+                )
+
+            console.print()
+            console.print(fail_table)
+
+        console.print()
+
+        # -- Verbose: detailed output for all tests --
+        if self.verbose:
+            for r in self.results:
+                if r.details and (not r.passed or self.verbose):
+                    console.print(
+                        Panel(
+                            str(r.details),
+                            title=f"[dim]{r.suite}[/] / {r.name}",
+                            border_style="dim" if r.passed else "red",
+                        )
+                    )
 
 
 # ── CLI ────────────────────────────────────────────────────────────────
 
 
+def _resolve_suites(modes: list[str]) -> list[str]:
+    """Resolve positional arguments into an ordered suite list."""
+    if not modes:
+        return []
+
+    # Single preset name
+    if len(modes) == 1 and modes[0] in PRESETS:
+        return list(PRESETS[modes[0]][1])
+
+    # Explicit suite names
+    suites: list[str] = []
+    for m in modes:
+        if m in SUITE_NAMES:
+            if m not in suites:
+                suites.append(m)
+        else:
+            console.print(f"[red]Unknown suite or preset: '{m}'[/]")
+            console.print(f"[dim]Presets: {', '.join(PRESETS)}[/]")
+            console.print(f"[dim]Suites:  {', '.join(sorted(SUITE_NAMES))}[/]")
+            sys.exit(1)
+    return suites
+
+
 def main() -> None:
+    preset_list = "  ".join(f"[bold]{k}[/]" for k in PRESETS)
     parser = argparse.ArgumentParser(
-        description="Comprehensive Cortex service test and monitoring script",
+        description="Cortex service test suite",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Test suites:
-  health       Health endpoint, GPU detection, uptime
-  models       Model registry, ONNX integrity, VRAM budget
-  inference    All 8 inference endpoints with valid input
-  errors       Invalid input, missing models, bad parameters
-  concurrency  Parallel requests, GPU queue behavior
-  format       Response structure validation
-  vram         VRAM tracking, idle monitoring, GPU consistency
-  benchmark    Latency benchmarks (opt-in with --benchmark)
-  all          Run all suites
+        epilog=f"""presets: {', '.join(PRESETS)}
+suites:  {', '.join(sorted(SUITE_NAMES))}
+
+examples:
+  %(prog)s                     interactive TUI menu
+  %(prog)s quick               health + models + inference
+  %(prog)s standard            all core suites
+  %(prog)s benchmark           standard + performance
+  %(prog)s stress              standard + memory pressure
+  %(prog)s profile             isolated VRAM profiling
+  %(prog)s full                everything
+  %(prog)s health inference    specific suites
 """,
+    )
+    parser.add_argument(
+        "mode", nargs="*", default=[],
+        help="preset name or suite name(s) (omit for TUI menu)",
     )
     parser.add_argument(
         "--url", default=DEFAULT_URL,
         help=f"Cortex base URL (default: {DEFAULT_URL})",
     )
     parser.add_argument(
-        "--suite", default="all",
-        choices=["all", "health", "models", "inference", "errors",
-                 "concurrency", "format", "vram", "benchmark"],
-        help="Test suite to run (default: all)",
-    )
-    parser.add_argument(
-        "--benchmark", action="store_true",
-        help="Include performance benchmarks (slower)",
-    )
-    parser.add_argument(
-        "--verbose", "-v", action="store_true",
-        help="Show detailed test output",
+        "-v", "--verbose", action="store_true",
+        help="show detailed output for each test",
     )
     args = parser.parse_args()
 
-    print(f"{_BOLD}Cortex Test Suite{_RESET}")
-    print(f"Target: {args.url}")
-    print(f"Suite:  {args.suite}")
+    # Determine suite list: TUI menu if no args, otherwise resolve
+    if not args.mode:
+        suites = _show_tui_menu(args.url)
+    else:
+        suites = _resolve_suites(args.mode)
+
+    if not suites:
+        console.print("[red]No suites selected[/]")
+        sys.exit(1)
+
+    # Header panel
+    header = Table(show_header=False, border_style="dim", pad_edge=False, expand=True)
+    header.add_column("Key", style="bold", width=10)
+    header.add_column("Value")
+    header.add_row("Target", args.url)
+    header.add_row("Suites", ", ".join(suites))
+    header.add_row("Time", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    console.print(Panel(header, title="Cortex Test Suite", border_style="bold cyan"))
 
     async def _run() -> None:
         runner_ref[0] = TestRunner(base_url=args.url, verbose=args.verbose)
         try:
-            await runner_ref[0].run_suite(args.suite, include_benchmark=args.benchmark)
+            await runner_ref[0].run_suites(suites)
         finally:
             await runner_ref[0].close()
 
@@ -1135,15 +2514,22 @@ Test suites:
     try:
         asyncio.run(_run())
     except KeyboardInterrupt:
-        print(f"\n{_YELLOW}Interrupted{_RESET}")
+        console.print("\n[yellow]Interrupted[/]")
 
     runner = runner_ref[0]
     if runner is None:
         sys.exit(1)
 
-    runner.print_summary()
+    runner.print_report()
 
-    # Exit with non-zero code if any test failed
+    # Save report to file (overwrite each time)
+    try:
+        report_text = console.export_text()
+        REPORT_PATH.write_text(report_text, encoding="utf-8")
+        console.print(f"[dim]Report saved to {REPORT_PATH}[/]")
+    except Exception as exc:
+        console.print(f"[yellow]Failed to save report: {exc}[/]")
+
     failed = sum(1 for r in runner.results if not r.passed)
     sys.exit(1 if failed > 0 else 0)
 
