@@ -17,7 +17,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCredits } from '@/hooks/useCredits'
 import type { ToolErrorMeta } from '@/lib/toolErrors'
 import type { ExtendedVisualization, FaceProfileResponse, FullReportResponse } from '@/services/faceMapApi'
-import { createFaceMapShare } from '@/services/faceMapApi'
+import { createResultShare } from '@/services/resultShareApi'
 
 import { useFaceMapState } from './useFaceMapState'
 import { AnnotationControls, type AnnotationLayers } from './components/AnnotationControls'
@@ -98,10 +98,10 @@ export function FaceMapPage() {
       const shareType = hasPaidReport ? 'report' : 'profile'
       const resultData = hasPaidReport ? reportResult : profileResult
       const locale = i18n.language.startsWith('en') ? 'en' : 'zh-CN'
-      const res = await createFaceMapShare(
+      const res = await createResultShare(
         file,
         JSON.stringify(resultData),
-        shareType as 'profile' | 'report',
+        shareType,
         locale,
       )
       const url = res.share_url
@@ -144,6 +144,7 @@ export function FaceMapPage() {
         <ToolPageShell
           title={t('faceMap:title')}
           description={t('faceMap:subtitle')}
+          toolName="facemap/profile"
           backTo="/"
           layout="compact"
           width="wide"
@@ -182,7 +183,7 @@ export function FaceMapPage() {
 
       {/* Error without profile data */}
       {hasResult && !profileData && (
-        <ToolPageShell title={t('faceMap:title')} backTo="/" layout="compact" width="wide">
+        <ToolPageShell title={t('faceMap:title')} toolName="facemap/profile" backTo="/" layout="compact" width="wide">
           <ToolErrorBanner error={error} errorMeta={errorMeta} onRetry={file ? () => retry() : undefined} />
         </ToolPageShell>
       )}

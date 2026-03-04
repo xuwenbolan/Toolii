@@ -1,0 +1,60 @@
+{
+  "loading": "加载分享内容...",
+  "expired": "此分享链接已过期",
+  "notFound": "未找到分享链接",
+  "expiresAt": "有效期至 {{date}}",
+  "beforeAfter": {
+    "before": "处理前",
+    "after": "处理后"
+  },
+  "cta": {
+    "profile": "来试试 FaceMap",
+    "report": "来试试 FaceMap",
+    "similarity": "来试试认贼做父",
+    "compress": "来试试图片压缩",
+    "remove_bg": "来试试 AI 抠图",
+    "upscale": "来试试 AI 图片放大",
+    "restore_face": "来试试 AI 人脸修复",
+    "denoise": "来试试 AI 照片降噪",
+    "colorize": "来试试 AI 黑白上色",
+    "inpaint": "来试试 AI 物体擦除",
+    "scan_enhance": "来试试扫描件增强",
+    "mosaic": "来试试图片马赛克",
+    "default": "来试试 Toolii"
+  },
+  "ctaDescription": {
+    "profile": "上传你的照片，免费获取 AI 面部美学分析",
+    "report": "上传你的照片，获取完整 AI 面部美学报告",
+    "similarity": "上传两张照片，看看他们有多像",
+    "default": "免费在线工具，无需安装"
+  },
+  "toolTitle": {
+    "compress": "图片压缩效果",
+    "remove_bg": "AI 抠图效果",
+    "upscale": "AI 图片放大效果",
+    "restore_face": "AI 人脸修复效果",
+    "denoise": "AI 照片降噪效果",
+    "colorize": "AI 黑白上色效果",
+    "inpaint": "AI 物体擦除效果",
+    "scan_enhance": "扫描件增强效果",
+    "mosaic": "马赛克处理效果"
+  },
+  "meta": {
+    "originalSize": "原始大小",
+    "resultSize": "处理后大小",
+    "savedPercent": "节省 {{percent}}%"
+  },
+  "shareButton": {
+    "share": "分享效果",
+    "creating": "正在创建...",
+    "copied": "链接已复制！",
+    "copyLink": "复制链接",
+    "retryError": "重试分享"
+  },
+  "badge": {
+    "profile": "FaceMap 基础分析",
+    "report": "FaceMap 完整报告",
+    "similarity": "人脸相似度对比",
+    "default": "处理效果分享"
+  }
+}

@@ -193,6 +193,7 @@ export function FaceSimilarityPage() {
       <ToolPageShell
         title={t('faceSimilarity:title')}
         description={t('faceSimilarity:subtitle')}
+        toolName="facemap/similarity"
       >
         {/* Error banner */}
         <ToolErrorBanner

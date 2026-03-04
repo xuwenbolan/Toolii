@@ -1,0 +1,60 @@
+{
+  "loading": "Loading shared content...",
+  "expired": "This share link has expired",
+  "notFound": "Share link not found",
+  "expiresAt": "Expires on {{date}}",
+  "beforeAfter": {
+    "before": "Before",
+    "after": "After"
+  },
+  "cta": {
+    "profile": "Try FaceMap Yourself",
+    "report": "Try FaceMap Yourself",
+    "similarity": "Try Face Similarity",
+    "compress": "Try Image Compression",
+    "remove_bg": "Try AI Background Removal",
+    "upscale": "Try AI Image Upscale",
+    "restore_face": "Try AI Face Restoration",
+    "denoise": "Try AI Photo Denoise",
+    "colorize": "Try AI Photo Colorization",
+    "inpaint": "Try AI Object Removal",
+    "scan_enhance": "Try Scan Enhancement",
+    "mosaic": "Try Mosaic Effect",
+    "default": "Try Toolii"
+  },
+  "ctaDescription": {
+    "profile": "Upload your photo for a free AI facial aesthetics analysis",
+    "report": "Upload your photo for a complete AI facial aesthetics report",
+    "similarity": "Upload two photos to see how similar they are",
+    "default": "Free online tools, no installation required"
+  },
+  "toolTitle": {
+    "compress": "Image Compression Result",
+    "remove_bg": "AI Background Removal Result",
+    "upscale": "AI Image Upscale Result",
+    "restore_face": "AI Face Restoration Result",
+    "denoise": "AI Photo Denoise Result",
+    "colorize": "AI Photo Colorization Result",
+    "inpaint": "AI Object Removal Result",
+    "scan_enhance": "Scan Enhancement Result",
+    "mosaic": "Mosaic Effect Result"
+  },
+  "meta": {
+    "originalSize": "Original size",
+    "resultSize": "Result size",
+    "savedPercent": "Saved {{percent}}%"
+  },
+  "shareButton": {
+    "share": "Share Result",
+    "creating": "Creating link...",
+    "copied": "Link copied!",
+    "copyLink": "Copy Link",
+    "retryError": "Retry Share"
+  },
+  "badge": {
+    "profile": "FaceMap Profile",
+    "report": "FaceMap Full Report",
+    "similarity": "Face Similarity",
+    "default": "Result Share"
+  }
+}

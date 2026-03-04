@@ -48,6 +48,7 @@ from app.processing.face_detection import prewarm_face_landmarker
 from app.processing.face_similarity import prewarm_facenet
 from app.routers import auth, credits, download, face_reading, feedback, history, image, pdf, photo, share, tools, transfer, users
 from app.routers.admin import router as admin_router
+from app.routers.result_share import router as result_share_router, og_router as result_share_og_router
 from app.services import cortex_client, llm_client
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,8 @@ def create_app() -> FastAPI:
     app.include_router(download.router)
     app.include_router(history.router)
     app.include_router(face_reading.router)
-    app.include_router(face_reading.share_page_router)
+    app.include_router(result_share_router)
+    app.include_router(result_share_og_router)
     app.include_router(feedback.router)
     app.include_router(tools.router)
     app.include_router(transfer.router)

@@ -5,17 +5,18 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class FaceMapShareCreateResponse(BaseModel):
+class ResultShareCreateResponse(BaseModel):
     token: str
     share_url: str
     expires_at: datetime
 
 
-class FaceMapShareDataResponse(BaseModel):
+class ResultShareDataResponse(BaseModel):
     token: str
     result_json: str
     share_type: str
     locale: str
     image_url: str
+    original_image_url: str | None = None
     expires_at: datetime
     created_at: datetime

@@ -5,11 +5,8 @@ import { toast } from 'sonner'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { precompressImage } from '@/lib/imageCompressor'
-import {
-  compareFaces,
-  createSimilarityShare,
-  type FaceSimilarityResponse,
-} from '@/services/faceMapApi'
+import { compareFaces, type FaceSimilarityResponse } from '@/services/faceMapApi'
+import { createSimilarityShare } from '@/services/resultShareApi'
 
 export function useFaceSimilarityState() {
   const { t, i18n } = useTranslation('faceSimilarity')

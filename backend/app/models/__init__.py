@@ -2,7 +2,7 @@ from app.models.base import Base
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
 from app.models.email_verification import EmailVerificationToken
-from app.models.facemap_share import FaceMapShare
+from app.models.result_share import ResultShare
 from app.models.feedback import Feedback
 from app.models.file_transfer import FileTransfer, TransferFile
 from app.models.login_history import LoginHistory
@@ -19,7 +19,7 @@ __all__ = [
     "CardCode",
     "CreditTransaction",
     "EmailVerificationToken",
-    "FaceMapShare",
+    "ResultShare",
     "Feedback",
     "FileTransfer",
     "LoginHistory",

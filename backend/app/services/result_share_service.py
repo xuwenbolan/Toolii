@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppError, NotFoundError
-from app.models.facemap_share import FaceMapShare
+from app.models.result_share import ResultShare
 from app.services.file_service import FileService
 from app.utils.time_utils import utcnow
 
@@ -64,22 +64,22 @@ def _create_side_by_side(img1_bytes: bytes, img2_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-class FaceMapShareService:
+class ResultShareService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
-        self._files = FileService(storage_dir=settings.facemap_share_storage_dir)
+        self._files = FileService(storage_dir=settings.result_share_storage_dir)
 
     @staticmethod
     def _compute_hash(share_type: str, result_json: str) -> str:
         data = f"{share_type}:{result_json}"
         return hashlib.sha256(data.encode()).hexdigest()
 
-    async def _find_by_hash(self, content_hash: str) -> FaceMapShare | None:
+    async def _find_by_hash(self, content_hash: str) -> ResultShare | None:
         """Return an existing non-expired share with the same content hash."""
         result = await self._db.execute(
-            select(FaceMapShare).where(
-                FaceMapShare.content_hash == content_hash,
-                FaceMapShare.expires_at > utcnow(),
+            select(ResultShare).where(
+                ResultShare.content_hash == content_hash,
+                ResultShare.expires_at > utcnow(),
             )
         )
         return result.scalar_one_or_none()
@@ -88,7 +88,7 @@ class FaceMapShareService:
         for _ in range(8):
             token = secrets.token_urlsafe(18).replace("-", "").replace("_", "")[:24]
             result = await self._db.execute(
-                select(FaceMapShare.id).where(FaceMapShare.token == token)
+                select(ResultShare.id).where(ResultShare.token == token)
             )
             if result.scalar_one_or_none() is None:
                 return token
@@ -98,6 +98,16 @@ class FaceMapShareService:
             status_code=500,
         )
 
+    def _save_image(self, image_bytes: bytes) -> str:
+        """Compress and save image, return file_id."""
+        compressed = _compress_image(image_bytes)
+        stored = self._files.save_bytes(
+            data=compressed,
+            filename="share.jpg",
+            content_type="image/jpeg",
+        )
+        return stored.file_id
+
     async def create_share(
         self,
         *,
@@ -106,30 +116,36 @@ class FaceMapShareService:
         share_type: str,
         locale: str,
         user_id: int | None = None,
-    ) -> FaceMapShare:
+        original_image_bytes: bytes | None = None,
+    ) -> ResultShare:
+        """Create a result share.
+
+        For FaceMap: image_bytes is the face photo, original_image_bytes is None.
+        For image tools: image_bytes is the result image, original_image_bytes
+        is the "before" image for before/after comparison.
+        """
         content_hash = self._compute_hash(share_type, result_json)
         existing = await self._find_by_hash(content_hash)
         if existing:
             return existing
 
-        compressed = _compress_image(image_bytes)
-        stored = self._files.save_bytes(
-            data=compressed,
-            filename="share.jpg",
-            content_type="image/jpeg",
-        )
+        image_file_id = self._save_image(image_bytes)
+        original_image_file_id = None
+        if original_image_bytes:
+            original_image_file_id = self._save_image(original_image_bytes)
 
         token = await self._generate_unique_token()
         now = utcnow()
-        share = FaceMapShare(
+        share = ResultShare(
             token=token,
             result_json=result_json,
-            image_file_id=stored.file_id,
+            image_file_id=image_file_id,
+            original_image_file_id=original_image_file_id,
             share_type=share_type,
             content_hash=content_hash,
             locale=locale,
             user_id=user_id,
-            expires_at=now + timedelta(days=settings.facemap_share_ttl_days),
+            expires_at=now + timedelta(days=settings.result_share_ttl_days),
         )
         self._db.add(share)
         try:
@@ -137,9 +153,11 @@ class FaceMapShareService:
             await self._db.refresh(share)
         except SQLAlchemyError as exc:
             await self._db.rollback()
-            self._files.delete(stored.file_id)
+            self._files.delete(image_file_id)
+            if original_image_file_id:
+                self._files.delete(original_image_file_id)
             raise AppError(
-                code="FACEMAP_SHARE_CREATE_FAILED",
+                code="RESULT_SHARE_CREATE_FAILED",
                 message="Failed to create share",
                 status_code=500,
             ) from exc
@@ -153,7 +171,7 @@ class FaceMapShareService:
         result_json: str,
         locale: str,
         user_id: int | None = None,
-    ) -> FaceMapShare:
+    ) -> ResultShare:
         """Create a share for face similarity with a side-by-side composite."""
         content_hash = self._compute_hash("similarity", result_json)
         existing = await self._find_by_hash(content_hash)
@@ -169,7 +187,7 @@ class FaceMapShareService:
 
         token = await self._generate_unique_token()
         now = utcnow()
-        share = FaceMapShare(
+        share = ResultShare(
             token=token,
             result_json=result_json,
             image_file_id=stored.file_id,
@@ -177,7 +195,7 @@ class FaceMapShareService:
             content_hash=content_hash,
             locale=locale,
             user_id=user_id,
-            expires_at=now + timedelta(days=settings.facemap_share_ttl_days),
+            expires_at=now + timedelta(days=settings.result_share_ttl_days),
         )
         self._db.add(share)
         try:
@@ -187,15 +205,15 @@ class FaceMapShareService:
             await self._db.rollback()
             self._files.delete(stored.file_id)
             raise AppError(
-                code="FACEMAP_SHARE_CREATE_FAILED",
+                code="RESULT_SHARE_CREATE_FAILED",
                 message="Failed to create share",
                 status_code=500,
             ) from exc
         return share
 
-    async def get_share(self, *, token: str) -> FaceMapShare:
+    async def get_share(self, *, token: str) -> ResultShare:
         result = await self._db.execute(
-            select(FaceMapShare).where(FaceMapShare.token == token)
+            select(ResultShare).where(ResultShare.token == token)
         )
         share = result.scalar_one_or_none()
         if share is None:
@@ -218,8 +236,8 @@ class FaceMapShareService:
         now = utcnow()
         try:
             result = await self._db.execute(
-                select(FaceMapShare)
-                .where(FaceMapShare.expires_at < now)
+                select(ResultShare)
+                .where(ResultShare.expires_at < now)
                 .limit(limit)
             )
             shares = result.scalars().all()
@@ -227,21 +245,24 @@ class FaceMapShareService:
                 return 0
 
             for share in shares:
-                try:
-                    self._files.delete(share.image_file_id)
-                except Exception:
-                    logger.warning(
-                        "Failed to delete image for share %s", share.token
-                    )
+                for fid in (share.image_file_id, share.original_image_file_id):
+                    if not fid:
+                        continue
+                    try:
+                        self._files.delete(fid)
+                    except Exception:
+                        logger.warning(
+                            "Failed to delete image %s for share %s", fid, share.token
+                        )
 
             share_ids = [s.id for s in shares]
             await self._db.execute(
-                delete(FaceMapShare).where(FaceMapShare.id.in_(share_ids))
+                delete(ResultShare).where(ResultShare.id.in_(share_ids))
             )
             await self._db.commit()
-            logger.info("Expired %d facemap shares", len(share_ids))
+            logger.info("Expired %d result shares", len(share_ids))
             return len(share_ids)
         except SQLAlchemyError:
             await self._db.rollback()
-            logger.exception("Failed to expire facemap shares")
+            logger.exception("Failed to expire result shares")
             return 0
