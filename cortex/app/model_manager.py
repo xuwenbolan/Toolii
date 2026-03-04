@@ -52,6 +52,21 @@ class LoadedModel:
     inference_count: int = 0
 
 
+_CIRCUIT_BREAKER_THRESHOLD = 3       # consecutive failures to trip
+_CIRCUIT_BREAKER_COOLDOWN = 60.0     # seconds before half-open retry
+
+
+class CircuitBreakerOpen(RuntimeError):
+    """Raised when a model's circuit breaker is tripped."""
+
+
+@dataclass
+class _CircuitState:
+    failures: int = 0
+    tripped_at: float = 0.0          # 0 = not tripped
+    last_error: str = ""
+
+
 class OnnxModelManager:
     """Manages ONNX Runtime sessions with real VRAM monitoring and LRU eviction.
 
@@ -59,7 +74,8 @@ class OnnxModelManager:
     - Real VRAM tracking: uses pynvml to query actual GPU memory
     - LRU eviction: if real VRAM exceeds budget after loading, evict least-recently-used
     - Workspace headroom: before returning session, ensure free VRAM for inference
-    - OOM recovery: catch CUDA OOM, evict least-used, retry once
+    - OOM recovery: catch CUDA OOM, evict candidates in a loop until success
+    - Circuit breaker: temporarily disable models that fail to load repeatedly
     """
 
     def __init__(self, vram_budget_mb: int) -> None:
@@ -70,6 +86,7 @@ class OnnxModelManager:
         self._idle_threshold = 0
         self._events: deque[ModelEvent] = deque(maxlen=200)
         self._profile_data: dict[str, dict[str, Any]] = {}
+        self._circuit: dict[str, _CircuitState] = {}
 
     @property
     def vram_budget_mb(self) -> int:
@@ -173,14 +190,41 @@ class OnnxModelManager:
             detail=f"tracked={delta}MB freed={freed}MB",
         ))
 
+    def _eviction_score(self, name: str) -> float:
+        """Higher score = better eviction candidate.
+
+        Score = vram_freed / (reload_cost * usage_recency)
+        - Large VRAM models free more space (good to evict)
+        - Slow-loading models are expensive to reload (bad to evict)
+        - Frequently/recently used models should stay loaded (bad to evict)
+        """
+        loaded = self._models[name]
+        vram = max(loaded.vram_delta_mb, loaded.info.vram_mb, 1)
+        load_ms = max(loaded.load_time_ms, 100)  # floor to avoid division issues
+        # Recency: seconds since last use, clamped to [1, 3600]
+        idle_sec = max(1.0, min(3600.0, time.time() - loaded.last_used))
+        # Frequency: inference count, clamped to [1, ...)
+        freq = max(1, loaded.inference_count)
+        # Score: prefer models that free lots of VRAM, are cheap to reload,
+        # idle for a long time, and rarely used
+        return (vram * idle_sec) / (load_ms * freq)
+
     def _find_eviction_candidate(self, exclude: str = "") -> str | None:
-        """Find best eviction candidate: prefer non-required, then oldest."""
-        for name in self._models:
-            if name != exclude and not self._models[name].info.required:
-                return name
-        for name in self._models:
-            if name != exclude:
-                return name
+        """Find best eviction candidate using weighted scoring.
+
+        Prefers non-required models. Among candidates of the same class,
+        picks the one with the highest eviction score (large VRAM, cheap
+        to reload, idle, infrequently used).
+        """
+        non_required = [
+            n for n in self._models
+            if n != exclude and not self._models[n].info.required
+        ]
+        if non_required:
+            return max(non_required, key=self._eviction_score)
+        required = [n for n in self._models if n != exclude]
+        if required:
+            return max(required, key=self._eviction_score)
         return None
 
     def _evict_lru_by_estimate(self, needed_mb: int) -> None:
@@ -241,17 +285,57 @@ class OnnxModelManager:
             time.sleep(0.1)
             real = gpu.vram_used_mb()
 
+    def _check_circuit(self, model_name: str) -> None:
+        """Raise RuntimeError if circuit breaker is tripped and cooldown not elapsed."""
+        cb = self._circuit.get(model_name)
+        if cb is None or cb.tripped_at == 0:
+            return
+        elapsed = time.time() - cb.tripped_at
+        if elapsed < _CIRCUIT_BREAKER_COOLDOWN:
+            raise CircuitBreakerOpen(
+                f"Model {model_name} circuit-breaker open "
+                f"({cb.failures} consecutive failures, "
+                f"retry in {_CIRCUIT_BREAKER_COOLDOWN - elapsed:.0f}s): {cb.last_error}"
+            )
+        # Half-open: allow one attempt
+        logger.info("Circuit breaker half-open for %s, allowing retry", model_name)
+
+    def _record_load_success(self, model_name: str) -> None:
+        cb = self._circuit.get(model_name)
+        if cb and cb.failures > 0:
+            logger.info("Circuit breaker reset for %s after successful load", model_name)
+            cb.failures = 0
+            cb.tripped_at = 0.0
+            cb.last_error = ""
+
+    def _record_load_failure(self, model_name: str, error: str) -> None:
+        cb = self._circuit.setdefault(model_name, _CircuitState())
+        cb.failures += 1
+        cb.last_error = error
+        if cb.failures >= _CIRCUIT_BREAKER_THRESHOLD:
+            cb.tripped_at = time.time()
+            logger.error("Circuit breaker TRIPPED for %s (%d failures): %s",
+                         model_name, cb.failures, error)
+            self._events.append(ModelEvent(
+                timestamp=time.time(), event="circuit_tripped", model=model_name,
+                vram_before_mb=gpu.vram_used_mb(), vram_after_mb=gpu.vram_used_mb(),
+                detail=f"failures={cb.failures} error={error}",
+            ))
+
     def get_session(self, model_name: str) -> ort.InferenceSession:
         """Load model if not loaded, evict LRU if over budget.
 
         Flow:
-        1. Already loaded -> ensure workspace headroom, return
-        2. Pre-evict based on estimates
-        3. Load model
-        4. Post-load: enforce real VRAM budget
-        5. Ensure workspace headroom for inference
+        1. Check circuit breaker
+        2. Already loaded -> ensure workspace headroom, return
+        3. Pre-evict based on estimates
+        4. Load model (loop-evict on OOM)
+        5. Post-load: enforce real VRAM budget
+        6. Ensure workspace headroom for inference
         """
         with self._lock:
+            self._check_circuit(model_name)
+
             loaded = self._models.get(model_name)
             if loaded is not None:
                 loaded.last_used = time.time()
@@ -272,26 +356,36 @@ class OnnxModelManager:
 
             vram_before = gpu.vram_used_mb()
             t_load = time.perf_counter()
-            try:
-                session = self._create_session(info.onnx_path, cpu_only=info.cpu_only)
-            except RuntimeError as exc:
-                # OOM recovery: evict one more and retry
-                victim = self._find_eviction_candidate()
-                if victim and not info.cpu_only:
+            session: ort.InferenceSession | None = None
+            last_exc: RuntimeError | None = None
+            # OOM recovery loop: evict candidates one at a time until load succeeds
+            for _attempt in range(len(self._models) + 1):
+                try:
+                    session = self._create_session(info.onnx_path, cpu_only=info.cpu_only)
+                    last_exc = None
+                    break
+                except RuntimeError as exc:
+                    last_exc = exc
+                    if info.cpu_only:
+                        break
+                    victim = self._find_eviction_candidate(exclude=model_name)
+                    if victim is None:
+                        break
                     logger.warning("OOM loading %s (%s), evicting %s and retrying",
                                    model_name, exc, victim)
                     self._events.append(ModelEvent(
                         timestamp=time.time(), event="oom_retry", model=model_name,
-                        vram_before_mb=vram_before, vram_after_mb=gpu.vram_used_mb(),
+                        vram_before_mb=gpu.vram_used_mb(), vram_after_mb=0,
                         detail=f"evicting {victim}: {exc}",
                     ))
                     self._evict_model(victim)
                     vram_before = gpu.vram_used_mb()
                     t_load = time.perf_counter()
-                    session = self._create_session(info.onnx_path, cpu_only=info.cpu_only)
-                else:
-                    raise
+            if session is None:
+                self._record_load_failure(model_name, str(last_exc))
+                raise last_exc  # type: ignore[misc]
 
+            self._record_load_success(model_name)
             load_time_ms = int((time.perf_counter() - t_load) * 1000)
             vram_after = gpu.vram_used_mb()
             vram_delta = max(0, vram_after - vram_before)

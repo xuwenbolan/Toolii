@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     warmup: bool = False
     max_concurrent: int = 2
+    max_concurrent_cpu: int = 2  # separate limit for CPU-only inferences
     gpu_queue_timeout: float = 30.0
     inference_timeout: float = 120.0
     idle_evict_minutes: int = 30
