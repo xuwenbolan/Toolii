@@ -77,6 +77,7 @@ function formatEventTime(timestamp: number): string {
 
 function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
   const { t } = useTranslation('admin')
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   if (samples.length < 2) {
     return (
@@ -87,10 +88,10 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   }
 
   const W = 600
-  const H = 120
+  const H = 140
   const PX = 40 // left padding for labels
   const PR = 8  // right padding
-  const PY = 4  // top/bottom padding
+  const PY = 8  // top/bottom padding
 
   const chartW = W - PX - PR
   const chartH = H - PY * 2
@@ -99,60 +100,132 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   const tMax = samples[samples.length - 1].t
   const tRange = tMax - tMin || 1
 
-  const toX = (t: number) => PX + ((t - tMin) / tRange) * chartW
-  const toY = (mb: number) => PY + chartH - (mb / vramTotal) * chartH
+  // Adaptive Y-axis: zoom into actual data range with padding
+  const dataMin = Math.min(...samples.map((s) => s.vram_used_mb))
+  const dataMax = Math.max(...samples.map((s) => s.vram_used_mb))
+  const dataSpan = dataMax - dataMin || dataMax * 0.2 || 512
+  const margin = dataSpan * 0.25
+  const yMin = Math.max(0, Math.floor((dataMin - margin) / 128) * 128)
+  const yMax = Math.min(vramTotal, Math.ceil((dataMax + margin) / 128) * 128)
+  const yRange = yMax - yMin || 1
+
+  const toX = (tv: number) => PX + ((tv - tMin) / tRange) * chartW
+  const toY = (mb: number) => PY + chartH - ((mb - yMin) / yRange) * chartH
 
   // Build polyline points for VRAM usage
   const vramPoints = samples.map((s) => `${toX(s.t)},${toY(s.vram_used_mb)}`).join(' ')
 
-  // Y-axis labels
-  const yLabels = [0, Math.round(vramTotal / 2), vramTotal]
+  // Y-axis labels: bottom, middle, top
+  const yMid = Math.round((yMin + yMax) / 2)
+  const yLabels = [yMin, yMid, yMax]
 
   // Event markers (non-empty events)
   const eventSamples = samples.filter((s) => s.event)
 
+  const fmtMb = (mb: number) => mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${mb}M`
+  const fmtTime = (ts: number) => {
+    const d = new Date(ts * 1000)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+  }
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = e.currentTarget
+    const rect = svg.getBoundingClientRect()
+    const svgX = ((e.clientX - rect.left) / rect.width) * W
+    const t = tMin + ((svgX - PX) / chartW) * tRange
+    // Find nearest sample
+    let best = 0
+    let bestDist = Infinity
+    for (let i = 0; i < samples.length; i++) {
+      const dist = Math.abs(samples[i].t - t)
+      if (dist < bestDist) { bestDist = dist; best = i }
+    }
+    setHoverIdx(best)
+  }
+
+  const hovered = hoverIdx !== null ? samples[hoverIdx] : null
+
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
-      {/* Y grid lines and labels */}
-      {yLabels.map((mb) => (
-        <g key={mb}>
-          <line
-            x1={PX} y1={toY(mb)} x2={W - PR} y2={toY(mb)}
-            stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2,2"
-          />
-          <text
-            x={PX - 4} y={toY(mb) + 3}
-            textAnchor="end" fill="currentColor" fillOpacity={0.4}
-            fontSize={9} fontFamily="monospace"
+    <div className="relative">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full"
+        preserveAspectRatio="none"
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        {/* Y grid lines and labels */}
+        {yLabels.map((mb) => (
+          <g key={mb}>
+            <line
+              x1={PX} y1={toY(mb)} x2={W - PR} y2={toY(mb)}
+              stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2,2"
+            />
+            <text
+              x={PX - 4} y={toY(mb) + 3}
+              textAnchor="end" fill="currentColor" fillOpacity={0.4}
+              fontSize={9} fontFamily="monospace"
+            >
+              {fmtMb(mb)}
+            </text>
+          </g>
+        ))}
+
+        {/* VRAM area fill */}
+        <polygon
+          points={`${toX(tMin)},${toY(yMin)} ${vramPoints} ${toX(tMax)},${toY(yMin)}`}
+          fill="currentColor" fillOpacity={0.08}
+        />
+
+        {/* VRAM line */}
+        <polyline
+          points={vramPoints}
+          fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5}
+        />
+
+        {/* Event markers */}
+        {eventSamples.map((s, i) => (
+          <circle
+            key={i}
+            cx={toX(s.t)} cy={toY(s.vram_used_mb)}
+            r={2.5} fill="hsl(var(--warning))"
           >
-            {mb >= 1024 ? `${(mb / 1024).toFixed(0)}G` : `${mb}M`}
-          </text>
-        </g>
-      ))}
+            <title>{s.event}</title>
+          </circle>
+        ))}
 
-      {/* VRAM area fill */}
-      <polygon
-        points={`${toX(tMin)},${toY(0)} ${vramPoints} ${toX(tMax)},${toY(0)}`}
-        fill="currentColor" fillOpacity={0.08}
-      />
+        {/* Hover crosshair */}
+        {hovered && (
+          <>
+            <line
+              x1={toX(hovered.t)} y1={PY} x2={toX(hovered.t)} y2={H - PY}
+              stroke="currentColor" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="3,2"
+            />
+            <circle
+              cx={toX(hovered.t)} cy={toY(hovered.vram_used_mb)}
+              r={3} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={1.5}
+            />
+          </>
+        )}
+      </svg>
 
-      {/* VRAM line */}
-      <polyline
-        points={vramPoints}
-        fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5}
-      />
-
-      {/* Event markers */}
-      {eventSamples.map((s, i) => (
-        <circle
-          key={i}
-          cx={toX(s.t)} cy={toY(s.vram_used_mb)}
-          r={2.5} fill="hsl(var(--warning))"
+      {/* Tooltip overlay */}
+      {hovered && (
+        <div
+          className="pointer-events-none absolute top-1 rounded border border-border bg-popover/95 px-2 py-1 text-xs shadow-md backdrop-blur-sm"
+          style={{
+            left: `${(toX(hovered.t) / W) * 100}%`,
+            transform: toX(hovered.t) > W * 0.7 ? 'translateX(-100%)' : 'translateX(0)',
+          }}
         >
-          <title>{s.event}</title>
-        </circle>
-      ))}
-    </svg>
+          <div className="font-mono text-muted-foreground">{fmtTime(hovered.t)}</div>
+          <div>VRAM: <span className="font-semibold">{fmtMb(hovered.vram_used_mb)}</span> / {fmtMb(vramTotal)}</div>
+          <div>RAM: {fmtMb(hovered.sys_ram_mb)}</div>
+          <div>Models: {hovered.models}</div>
+          {hovered.event && <div className="text-warning">{hovered.event}</div>}
+        </div>
+      )}
+    </div>
   )
 }
 

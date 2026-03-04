@@ -14,7 +14,7 @@ import {
   Legend,
 } from 'recharts'
 
-import { AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/admin'
+import { AdminFilter, DataTable, Pagination, StatusBadge, ChartTooltip, ChartLegend, CHART_COLORS, GRID_PROPS } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -53,9 +53,12 @@ function ToolUsageTab() {
 
   const items = data?.items ?? []
 
-  const toolNames = useMemo(() => {
-    const names = new Set(items.map((d) => d.tool_name))
-    return Array.from(names).sort()
+  const toolEntries = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const d of items) {
+      if (!map.has(d.tool_name)) map.set(d.tool_name, d.display_name)
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [items])
 
   const chartData = useMemo(() => {
@@ -75,14 +78,14 @@ function ToolUsageTab() {
   const toolFilterOptions = useMemo(
     () => [
       { value: 'all', label: t('operations.toolUsage.allTools') },
-      ...toolNames.map((n) => ({ value: n, label: n })),
+      ...toolEntries.map(([name, display]) => ({ value: name, label: display })),
     ],
-    [t, toolNames],
+    [t, toolEntries],
   )
 
   const columns: Column<ToolUsageItem>[] = useMemo(
     () => [
-      { key: 'tool', header: t('operations.toolUsage.tool'), render: (i) => i.tool_name },
+      { key: 'tool', header: t('operations.toolUsage.tool'), render: (i) => i.display_name },
       { key: 'date', header: t('operations.toolUsage.date'), render: (i) => i.date },
       { key: 'total', header: t('operations.toolUsage.total'), align: 'right', render: (i) => i.count },
       {
@@ -126,7 +129,7 @@ function ToolUsageTab() {
         <div className="rounded-xl border bg-card p-4">
           <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid {...GRID_PROPS} />
               <XAxis
                 dataKey="date"
                 tick={{ fontSize: isMobile ? 10 : 12 }}
@@ -134,12 +137,14 @@ function ToolUsageTab() {
                 angle={isMobile ? -45 : 0}
                 textAnchor={isMobile ? 'end' : 'middle'}
                 height={isMobile ? 50 : 30}
+                tickLine={false}
+                axisLine={false}
               />
-              <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 30 : 60} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="success" stackId="a" fill="var(--success)" name={t('operations.toolUsage.success')} />
-              <Bar dataKey="fail" stackId="a" fill="var(--destructive)" name={t('operations.toolUsage.fail')} />
+              <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 30 : 60} tickLine={false} axisLine={false} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+              <Legend content={<ChartLegend />} />
+              <Bar dataKey="success" stackId="a" fill={CHART_COLORS[1]} name={t('operations.toolUsage.success')} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="fail" stackId="a" fill={CHART_COLORS[4]} name={t('operations.toolUsage.fail')} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -242,7 +247,30 @@ function TransactionsTab() {
         onChange={(v) => { setTxType(v); setOffset(0) }}
       />
 
-      <DataTable columns={columns} data={items} rowKey={(i) => i.id} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={items}
+        rowKey={(i) => i.id}
+        loading={isLoading}
+        renderMobileCard={(i) => (
+          <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-sm">{i.user_email ?? '-'}</span>
+              <span className={`font-medium tabular-nums ${i.amount >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {i.amount >= 0 ? '+' : ''}{i.amount}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5">{t(`operations.transactions.types.${i.tx_type}`)}</span>
+              <span>{i.balance_before} &rarr; {i.balance_after}</span>
+            </div>
+            {i.description && (
+              <div className="truncate text-xs text-muted-foreground">{i.description}</div>
+            )}
+            <div className="text-[11px] text-muted-foreground">{new Date(i.created_at).toLocaleString()}</div>
+          </div>
+        )}
+      />
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
     </div>
   )
@@ -321,7 +349,25 @@ function ShareLinksTab() {
         onChange={(v) => { setStatus(v); setOffset(0) }}
       />
 
-      <DataTable columns={columns} data={items} rowKey={(i) => i.id} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={items}
+        rowKey={(i) => i.id}
+        loading={isLoading}
+        renderMobileCard={(i) => (
+          <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="truncate text-sm">{i.from_user_email ?? '-'}</span>
+              <StatusBadge status={i.status} />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">&rarr; {i.to_user_email ?? '-'}</span>
+              <span className="font-medium">{i.amount}</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground">{new Date(i.created_at).toLocaleString()}</div>
+          </div>
+        )}
+      />
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
     </div>
   )
@@ -385,7 +431,7 @@ function RevenueTab() {
           <div className="rounded-xl border bg-card p-4">
             <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
               <LineChart data={items}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid {...GRID_PROPS} />
                 <XAxis
                   dataKey="period"
                   tick={{ fontSize: isMobile ? 10 : 12 }}
@@ -393,14 +439,16 @@ function RevenueTab() {
                   angle={isMobile ? -45 : 0}
                   textAnchor={isMobile ? 'end' : 'middle'}
                   height={isMobile ? 50 : 30}
+                  tickLine={false}
+                  axisLine={false}
                 />
-                <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} />
-                <Tooltip />
-                <Legend />
+                <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend content={<ChartLegend />} />
                 <Line
                   type="monotone"
                   dataKey="total_credits"
-                  stroke="var(--foreground)"
+                  stroke={CHART_COLORS[0]}
                   strokeWidth={2}
                   dot={false}
                   name={t('operations.revenue.credits')}

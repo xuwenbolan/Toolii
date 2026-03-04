@@ -387,6 +387,39 @@ export function AdminCardsPage() {
             data={cards}
             rowKey={(c) => c.id}
             loading={isLoading}
+            renderMobileCard={(c) => (
+              <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{c.credits} {t('cards.credits')}</span>
+                  <StatusBadge status={c.status} />
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{c.card_type}</span>
+                  <span>#{c.id}</span>
+                </div>
+                {c.redeemed_by_email && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {t('cards.redeemedBy')}: {c.redeemed_by_email}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-muted-foreground">
+                    {formatDate(c.expires_at !== null ? c.expires_at : c.created_at)}
+                  </span>
+                  {c.status === 'unused' && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-7"
+                      disabled={disableMutation.isPending}
+                      onClick={() => setConfirmCardId(c.id)}
+                    >
+                      {t('cards.disableCard')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           />
           {total > PAGE_SIZE && (
             <div className="p-4 pt-0">

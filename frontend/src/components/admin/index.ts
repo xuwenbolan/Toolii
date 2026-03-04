@@ -1,4 +1,5 @@
 export { AdminErrorState } from './AdminErrorState'
+export { ChartTooltip, ChartLegend, CHART_COLORS, GRID_PROPS } from './ChartParts'
 export { AdminFilter } from './AdminFilter'
 export { ConfirmDialog } from './ConfirmDialog'
 export { DataTable } from './DataTable'

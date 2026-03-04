@@ -280,6 +280,23 @@ export function AdminUserDetailPage() {
             columns={txColumns}
             data={user.recent_transactions}
             rowKey={(tx) => tx.id}
+            renderMobileCard={(tx) => (
+              <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{tx.tx_type}</span>
+                  <span className={`font-medium tabular-nums ${tx.amount >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{tx.balance_before} &rarr; {tx.balance_after}</span>
+                  <span>{new Date(tx.created_at).toLocaleString()}</span>
+                </div>
+                {tx.description && (
+                  <div className="truncate text-xs text-muted-foreground">{tx.description}</div>
+                )}
+              </div>
+            )}
           />
         </CardContent>
       </Card>

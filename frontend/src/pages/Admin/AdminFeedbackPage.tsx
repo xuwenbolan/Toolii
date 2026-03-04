@@ -220,6 +220,31 @@ export function AdminFeedbackPage() {
         onRowClick={handleExpand}
         expandedRowKey={expandedId}
         renderExpanded={renderExpanded}
+        renderMobileCard={(fb) => (
+          <div className="rounded-xl border bg-card">
+            <div
+              className="cursor-pointer px-3 py-2.5 space-y-1.5"
+              onClick={() => handleExpand(fb)}
+            >
+              <div className="flex items-center justify-between">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                  {t(`feedback.categories.${fb.category}`)}
+                </span>
+                <StatusBadge status={fb.status} label={t(`feedback.status.${fb.status}`)} />
+              </div>
+              <div className="text-sm line-clamp-2">{fb.content}</div>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>{fb.user_email}</span>
+                <span>{new Date(fb.created_at).toLocaleString()}</span>
+              </div>
+            </div>
+            {expandedId === fb.id && (
+              <div className="border-t bg-muted/20 px-3 py-3">
+                {renderExpanded(fb)}
+              </div>
+            )}
+          </div>
+        )}
       />
 
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />

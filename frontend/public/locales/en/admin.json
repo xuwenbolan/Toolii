@@ -9,6 +9,8 @@
     "feedback": "Feedback",
     "tools": "Tools",
     "system": "System",
+    "storage": "Storage",
+    "transfers": "Transfers",
     "menu": "Menu"
   },
   "dashboard": {
@@ -185,17 +187,22 @@
     "title": "Tool Management",
     "toolName": "Tool",
     "category": "Category",
-    "enabled": "Enabled",
+    "enabled": "Live",
+    "status": "Status",
     "creditCost": "Credits",
     "accessLevel": "Access",
     "dailyLimitAnon": "Anon Limit",
     "dailyLimitAuth": "Auth Limit",
     "displayOrder": "Order",
-    "editMeta": "Edit Info",
     "displayName": "Display Name",
     "description": "Description",
     "icon": "Icon",
     "unlimited": "Unlimited",
+    "statuses": {
+      "active": "Active",
+      "restricted": "Restricted",
+      "disabled": "Offline"
+    },
     "accessLevels": {
       "public": "Public",
       "auth": "Login Required",
@@ -203,12 +210,40 @@
       "admin": "Admin Only"
     },
     "updateSuccess": "Tool updated",
-    "on": "ON",
-    "off": "OFF",
     "categories": {
       "image": "Image",
       "pdf": "PDF",
       "facemap": "FaceMap"
+    },
+    "section": {
+      "displayInfo": "Display Info",
+      "accessControl": "Access Control",
+      "displaySettings": "Display Settings"
+    },
+    "disableConfirm": {
+      "title": "Take Tool Offline",
+      "description": "Taking {{tool}} offline will block ALL users (including admins) from using it. The tool will be hidden from the frontend. Continue?",
+      "confirm": "Take Offline"
+    },
+    "accessSummary": {
+      "disabled": "Tool is offline, no users can access it",
+      "level": {
+        "public": "Accessible to all users",
+        "auth": "Login required",
+        "verified": "Email verification required",
+        "admin": "Admin only"
+      },
+      "anonLimit": "Anonymous: {{count}}/day",
+      "authLimit": "Authenticated: {{count}}/day",
+      "cost": "{{count}} credits per use",
+      "free": "Free to use",
+      "separator": "; "
+    },
+    "help": {
+      "dailyLimitAnon": "Daily usage limit for anonymous users. Leave empty for unlimited.",
+      "dailyLimitAuth": "Daily usage limit for logged-in users. Leave empty for unlimited.",
+      "creditCost": "Credits deducted per use",
+      "displayOrder": "Sort order in the public tool list. Lower numbers appear first."
     }
   },
   "system": {
@@ -289,6 +324,50 @@
       "evicted_budget": "Evicted (Budget)",
       "oom_retry": "OOM Retry"
     }
+  },
+  "storage": {
+    "title": "Storage Management",
+    "totalProcessing": "Processing Records",
+    "today": "Today",
+    "cleanup": "Clean Up Expired Files",
+    "cleanupConfirmTitle": "Confirm Cleanup",
+    "cleanupConfirmDesc": "This will clean up expired files, transfers, and shares across all directories. This action cannot be undone.",
+    "cleanupEmpty": "No files to clean up",
+    "processingHistory": "Processing History",
+    "allStatus": "All Status",
+    "statusDone": "Done",
+    "statusFailed": "Failed",
+    "tool": "Tool",
+    "user": "User",
+    "status": "Status",
+    "time": "Time"
+  },
+  "transfers": {
+    "title": "Transfers & Shares",
+    "tabs": {
+      "fileTransfers": "File Transfers",
+      "resultShares": "Result Shares"
+    },
+    "allStatus": "All Status",
+    "allTypes": "All Types",
+    "token": "Token",
+    "user": "User",
+    "files": "Files",
+    "downloads": "Downloads",
+    "status": "Status",
+    "expiresAt": "Expires At",
+    "expire": "Force Expire",
+    "delete": "Delete",
+    "expireConfirmTitle": "Confirm Force Expire",
+    "expireConfirmDesc": "This will mark the transfer as expired and delete physical files. This action cannot be undone.",
+    "deleteConfirmTitle": "Confirm Delete",
+    "deleteConfirmDesc": "This will permanently delete the transfer record and physical files. This action cannot be undone.",
+    "shareType": "Type",
+    "locale": "Locale",
+    "shareActive": "Active",
+    "shareExpired": "Expired",
+    "deleteShareConfirmTitle": "Confirm Delete Share",
+    "deleteShareConfirmDesc": "This will delete the share record and associated image. This action cannot be undone."
   },
   "common": {
     "loading": "Loading...",

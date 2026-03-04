@@ -1,21 +1,20 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { HelpCircle } from 'lucide-react'
 
-import { AdminErrorState, AdminFilter, DataTable } from '@/components/admin'
+import { AdminErrorState, AdminFilter, DataTable, StatusBadge, ConfirmDialog } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   Select,
   SelectContent,
@@ -34,13 +33,44 @@ import {
 const CATEGORY_KEYS = ['image', 'pdf', 'facemap'] as const
 const ACCESS_LEVELS = ['public', 'auth', 'verified', 'admin'] as const
 
+// -- Status helpers --
+
+function getToolStatus(tool: AdminToolItem) {
+  if (!tool.is_enabled) return 'disabled'
+  if (tool.access_level !== 'public') return 'restricted'
+  return 'active'
+}
+
+function getAccessSummary(tool: AdminToolItem, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  if (!tool.is_enabled) return t('tools.accessSummary.disabled')
+
+  const parts: string[] = []
+  parts.push(t(`tools.accessSummary.level.${tool.access_level}`))
+
+  if (tool.daily_limit_anon !== null) {
+    parts.push(t('tools.accessSummary.anonLimit', { count: tool.daily_limit_anon }))
+  }
+  if (tool.daily_limit_auth !== null) {
+    parts.push(t('tools.accessSummary.authLimit', { count: tool.daily_limit_auth }))
+  }
+
+  if (tool.credit_cost > 0) {
+    parts.push(t('tools.accessSummary.cost', { count: tool.credit_cost }))
+  } else {
+    parts.push(t('tools.accessSummary.free'))
+  }
+
+  return parts.join(t('tools.accessSummary.separator'))
+}
+
 
 export function AdminToolsPage() {
   const { t } = useTranslation('admin')
   const queryClient = useQueryClient()
 
   const [filterCategory, setFilterCategory] = useState('all')
-  const [editingTool, setEditingTool] = useState<AdminToolItem | null>(null)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [disablingTool, setDisablingTool] = useState<AdminToolItem | null>(null)
 
   const { data: tools = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'tools'],
@@ -63,10 +93,11 @@ export function AdminToolsPage() {
 
   const handleToggleEnabled = useCallback(
     (tool: AdminToolItem) => {
-      updateMutation.mutate({
-        name: tool.tool_name,
-        updates: { is_enabled: !tool.is_enabled },
-      })
+      if (tool.is_enabled) {
+        setDisablingTool(tool)
+      } else {
+        updateMutation.mutate({ name: tool.tool_name, updates: { is_enabled: true } })
+      }
     },
     [updateMutation],
   )
@@ -81,6 +112,16 @@ export function AdminToolsPage() {
     [updateMutation],
   )
 
+  const handleTextFieldSave = useCallback(
+    (toolName: string, field: string, value: string) => {
+      updateMutation.mutate({
+        name: toolName,
+        updates: { [field]: value || null },
+      })
+    },
+    [updateMutation],
+  )
+
   const filteredTools =
     filterCategory === 'all'
       ? tools
@@ -88,26 +129,49 @@ export function AdminToolsPage() {
 
   const columns: Column<AdminToolItem>[] = [
     {
-      key: 'tool_name',
+      key: 'tool',
       header: t('tools.toolName'),
       render: (row) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-mono text-sm">{row.tool_name}</span>
-          {(row.display_name_zh || row.display_name_en) && (
-            <span className="text-xs text-muted-foreground">
-              {row.display_name_zh || row.display_name_en}
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="shrink-0 text-[11px]">
+            {t(`tools.categories.${row.category}`)}
+          </Badge>
+          <div className="flex flex-col gap-0.5">
+            <span className="font-mono text-sm">{row.tool_name}</span>
+            {(row.display_name_zh || row.display_name_en) && (
+              <span className="text-xs text-muted-foreground">
+                {row.display_name_zh || row.display_name_en}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
     {
-      key: 'category',
-      header: t('tools.category'),
+      key: 'status',
+      header: t('tools.status'),
+      render: (row) => {
+        const status = getToolStatus(row)
+        return <StatusBadge status={status} label={t(`tools.statuses.${status}`)} />
+      },
+    },
+    {
+      key: 'access_level',
+      header: t('tools.accessLevel'),
+      hiddenOnMobile: true,
       render: (row) => (
-        <Badge variant="secondary">
-          {row.category}
+        <Badge variant="outline">
+          {t(`tools.accessLevels.${row.access_level}`)}
         </Badge>
+      ),
+    },
+    {
+      key: 'credit_cost',
+      header: t('tools.creditCost'),
+      align: 'center',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="tabular-nums text-sm">{row.credit_cost}</span>
       ),
     },
     {
@@ -115,105 +179,187 @@ export function AdminToolsPage() {
       header: t('tools.enabled'),
       align: 'center',
       render: (row) => (
-        <Button
-          size="sm"
-          variant={row.is_enabled ? 'default' : 'outline'}
-          className="h-7 min-w-[52px] text-xs"
-          onClick={() => handleToggleEnabled(row)}
-        >
-          {row.is_enabled ? t('tools.on') : t('tools.off')}
-        </Button>
-      ),
-    },
-    {
-      key: 'credit_cost',
-      header: t('tools.creditCost'),
-      align: 'center',
-      render: (row) => (
-        <InlineNumberEditor
-          value={row.credit_cost}
-          onChange={(v) => handleQuickUpdate(row.tool_name, 'credit_cost', v)}
-          min={0}
-        />
-      ),
-    },
-    {
-      key: 'access_level',
-      header: t('tools.accessLevel'),
-      render: (row) => (
-        <Select
-          value={row.access_level}
-          onValueChange={(v) => handleQuickUpdate(row.tool_name, 'access_level', v)}
-        >
-          <SelectTrigger className="h-8 w-[110px] text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ACCESS_LEVELS.map((level) => (
-              <SelectItem key={level} value={level}>
-                {t(`tools.accessLevels.${level}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ),
-    },
-    {
-      key: 'daily_limit_anon',
-      header: t('tools.dailyLimitAnon'),
-      align: 'center',
-      render: (row) => (
-        <InlineNumberEditor
-          value={row.daily_limit_anon}
-          onChange={(v) => handleQuickUpdate(row.tool_name, 'daily_limit_anon', v)}
-          min={0}
-          nullable
-          placeholder={t('tools.unlimited')}
-        />
-      ),
-    },
-    {
-      key: 'daily_limit_auth',
-      header: t('tools.dailyLimitAuth'),
-      align: 'center',
-      render: (row) => (
-        <InlineNumberEditor
-          value={row.daily_limit_auth}
-          onChange={(v) => handleQuickUpdate(row.tool_name, 'daily_limit_auth', v)}
-          min={0}
-          nullable
-          placeholder={t('tools.unlimited')}
-        />
-      ),
-    },
-    {
-      key: 'display_order',
-      header: t('tools.displayOrder'),
-      align: 'center',
-      render: (row) => (
-        <InlineNumberEditor
-          value={row.display_order}
-          onChange={(v) => handleQuickUpdate(row.tool_name, 'display_order', v ?? 0)}
-          min={0}
-        />
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      align: 'right',
-      render: (row) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs"
-          onClick={() => setEditingTool(row)}
-        >
-          {t('tools.editMeta')}
-        </Button>
+        // stopPropagation prevents row expansion when clicking switch
+        <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+          <Switch
+            checked={row.is_enabled}
+            onCheckedChange={() => handleToggleEnabled(row)}
+          />
+        </div>
       ),
     },
   ]
+
+  const handleRowClick = (row: AdminToolItem) => {
+    setExpandedKey((prev) => (prev === row.tool_name ? null : row.tool_name))
+  }
+
+  const renderExpanded = (tool: AdminToolItem) => (
+    <div className="space-y-5">
+      {/* Section 1: Display Info */}
+      <ExpandedSection title={t('tools.section.displayInfo')}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <TextFieldEditor
+            label={`${t('tools.displayName')} (ZH)`}
+            value={tool.display_name_zh ?? ''}
+            onSave={(v) => handleTextFieldSave(tool.tool_name, 'display_name_zh', v)}
+          />
+          <TextFieldEditor
+            label={`${t('tools.displayName')} (EN)`}
+            value={tool.display_name_en ?? ''}
+            onSave={(v) => handleTextFieldSave(tool.tool_name, 'display_name_en', v)}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <TextFieldEditor
+            label={`${t('tools.description')} (ZH)`}
+            value={tool.description_zh ?? ''}
+            onSave={(v) => handleTextFieldSave(tool.tool_name, 'description_zh', v)}
+          />
+          <TextFieldEditor
+            label={`${t('tools.description')} (EN)`}
+            value={tool.description_en ?? ''}
+            onSave={(v) => handleTextFieldSave(tool.tool_name, 'description_en', v)}
+          />
+        </div>
+        <TextFieldEditor
+          label={t('tools.icon')}
+          value={tool.icon ?? ''}
+          onSave={(v) => handleTextFieldSave(tool.tool_name, 'icon', v)}
+          placeholder="e.g. compress"
+          className="max-w-xs"
+        />
+      </ExpandedSection>
+
+      <div className="border-t" />
+
+      {/* Section 2: Access Control */}
+      <ExpandedSection title={t('tools.section.accessControl')}>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="space-y-1">
+            <Label className="text-xs">{t('tools.accessLevel')}</Label>
+            <Select
+              value={tool.access_level}
+              onValueChange={(v) => handleQuickUpdate(tool.tool_name, 'access_level', v)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCESS_LEVELS.map((level) => (
+                  <SelectItem key={level} value={level}>
+                    {t(`tools.accessLevels.${level}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <LabelWithTooltip label={t('tools.creditCost')} tooltip={t('tools.help.creditCost')} />
+            <InlineNumberEditor
+              value={tool.credit_cost}
+              onChange={(v) => handleQuickUpdate(tool.tool_name, 'credit_cost', v)}
+              min={0}
+            />
+          </div>
+          <div className="space-y-1">
+            <LabelWithTooltip label={t('tools.dailyLimitAnon')} tooltip={t('tools.help.dailyLimitAnon')} />
+            <InlineNumberEditor
+              value={tool.daily_limit_anon}
+              onChange={(v) => handleQuickUpdate(tool.tool_name, 'daily_limit_anon', v)}
+              min={0}
+              nullable
+              placeholder={t('tools.unlimited')}
+            />
+          </div>
+          <div className="space-y-1">
+            <LabelWithTooltip label={t('tools.dailyLimitAuth')} tooltip={t('tools.help.dailyLimitAuth')} />
+            <InlineNumberEditor
+              value={tool.daily_limit_auth}
+              onChange={(v) => handleQuickUpdate(tool.tool_name, 'daily_limit_auth', v)}
+              min={0}
+              nullable
+              placeholder={t('tools.unlimited')}
+            />
+          </div>
+        </div>
+        {/* Access summary */}
+        <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          {getAccessSummary(tool, t)}
+        </div>
+      </ExpandedSection>
+
+      <div className="border-t" />
+
+      {/* Section 3: Display Settings */}
+      <ExpandedSection title={t('tools.section.displaySettings')}>
+        <div className="max-w-[120px] space-y-1">
+          <LabelWithTooltip label={t('tools.displayOrder')} tooltip={t('tools.help.displayOrder')} />
+          <InlineNumberEditor
+            value={tool.display_order}
+            onChange={(v) => handleQuickUpdate(tool.tool_name, 'display_order', v ?? 0)}
+            min={0}
+          />
+        </div>
+      </ExpandedSection>
+    </div>
+  )
+
+  const renderMobileCard = (tool: AdminToolItem) => {
+    const status = getToolStatus(tool)
+    const isExpanded = expandedKey === tool.tool_name
+
+    return (
+      <div className="rounded-xl border bg-card">
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-3 py-2.5 cursor-pointer"
+          onClick={() => handleRowClick(tool)}
+        >
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[11px]">
+              {t(`tools.categories.${tool.category}`)}
+            </Badge>
+            <div className="flex flex-col">
+              <span className="font-mono text-sm">{tool.tool_name}</span>
+              {(tool.display_name_zh || tool.display_name_en) && (
+                <span className="text-xs text-muted-foreground">
+                  {tool.display_name_zh || tool.display_name_en}
+                </span>
+              )}
+            </div>
+          </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <Switch
+              checked={tool.is_enabled}
+              onCheckedChange={() => handleToggleEnabled(tool)}
+            />
+          </div>
+        </div>
+
+        {/* Summary badges */}
+        <div
+          className="flex flex-wrap gap-1.5 px-3 pb-2.5 cursor-pointer"
+          onClick={() => handleRowClick(tool)}
+        >
+          <StatusBadge status={status} label={t(`tools.statuses.${status}`)} />
+          <Badge variant="outline">{t(`tools.accessLevels.${tool.access_level}`)}</Badge>
+          {tool.credit_cost > 0 && (
+            <Badge variant="outline" className="tabular-nums">
+              {tool.credit_cost} credits
+            </Badge>
+          )}
+        </div>
+
+        {/* Expanded content */}
+        {isExpanded && (
+          <div className="border-t px-3 py-3">
+            {renderExpanded(tool)}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -229,25 +375,120 @@ export function AdminToolsPage() {
         />
       </div>
 
-      <DataTable columns={columns} data={filteredTools} rowKey={(row) => row.tool_name} loading={isLoading} />
+      <DataTable
+        columns={columns}
+        data={filteredTools}
+        rowKey={(row) => row.tool_name}
+        loading={isLoading}
+        onRowClick={handleRowClick}
+        expandedRowKey={expandedKey}
+        renderExpanded={renderExpanded}
+        renderMobileCard={renderMobileCard}
+      />
 
-      {editingTool && (
-        <MetadataDialog
-          tool={editingTool}
-          open={!!editingTool}
-          onOpenChange={(open) => !open && setEditingTool(null)}
-          onSave={(updates) => {
+      {/* Disable confirmation dialog */}
+      {disablingTool && (
+        <ConfirmDialog
+          open={!!disablingTool}
+          onOpenChange={(open) => !open && setDisablingTool(null)}
+          title={t('tools.disableConfirm.title')}
+          description={t('tools.disableConfirm.description', { tool: disablingTool.tool_name })}
+          confirmText={t('tools.disableConfirm.confirm')}
+          variant="destructive"
+          loading={updateMutation.isPending}
+          onConfirm={() => {
             updateMutation.mutate(
-              { name: editingTool.tool_name, updates },
-              { onSuccess: () => setEditingTool(null) },
+              { name: disablingTool.tool_name, updates: { is_enabled: false } },
+              { onSuccess: () => setDisablingTool(null) },
             )
           }}
-          saving={updateMutation.isPending}
         />
       )}
     </div>
   )
 }
+
+
+// -- Expanded section wrapper --
+
+function ExpandedSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h4 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h4>
+      {children}
+    </section>
+  )
+}
+
+
+// -- Label with tooltip help icon --
+
+function LabelWithTooltip({ label, tooltip }: { label: string; tooltip: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <Label className="text-xs">{label}</Label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <HelpCircle className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[220px]">
+          <p>{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  )
+}
+
+
+// -- Text field editor (onBlur save) --
+
+function TextFieldEditor({
+  label,
+  value,
+  onSave,
+  placeholder,
+  className,
+}: {
+  label: string
+  value: string
+  onSave: (v: string) => void
+  placeholder?: string
+  className?: string
+}) {
+  const [draft, setDraft] = useState(value)
+
+  // Sync draft when external value changes (e.g. after React Query refetch)
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  const handleBlur = () => {
+    if (draft !== value) onSave(draft)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      (e.target as HTMLInputElement).blur()
+    }
+  }
+
+  return (
+    <div className={className}>
+      <Label className="text-xs">{label}</Label>
+      <Input
+        className="mt-1 h-8 text-xs"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+      />
+    </div>
+  )
+}
+
 
 // -- Inline number editor --
 
@@ -314,89 +555,5 @@ function InlineNumberEditor({
         <span className="text-muted-foreground">{placeholder ?? '-'}</span>
       )}
     </button>
-  )
-}
-
-// -- Metadata dialog --
-
-function MetadataDialog({
-  tool,
-  open,
-  onOpenChange,
-  onSave,
-  saving,
-}: {
-  tool: AdminToolItem
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSave: (updates: AdminToolUpdateRequest) => void
-  saving: boolean
-}) {
-  const { t } = useTranslation('admin')
-
-  const [nameZh, setNameZh] = useState(tool.display_name_zh ?? '')
-  const [nameEn, setNameEn] = useState(tool.display_name_en ?? '')
-  const [descZh, setDescZh] = useState(tool.description_zh ?? '')
-  const [descEn, setDescEn] = useState(tool.description_en ?? '')
-  const [icon, setIcon] = useState(tool.icon ?? '')
-
-  const handleSave = () => {
-    onSave({
-      display_name_zh: nameZh || null,
-      display_name_en: nameEn || null,
-      description_zh: descZh || null,
-      description_en: descEn || null,
-      icon: icon || null,
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {t('tools.editMeta')} - <span className="font-mono">{tool.tool_name}</span>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">{t('tools.displayName')} (ZH)</Label>
-              <Input value={nameZh} onChange={(e) => setNameZh(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs">{t('tools.displayName')} (EN)</Label>
-              <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} className="mt-1" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label className="text-xs">{t('tools.description')} (ZH)</Label>
-              <Input value={descZh} onChange={(e) => setDescZh(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label className="text-xs">{t('tools.description')} (EN)</Label>
-              <Input value={descEn} onChange={(e) => setDescEn(e.target.value)} className="mt-1" />
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs">{t('tools.icon')}</Label>
-            <Input value={icon} onChange={(e) => setIcon(e.target.value)} className="mt-1" placeholder="e.g. compress" />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? t('common.loading') : t('common.confirm')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }

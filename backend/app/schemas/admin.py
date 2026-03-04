@@ -14,6 +14,7 @@ class DailyTrend(BaseModel):
 
 class ToolRanking(BaseModel):
     tool_name: str
+    display_name: str
     count: int
 
 
@@ -156,6 +157,7 @@ class CardSummaryResponse(BaseModel):
 
 class ToolUsageItem(BaseModel):
     tool_name: str
+    display_name: str
     date: str
     count: int
     success_count: int
@@ -217,3 +219,94 @@ class RevenueResponse(BaseModel):
     items: list[RevenueItem]
     total_credits: int
     total_transactions: int
+
+
+# ── Storage ──────────────────────────────────────────────
+
+class StorageDirStats(BaseModel):
+    name: str
+    file_count: int
+    total_size_bytes: int
+
+
+class ProcessingStats(BaseModel):
+    total: int
+    today: int
+
+
+class StorageOverviewResponse(BaseModel):
+    directories: list[StorageDirStats]
+    processing: ProcessingStats
+
+
+class AdminProcessingHistoryListItem(BaseModel):
+    id: int
+    user_id: int | None
+    user_email: str | None
+    tool_name: str
+    display_name: str
+    status: str
+    input_file_id: str | None
+    output_file_id: str | None
+    created_at: datetime
+
+
+class AdminProcessingHistoryListResponse(BaseModel):
+    items: list[AdminProcessingHistoryListItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class StorageCleanupRequest(BaseModel):
+    target: str = Field(pattern=r"^(files|transfers|result_shares|all)$")
+
+
+class StorageCleanupResponse(BaseModel):
+    files_removed: int
+    transfers_expired: int
+    shares_expired: int
+
+
+# ── Transfers & Shares ────────────────────────────────────
+
+class AdminFileTransferItem(BaseModel):
+    id: int
+    token: str
+    user_id: int
+    user_email: str | None
+    file_count: int
+    total_size: int
+    download_count: int
+    max_downloads: int | None
+    status: str
+    burn_after_read: bool
+    has_extract_code: bool
+    message: str | None
+    expires_at: datetime
+    created_at: datetime
+
+
+class AdminFileTransferListResponse(BaseModel):
+    items: list[AdminFileTransferItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminResultShareItem(BaseModel):
+    id: int
+    token: str
+    share_type: str
+    locale: str
+    user_id: int | None
+    user_email: str | None
+    expires_at: datetime
+    created_at: datetime
+
+
+class AdminResultShareListResponse(BaseModel):
+    items: list[AdminResultShareItem]
+    total: int
+    limit: int
+    offset: int

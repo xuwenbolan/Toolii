@@ -9,6 +9,7 @@ export type DailyTrend = {
 
 export type ToolRanking = {
   tool_name: string
+  display_name: string
   count: number
 }
 
@@ -114,6 +115,7 @@ export type CardSummaryResponse = {
 
 export type ToolUsageItem = {
   tool_name: string
+  display_name: string
   date: string
   count: number
   success_count: number
@@ -171,6 +173,93 @@ export type RevenueResponse = {
   items: RevenueItem[]
   total_credits: number
   total_transactions: number
+}
+
+// ── Storage types ─────────────────────────────────────────
+
+export type StorageDirStats = {
+  name: string
+  file_count: number
+  total_size_bytes: number
+}
+
+export type ProcessingStats = {
+  total: number
+  today: number
+}
+
+export type StorageOverview = {
+  directories: StorageDirStats[]
+  processing: ProcessingStats
+}
+
+export type AdminProcessingHistoryListItem = {
+  id: number
+  user_id: number | null
+  user_email: string | null
+  tool_name: string
+  display_name: string
+  status: string
+  input_file_id: string | null
+  output_file_id: string | null
+  created_at: string
+}
+
+export type AdminProcessingHistoryListResponse = {
+  items: AdminProcessingHistoryListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type StorageCleanupResponse = {
+  files_removed: number
+  transfers_expired: number
+  shares_expired: number
+}
+
+// ── Transfers & Shares types ──────────────────────────────
+
+export type AdminFileTransferItem = {
+  id: number
+  token: string
+  user_id: number
+  user_email: string | null
+  file_count: number
+  total_size: number
+  download_count: number
+  max_downloads: number | null
+  status: string
+  burn_after_read: boolean
+  has_extract_code: boolean
+  message: string | null
+  expires_at: string
+  created_at: string
+}
+
+export type AdminFileTransferListResponse = {
+  items: AdminFileTransferItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type AdminResultShareItem = {
+  id: number
+  token: string
+  share_type: string
+  locale: string
+  user_id: number | null
+  user_email: string | null
+  expires_at: string
+  created_at: string
+}
+
+export type AdminResultShareListResponse = {
+  items: AdminResultShareItem[]
+  total: number
+  limit: number
+  offset: number
 }
 
 // ── Cortex / System types ─────────────────────────────────
@@ -434,5 +523,72 @@ export async function fetchCortexTimeline(last = 300) {
     '/api/admin/system/cortex/timeline',
     { params: { last } },
   )
+  return res.data
+}
+
+// ── Storage ──────────────────────────────────────────────
+
+export async function fetchStorageOverview() {
+  const res = await api.get<StorageOverview>('/api/admin/storage/overview')
+  return res.data
+}
+
+export async function fetchProcessingHistory(params?: {
+  limit?: number
+  offset?: number
+  tool_name?: string
+  status?: string
+}) {
+  const res = await api.get<AdminProcessingHistoryListResponse>(
+    '/api/admin/storage/processing-history',
+    { params },
+  )
+  return res.data
+}
+
+export async function triggerStorageCleanup(target: string) {
+  const res = await api.post<StorageCleanupResponse>('/api/admin/storage/cleanup', { target })
+  return res.data
+}
+
+// ── Transfers & Shares ───────────────────────────────────
+
+export async function fetchFileTransfers(params?: {
+  limit?: number
+  offset?: number
+  status?: string
+}) {
+  const res = await api.get<AdminFileTransferListResponse>(
+    '/api/admin/transfers/file-transfers',
+    { params },
+  )
+  return res.data
+}
+
+export async function forceExpireTransfer(transferId: number) {
+  const res = await api.put(`/api/admin/transfers/file-transfers/${transferId}/expire`)
+  return res.data
+}
+
+export async function deleteTransfer(transferId: number) {
+  const res = await api.delete(`/api/admin/transfers/file-transfers/${transferId}`)
+  return res.data
+}
+
+export async function fetchResultShares(params?: {
+  limit?: number
+  offset?: number
+  share_type?: string
+  expired?: boolean
+}) {
+  const res = await api.get<AdminResultShareListResponse>(
+    '/api/admin/transfers/result-shares',
+    { params },
+  )
+  return res.data
+}
+
+export async function deleteResultShare(shareId: number) {
+  const res = await api.delete(`/api/admin/transfers/result-shares/${shareId}`)
   return res.data
 }

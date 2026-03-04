@@ -2,6 +2,7 @@ import { useRef, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { useIsMobile } from '@/hooks/useIsMobile'
 import { cn } from '@/lib/utils'
 
 export type Column<T> = {
@@ -23,6 +24,8 @@ type Props<T> = {
   onRowClick?: (row: T) => void
   expandedRowKey?: string | number | null
   renderExpanded?: (row: T) => ReactNode | null
+  // Render a card for each row on mobile instead of the table
+  renderMobileCard?: (row: T, index: number) => ReactNode
 }
 
 const ALIGN_CLASS = {
@@ -40,8 +43,10 @@ export function DataTable<T>({
   onRowClick,
   expandedRowKey,
   renderExpanded,
+  renderMobileCard,
 }: Props<T>) {
   const { t } = useTranslation('admin')
+  const isMobile = useIsMobile()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollRight, setCanScrollRight] = useState(false)
 
@@ -60,6 +65,23 @@ export function DataTable<T>({
       ro.disconnect()
     }
   }, [data, columns])
+
+  // Mobile card layout
+  if (isMobile && renderMobileCard) {
+    if (loading) {
+      return <div className="py-10 text-center text-sm text-muted-foreground">{t('common.loading')}</div>
+    }
+    if (data.length === 0) {
+      return <div className="py-10 text-center text-sm text-muted-foreground">{emptyText ?? t('common.noData')}</div>
+    }
+    return (
+      <div className="space-y-3">
+        {data.map((row, i) => (
+          <div key={rowKey(row)}>{renderMobileCard(row, i)}</div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="relative rounded-xl border bg-card">

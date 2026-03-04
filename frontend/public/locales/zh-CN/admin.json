@@ -9,6 +9,8 @@
     "feedback": "用户反馈",
     "tools": "工具管理",
     "system": "系统状态",
+    "storage": "存储管理",
+    "transfers": "传输管理",
     "menu": "菜单"
   },
   "dashboard": {
@@ -185,17 +187,22 @@
     "title": "工具管理",
     "toolName": "工具",
     "category": "分类",
-    "enabled": "启用",
+    "enabled": "上线",
+    "status": "状态",
     "creditCost": "积分消耗",
     "accessLevel": "访问权限",
     "dailyLimitAnon": "匿名限次",
     "dailyLimitAuth": "登录限次",
     "displayOrder": "排序",
-    "editMeta": "编辑信息",
     "displayName": "显示名称",
     "description": "描述",
     "icon": "图标",
     "unlimited": "不限",
+    "statuses": {
+      "active": "正常",
+      "restricted": "受限",
+      "disabled": "已下线"
+    },
     "accessLevels": {
       "public": "公开",
       "auth": "需登录",
@@ -203,12 +210,40 @@
       "admin": "仅管理员"
     },
     "updateSuccess": "工具已更新",
-    "on": "开启",
-    "off": "关闭",
     "categories": {
       "image": "图片",
       "pdf": "PDF",
       "facemap": "面部分析"
+    },
+    "section": {
+      "displayInfo": "显示信息",
+      "accessControl": "访问控制",
+      "displaySettings": "显示设置"
+    },
+    "disableConfirm": {
+      "title": "确认下线工具",
+      "description": "下线 {{tool}} 后，所有用户（包括管理员）都将无法使用此工具，前端将隐藏该工具。确定要继续吗？",
+      "confirm": "确认下线"
+    },
+    "accessSummary": {
+      "disabled": "工具已下线，所有用户均无法访问",
+      "level": {
+        "public": "所有用户可访问",
+        "auth": "需登录后使用",
+        "verified": "需邮箱验证后使用",
+        "admin": "仅管理员可使用"
+      },
+      "anonLimit": "匿名用户每日 {{count}} 次",
+      "authLimit": "登录用户每日 {{count}} 次",
+      "cost": "每次消耗 {{count}} 积分",
+      "free": "免费使用",
+      "separator": "；"
+    },
+    "help": {
+      "dailyLimitAnon": "未登录用户每日可使用的次数，留空表示不限制",
+      "dailyLimitAuth": "已登录用户每日可使用的次数，留空表示不限制",
+      "creditCost": "每次使用扣除的积分数量",
+      "displayOrder": "在前台工具列表中的排列顺序，数字越小越靠前"
     }
   },
   "system": {
@@ -289,6 +324,50 @@
       "evicted_budget": "淘汰(预算)",
       "oom_retry": "OOM 重试"
     }
+  },
+  "storage": {
+    "title": "存储管理",
+    "totalProcessing": "处理记录",
+    "today": "今日",
+    "cleanup": "清理过期文件",
+    "cleanupConfirmTitle": "确认清理",
+    "cleanupConfirmDesc": "将清理所有目录中的过期文件、过期传输和过期分享。此操作不可撤销。",
+    "cleanupEmpty": "没有需要清理的文件",
+    "processingHistory": "处理历史",
+    "allStatus": "全部状态",
+    "statusDone": "成功",
+    "statusFailed": "失败",
+    "tool": "工具",
+    "user": "用户",
+    "status": "状态",
+    "time": "时间"
+  },
+  "transfers": {
+    "title": "传输与分享",
+    "tabs": {
+      "fileTransfers": "文件传输",
+      "resultShares": "结果分享"
+    },
+    "allStatus": "全部状态",
+    "allTypes": "全部类型",
+    "token": "令牌",
+    "user": "用户",
+    "files": "文件",
+    "downloads": "下载次数",
+    "status": "状态",
+    "expiresAt": "过期时间",
+    "expire": "强制过期",
+    "delete": "删除",
+    "expireConfirmTitle": "确认强制过期",
+    "expireConfirmDesc": "此操作将标记传输为过期并删除物理文件，不可撤销。",
+    "deleteConfirmTitle": "确认删除",
+    "deleteConfirmDesc": "此操作将彻底删除传输记录和物理文件，不可撤销。",
+    "shareType": "类型",
+    "locale": "语言",
+    "shareActive": "有效",
+    "shareExpired": "已过期",
+    "deleteShareConfirmTitle": "确认删除分享",
+    "deleteShareConfirmDesc": "此操作将删除分享记录和关联图片，不可撤销。"
   },
   "common": {
     "loading": "加载中...",

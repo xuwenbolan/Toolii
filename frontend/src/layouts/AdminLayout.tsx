@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 const NAV_ITEMS = [
   { to: '/admin', labelKey: 'admin:nav.dashboard', end: true },
@@ -13,6 +14,8 @@ const NAV_ITEMS = [
   { to: '/admin/tools', labelKey: 'admin:nav.tools' },
   { to: '/admin/operations', labelKey: 'admin:nav.operations' },
   { to: '/admin/feedback', labelKey: 'admin:nav.feedback' },
+  { to: '/admin/storage', labelKey: 'admin:nav.storage' },
+  { to: '/admin/transfers', labelKey: 'admin:nav.transfers' },
   { to: '/admin/system', labelKey: 'admin:nav.system' },
 ]
 
@@ -90,9 +93,11 @@ export function AdminLayout() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto p-4 lg:p-6">
-        <div className="motion-safe:animate-fade-in">
-          <Outlet />
-        </div>
+        <TooltipProvider>
+          <div className="motion-safe:animate-fade-in">
+            <Outlet />
+          </div>
+        </TooltipProvider>
       </main>
     </div>
   )

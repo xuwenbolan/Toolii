@@ -158,6 +158,40 @@ export function AdminUsersPage() {
         data={items}
         rowKey={(u) => u.id}
         loading={isLoading}
+        renderMobileCard={(u) => (
+          <div className="rounded-xl border bg-card px-3 py-2.5">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{u.email}</div>
+                {u.name && <div className="text-xs text-muted-foreground">{u.name}</div>}
+              </div>
+              <StatusBadge
+                status={u.is_active ? 'active' : 'disabled'}
+                label={u.is_active ? t('users.active') : t('users.disabled')}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{t('users.balance')}: <span className="font-medium text-foreground">{u.balance}</span></span>
+              <div className="flex items-center gap-2">
+                <Link to={`/admin/users/${u.id}`} className="text-primary hover:underline text-sm">
+                  {t('users.viewDetail')}
+                </Link>
+                {u.is_admin ? (
+                  <StatusBadge status="reviewed" label={t('users.detail.admin')} />
+                ) : (
+                  <Button
+                    variant={u.is_active ? 'destructive' : 'default'}
+                    size="sm"
+                    className="h-7"
+                    onClick={() => setConfirmUser(u)}
+                  >
+                    {u.is_active ? t('users.disable') : t('users.enable')}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       />
 
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />

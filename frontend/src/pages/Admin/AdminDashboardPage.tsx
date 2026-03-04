@@ -12,7 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-import { AdminErrorState } from '@/components/admin'
+import { AdminErrorState, ChartTooltip, CHART_COLORS, GRID_PROPS } from '@/components/admin'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useIsMobile } from '@/hooks/useIsMobile'
@@ -91,7 +91,7 @@ export function AdminDashboardPage() {
               <TabsContent key={tab.key} value={tab.key}>
                 <ResponsiveContainer width="100%" height={isMobile ? 200 : 300}>
                   <LineChart data={tab.data}>
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid {...GRID_PROPS} />
                     <XAxis
                       dataKey="date"
                       tick={{ fontSize: isMobile ? 10 : 12 }}
@@ -100,13 +100,15 @@ export function AdminDashboardPage() {
                       angle={isMobile ? -45 : 0}
                       textAnchor={isMobile ? 'end' : 'middle'}
                       height={isMobile ? 50 : 30}
+                      tickLine={false}
+                      axisLine={false}
                     />
-                    <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} />
-                    <Tooltip />
+                    <YAxis tick={{ fontSize: isMobile ? 10 : 12 }} width={isMobile ? 35 : 60} tickLine={false} axisLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
                     <Line
                       type="monotone"
                       dataKey="value"
-                      stroke="var(--foreground)"
+                      stroke={CHART_COLORS[0]}
                       strokeWidth={2}
                       dot={false}
                     />
@@ -134,16 +136,18 @@ export function AdminDashboardPage() {
               height={data.tool_ranking.length * (isMobile ? 36 : 40) + 20}
             >
               <BarChart data={data.tool_ranking} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                <CartesianGrid {...GRID_PROPS} horizontal={false} vertical />
+                <XAxis type="number" tick={{ fontSize: isMobile ? 10 : 12 }} tickLine={false} axisLine={false} />
                 <YAxis
                   type="category"
-                  dataKey="tool_name"
+                  dataKey="display_name"
                   tick={{ fontSize: isMobile ? 10 : 12 }}
                   width={isMobile ? 80 : 120}
+                  tickLine={false}
+                  axisLine={false}
                 />
-                <Tooltip />
-                <Bar dataKey="count" fill="var(--muted-foreground)" radius={[0, 4, 4, 0]} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--muted)', opacity: 0.4 }} />
+                <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

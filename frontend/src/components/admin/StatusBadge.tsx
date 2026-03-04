@@ -16,9 +16,14 @@ const DEFAULT_COLORS: Record<string, string> = {
   // processing statuses
   done: 'bg-success-light text-success border-success/20',
   failed: 'bg-destructive-light text-destructive border-destructive/20',
+  // transfer statuses
+  burned: 'bg-warning-light text-warning border-warning/20',
+  deleted: 'bg-muted text-muted-foreground border-border',
   // feedback statuses
   reviewed: 'bg-info-light text-info border-info/20',
   resolved: 'bg-success-light text-success border-success/20',
+  // tool statuses
+  restricted: 'bg-warning-light text-warning border-warning/20',
 }
 
 type Props = {

@@ -4,19 +4,25 @@ import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.core.exceptions import AppError, NotFoundError
 from app.utils.time_utils import utcnow
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
+from app.models.result_share import ResultShare
+from app.models.file_transfer import FileTransfer, TransferStatus
 from app.models.login_history import LoginHistory
 from app.models.processing_history import ProcessingHistory
 from app.models.share_link import ShareLink
+from app.models.tool import Tool
 from app.models.user import User
 from app.models.user_credit import UserCredit
 from app.services.credit_service import CreditService
+from app.services.file_service import FileService
 from app.utils.hash_utils import sha256_hex
 
 logger = logging.getLogger(__name__)
@@ -90,14 +96,22 @@ class AdminService:
             )).scalar_one()
         )
 
-        # Tool ranking
+        # Tool ranking (JOIN tools to filter out dirty data and get display names)
         ranking_rows = (await self._db.execute(
-            select(ProcessingHistory.tool_name, func.count().label("cnt"))
-            .group_by(ProcessingHistory.tool_name)
+            select(
+                ProcessingHistory.tool_name,
+                func.coalesce(Tool.display_name_zh, ProcessingHistory.tool_name).label("display_name"),
+                func.count().label("cnt"),
+            )
+            .join(Tool, Tool.tool_name == ProcessingHistory.tool_name)
+            .group_by(ProcessingHistory.tool_name, Tool.display_name_zh)
             .order_by(func.count().desc())
             .limit(10)
         )).all()
-        tool_ranking = [{"tool_name": r[0], "count": r[1]} for r in ranking_rows]
+        tool_ranking = [
+            {"tool_name": r[0], "display_name": r[1], "count": r[2]}
+            for r in ranking_rows
+        ]
 
         # Build full date range for trend charts
         all_dates = [
@@ -458,6 +472,9 @@ class AdminService:
         period_start = _days_ago(days)
         date_col = func.date(ProcessingHistory.created_at)
 
+        display_name_col = func.coalesce(
+            Tool.display_name_zh, ProcessingHistory.tool_name,
+        ).label("display_name")
         stmt = (
             select(
                 ProcessingHistory.tool_name,
@@ -465,13 +482,17 @@ class AdminService:
                 func.count().label("total"),
                 func.sum(case((ProcessingHistory.status == "done", 1), else_=0)).label("success"),
                 func.sum(case((ProcessingHistory.status == "failed", 1), else_=0)).label("fail"),
+                display_name_col,
             )
+            .join(Tool, Tool.tool_name == ProcessingHistory.tool_name)
             .where(ProcessingHistory.created_at >= period_start)
         )
         if tool_name:
             stmt = stmt.where(ProcessingHistory.tool_name == tool_name)
 
-        stmt = stmt.group_by(ProcessingHistory.tool_name, date_col).order_by(date_col)
+        stmt = stmt.group_by(
+            ProcessingHistory.tool_name, date_col, Tool.display_name_zh,
+        ).order_by(date_col)
         rows = (await self._db.execute(stmt)).all()
 
         return [
@@ -481,6 +502,7 @@ class AdminService:
                 "count": int(r[2]),
                 "success_count": int(r[3]),
                 "fail_count": int(r[4]),
+                "display_name": r[5],
             }
             for r in rows
         ]
@@ -607,3 +629,218 @@ class AdminService:
             "total_credits": total_credits,
             "total_transactions": total_transactions,
         }
+
+    # ── Storage: Processing History ─────────────────────────
+
+    async def list_processing_history(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        tool_name: str | None = None,
+        status: str | None = None,
+    ) -> dict:
+        base = (
+            select(
+                ProcessingHistory.id,
+                ProcessingHistory.user_id,
+                User.email.label("user_email"),
+                ProcessingHistory.tool_name,
+                func.coalesce(Tool.display_name_zh, ProcessingHistory.tool_name).label("display_name"),
+                ProcessingHistory.status,
+                ProcessingHistory.input_file_id,
+                ProcessingHistory.output_file_id,
+                ProcessingHistory.created_at,
+            )
+            .outerjoin(User, User.id == ProcessingHistory.user_id)
+            .outerjoin(Tool, Tool.tool_name == ProcessingHistory.tool_name)
+        )
+        count_base = select(func.count()).select_from(ProcessingHistory)
+
+        if tool_name:
+            base = base.where(ProcessingHistory.tool_name == tool_name)
+            count_base = count_base.where(ProcessingHistory.tool_name == tool_name)
+        if status:
+            base = base.where(ProcessingHistory.status == status)
+            count_base = count_base.where(ProcessingHistory.status == status)
+
+        total = int((await self._db.execute(count_base)).scalar_one())
+        rows = (await self._db.execute(
+            base.order_by(ProcessingHistory.id.desc()).limit(limit).offset(offset)
+        )).all()
+
+        items = [
+            {
+                "id": r.id,
+                "user_id": r.user_id,
+                "user_email": r.user_email,
+                "tool_name": r.tool_name,
+                "display_name": r.display_name,
+                "status": r.status,
+                "input_file_id": r.input_file_id,
+                "output_file_id": r.output_file_id,
+                "created_at": r.created_at,
+            }
+            for r in rows
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    # ── Transfers ───────────────────────────────────────────
+
+    async def list_file_transfers(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        status: str | None = None,
+    ) -> dict:
+        base = select(FileTransfer)
+        count_base = select(func.count()).select_from(FileTransfer)
+
+        if status:
+            base = base.where(FileTransfer.status == status)
+            count_base = count_base.where(FileTransfer.status == status)
+
+        total = int((await self._db.execute(count_base)).scalar_one())
+        transfers = (await self._db.execute(
+            base.order_by(FileTransfer.id.desc()).limit(limit).offset(offset)
+        )).scalars().all()
+
+        # Batch-load user emails
+        user_ids = list({t.user_id for t in transfers})
+        emails: dict[int, str] = {}
+        if user_ids:
+            rows = (await self._db.execute(
+                select(User.id, User.email).where(User.id.in_(user_ids))
+            )).all()
+            emails = {r[0]: r[1] for r in rows}
+
+        items = [
+            {
+                "id": t.id,
+                "token": t.token,
+                "user_id": t.user_id,
+                "user_email": emails.get(t.user_id),
+                "file_count": t.file_count,
+                "total_size": t.total_size,
+                "download_count": t.download_count,
+                "max_downloads": t.max_downloads,
+                "status": t.status,
+                "burn_after_read": t.burn_after_read,
+                "has_extract_code": t.extract_code is not None,
+                "message": t.message,
+                "expires_at": t.expires_at,
+                "created_at": t.created_at,
+            }
+            for t in transfers
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    async def force_expire_transfer(self, transfer_id: int) -> None:
+        result = await self._db.execute(
+            select(FileTransfer)
+            .options(selectinload(FileTransfer.files))
+            .where(FileTransfer.id == transfer_id)
+        )
+        transfer = result.scalar_one_or_none()
+        if transfer is None:
+            raise NotFoundError("Transfer not found")
+
+        fs = FileService(storage_dir=settings.transfer_storage_dir)
+        for f in transfer.files:
+            fs.delete(f.file_id)
+
+        transfer.status = TransferStatus.EXPIRED
+        await self._db.commit()
+
+    async def delete_transfer(self, transfer_id: int) -> None:
+        result = await self._db.execute(
+            select(FileTransfer)
+            .options(selectinload(FileTransfer.files))
+            .where(FileTransfer.id == transfer_id)
+        )
+        transfer = result.scalar_one_or_none()
+        if transfer is None:
+            raise NotFoundError("Transfer not found")
+
+        fs = FileService(storage_dir=settings.transfer_storage_dir)
+        for f in transfer.files:
+            fs.delete(f.file_id)
+
+        await self._db.delete(transfer)
+        await self._db.commit()
+
+    # ── Result Shares ──────────────────────────────────────
+
+    async def list_result_shares(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        share_type: str | None = None,
+        expired: bool | None = None,
+    ) -> dict:
+        now = utcnow()
+        base = select(ResultShare)
+        count_base = select(func.count()).select_from(ResultShare)
+
+        if share_type:
+            base = base.where(ResultShare.share_type == share_type)
+            count_base = count_base.where(ResultShare.share_type == share_type)
+        if expired is True:
+            base = base.where(ResultShare.expires_at <= now)
+            count_base = count_base.where(ResultShare.expires_at <= now)
+        elif expired is False:
+            base = base.where(ResultShare.expires_at > now)
+            count_base = count_base.where(ResultShare.expires_at > now)
+
+        total = int((await self._db.execute(count_base)).scalar_one())
+        shares = (await self._db.execute(
+            base.order_by(ResultShare.id.desc()).limit(limit).offset(offset)
+        )).scalars().all()
+
+        # Batch-load user emails
+        user_ids = [s.user_id for s in shares if s.user_id is not None]
+        emails: dict[int, str] = {}
+        if user_ids:
+            rows = (await self._db.execute(
+                select(User.id, User.email).where(User.id.in_(user_ids))
+            )).all()
+            emails = {r[0]: r[1] for r in rows}
+
+        items = [
+            {
+                "id": s.id,
+                "token": s.token,
+                "share_type": s.share_type,
+                "locale": s.locale,
+                "user_id": s.user_id,
+                "user_email": emails.get(s.user_id) if s.user_id else None,
+                "expires_at": s.expires_at,
+                "created_at": s.created_at,
+            }
+            for s in shares
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    async def delete_result_share(self, share_id: int) -> None:
+        result = await self._db.execute(
+            select(ResultShare).where(ResultShare.id == share_id)
+        )
+        share = result.scalar_one_or_none()
+        if share is None:
+            raise NotFoundError("Share not found")
+
+        fs = FileService(storage_dir=settings.result_share_storage_dir)
+        for fid in (share.image_file_id, share.original_image_file_id):
+            if not fid:
+                continue
+            try:
+                fs.delete(fid)
+            except Exception:
+                logger.warning("Failed to delete image %s for share %s", fid, share.token)
+
+        await self._db.execute(
+            delete(ResultShare).where(ResultShare.id == share_id)
+        )
+        await self._db.commit()
