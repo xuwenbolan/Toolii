@@ -73,11 +73,11 @@ class Settings(BaseSettings):
     # Cortex GPU inference service
     cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
 
-    # FaceMap share settings
-    facemap_share_storage_dir: str = Field(
-        default="../data/facemap_shares", alias="FACEMAP_SHARE_STORAGE_DIR"
+    # Result share settings
+    result_share_storage_dir: str = Field(
+        default="../data/result_shares", alias="RESULT_SHARE_STORAGE_DIR"
     )
-    facemap_share_ttl_days: int = Field(default=7, alias="FACEMAP_SHARE_TTL_DAYS")
+    result_share_ttl_days: int = Field(default=7, alias="RESULT_SHARE_TTL_DAYS")
 
     # LLM settings (for physiognomy detailed analysis)
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")

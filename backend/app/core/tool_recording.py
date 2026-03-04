@@ -17,10 +17,21 @@ from app.models.processing_history import ProcessingHistory
 logger = logging.getLogger(__name__)
 
 
+# Categories where all endpoints share a single tool identity
+_CATEGORY_TOOL_OVERRIDES = {
+    "pdf": "pdf/tools",
+}
+
+
 def _extract_tool_name(path: str) -> str:
     """Derive tool_name from URL path: /api/v1/image/compress -> image/compress"""
     parts = path.rstrip("/").split("/")
-    return f"{parts[-2]}/{parts[-1]}" if len(parts) >= 2 else path
+    if len(parts) >= 2:
+        category = parts[-2]
+        if category in _CATEGORY_TOOL_OVERRIDES:
+            return _CATEGORY_TOOL_OVERRIDES[category]
+        return f"{category}/{parts[-1]}"
+    return path
 
 
 def _try_extract_user_id(request: Request) -> int | None:

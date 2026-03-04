@@ -53,7 +53,7 @@ export async function fetchMyFeedback(params: { offset?: number; limit?: number 
 export async function fetchAllFeedback(
   params: { status?: string; offset?: number; limit?: number } = {},
 ) {
-  const { data } = await api.get<AdminFeedbackListResponse>('/api/v1/admin/feedback/', { params })
+  const { data } = await api.get<AdminFeedbackListResponse>('/api/admin/feedback/', { params })
   return data
 }
 
@@ -61,6 +61,6 @@ export async function updateFeedback(
   feedbackId: number,
   body: { status?: FeedbackStatus; admin_note?: string },
 ) {
-  const { data } = await api.put<FeedbackItem>(`/api/v1/admin/feedback/${feedbackId}`, body)
+  const { data } = await api.put<FeedbackItem>(`/api/admin/feedback/${feedbackId}`, body)
   return data
 }
