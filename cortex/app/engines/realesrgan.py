@@ -12,9 +12,9 @@ from app.model_manager import ModelInfo, OnnxModelManager
 from app.utils import encode_png
 
 _VARIANTS = {
-    "x4plus": ("realesrgan/realesrgan-x4plus.onnx", 200, True, 4),
-    "x4v3":   ("realesrgan/realesrgan-x4v3.onnx",    50, True, 4),
-    "anime":  ("realesrgan/realesrgan-anime.onnx",   200, False, 4),
+    "x4plus": ("realesrgan/realesrgan-x4plus.onnx", True,  4),
+    "x4v3":   ("realesrgan/realesrgan-x4v3.onnx",   True,  4),
+    "anime":  ("realesrgan/realesrgan-anime.onnx",   False, 4),
 }
 
 _TILE_PAD = 10
@@ -27,10 +27,9 @@ class RealESRGANEngine(BaseEngine):
             ModelInfo(
                 name=f"realesrgan-{name}",
                 onnx_path=settings.model_dir / path,
-                vram_mb=vram,
                 required=req,
             )
-            for name, (path, vram, req, _) in _VARIANTS.items()
+            for name, (path, req, _) in _VARIANTS.items()
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:
@@ -42,7 +41,7 @@ class RealESRGANEngine(BaseEngine):
 
         model_name = f"realesrgan-{model}"
         session = manager.get_session(model_name)
-        net_scale = _VARIANTS[model][3]
+        net_scale = _VARIANTS[model][2]
 
         if tile_size <= 0:
             tile_size = _DEFAULT_TILE

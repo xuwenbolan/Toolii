@@ -172,8 +172,8 @@ class GFPGANEngine(BaseEngine):
     def get_models(self) -> list[ModelInfo]:
         base = settings.model_dir
         return [
-            ModelInfo("gfpgan-v1.4", base / "gfpgan/gfpgan-v1.4.onnx", 330, True),
-            ModelInfo("retinaface", base / "gfpgan/retinaface-resnet50.onnx", 100, True),
+            ModelInfo("gfpgan-v1.4", base / "gfpgan/gfpgan-v1.4.onnx"),
+            ModelInfo("retinaface", base / "gfpgan/retinaface-resnet50.onnx"),
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:

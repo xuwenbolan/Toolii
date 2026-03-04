@@ -11,11 +11,12 @@ from app.engines.base import BaseEngine
 from app.model_manager import ModelInfo, OnnxModelManager
 from app.utils import encode_png
 
+# (onnx_path, required)
 _VARIANTS = {
-    "general":  ("birefnet/birefnet-general.onnx",  800, True),
-    "portrait": ("birefnet/birefnet-portrait.onnx", 800, False),
-    "lite":     ("birefnet/birefnet-lite.onnx",     400, False),
-    "matting":  ("birefnet/birefnet-matting.onnx",   800, False),
+    "general":  ("birefnet/birefnet-general.onnx",  True),
+    "portrait": ("birefnet/birefnet-portrait.onnx", False),
+    "lite":     ("birefnet/birefnet-lite.onnx",     False),
+    "matting":  ("birefnet/birefnet-matting.onnx",   False),
 }
 
 # ImageNet normalization
@@ -29,10 +30,9 @@ class BiRefNetEngine(BaseEngine):
             ModelInfo(
                 name=f"birefnet-{name}",
                 onnx_path=settings.model_dir / path,
-                vram_mb=vram,
                 required=req,
             )
-            for name, (path, vram, req) in _VARIANTS.items()
+            for name, (path, req) in _VARIANTS.items()
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:

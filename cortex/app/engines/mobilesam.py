@@ -20,8 +20,8 @@ class MobileSAMEngine(BaseEngine):
     def get_models(self) -> list[ModelInfo]:
         base = settings.model_dir
         return [
-            ModelInfo("mobilesam-encoder", base / "mobilesam/mobilesam-encoder.onnx", 20, True),
-            ModelInfo("mobilesam-decoder", base / "mobilesam/mobilesam-decoder.onnx", 20, True),
+            ModelInfo("mobilesam-encoder", base / "mobilesam/mobilesam-encoder.onnx"),
+            ModelInfo("mobilesam-decoder", base / "mobilesam/mobilesam-decoder.onnx"),
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:

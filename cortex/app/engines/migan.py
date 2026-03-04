@@ -17,7 +17,7 @@ _INFER_SIZE = 512
 class MIGANEngine(BaseEngine):
     def get_models(self) -> list[ModelInfo]:
         return [
-            ModelInfo("migan", settings.model_dir / "inpaint/migan.onnx", 11, True),
+            ModelInfo("migan", settings.model_dir / "inpaint/migan.onnx"),
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:

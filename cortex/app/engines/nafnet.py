@@ -11,12 +11,12 @@ from app.engines.base import BaseEngine
 from app.model_manager import ModelInfo, OnnxModelManager
 from app.utils import encode_png
 
-# (onnx_path, vram_mb, required, task)
+# (onnx_path, required, task)
 _VARIANTS = {
-    "nafnet-sidd-w64":  ("nafnet/nafnet-sidd-w64.onnx",  105, True,  "denoise"),
-    "nafnet-sidd-w32":  ("nafnet/nafnet-sidd-w32.onnx",   30, False, "denoise"),
-    "nafnet-gopro-w64": ("nafnet/nafnet-gopro-w64.onnx",  105, False, "deblur"),
-    "nafnet-gopro-w32": ("nafnet/nafnet-gopro-w32.onnx",   30, False, "deblur"),
+    "nafnet-sidd-w64":  ("nafnet/nafnet-sidd-w64.onnx",  True,  "denoise"),
+    "nafnet-sidd-w32":  ("nafnet/nafnet-sidd-w32.onnx",  False, "denoise"),
+    "nafnet-gopro-w64": ("nafnet/nafnet-gopro-w64.onnx", False, "deblur"),
+    "nafnet-gopro-w32": ("nafnet/nafnet-gopro-w32.onnx", False, "deblur"),
 }
 
 _TILE_PAD = 8
@@ -29,10 +29,9 @@ class NAFNetEngine(BaseEngine):
             ModelInfo(
                 name=name,
                 onnx_path=settings.model_dir / path,
-                vram_mb=vram,
                 required=req,
             )
-            for name, (path, vram, req, _) in _VARIANTS.items()
+            for name, (path, req, _) in _VARIANTS.items()
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:
