@@ -60,7 +60,7 @@ services:
       - CORTEX_MODEL_DIR=/app/models
       - CORTEX_LOG_LEVEL=INFO
     ports:
-      - "127.0.0.1:9100:9100"
+      - "9100:9100"
     networks:
       - toolii-net
     deploy:
