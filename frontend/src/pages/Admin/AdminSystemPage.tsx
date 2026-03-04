@@ -11,11 +11,14 @@ import {
   fetchCortexStatus,
   checkCortexModels,
   checkCortexModel,
+  unloadAllCortexModels,
+  fetchCortexTimeline,
 } from '@/services/adminApi'
 import type {
   CortexModelItem,
   CortexModelCheckResult,
   CortexModelEvent,
+  CortexVramSample,
 } from '@/services/adminApi'
 
 const MODEL_STATUS_COLORS: Record<string, string> = {
@@ -70,18 +73,110 @@ function formatEventTime(timestamp: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
 }
 
+// -- VRAM Timeline mini chart (pure SVG, no library) --
+
+function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
+  const { t } = useTranslation('admin')
+
+  if (samples.length < 2) {
+    return (
+      <div className="py-6 text-center text-sm text-muted-foreground">
+        {t('system.noTimelineData')}
+      </div>
+    )
+  }
+
+  const W = 600
+  const H = 120
+  const PX = 40 // left padding for labels
+  const PR = 8  // right padding
+  const PY = 4  // top/bottom padding
+
+  const chartW = W - PX - PR
+  const chartH = H - PY * 2
+
+  const tMin = samples[0].t
+  const tMax = samples[samples.length - 1].t
+  const tRange = tMax - tMin || 1
+
+  const toX = (t: number) => PX + ((t - tMin) / tRange) * chartW
+  const toY = (mb: number) => PY + chartH - (mb / vramTotal) * chartH
+
+  // Build polyline points for VRAM usage
+  const vramPoints = samples.map((s) => `${toX(s.t)},${toY(s.vram_used_mb)}`).join(' ')
+
+  // Y-axis labels
+  const yLabels = [0, Math.round(vramTotal / 2), vramTotal]
+
+  // Event markers (non-empty events)
+  const eventSamples = samples.filter((s) => s.event)
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none">
+      {/* Y grid lines and labels */}
+      {yLabels.map((mb) => (
+        <g key={mb}>
+          <line
+            x1={PX} y1={toY(mb)} x2={W - PR} y2={toY(mb)}
+            stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2,2"
+          />
+          <text
+            x={PX - 4} y={toY(mb) + 3}
+            textAnchor="end" fill="currentColor" fillOpacity={0.4}
+            fontSize={9} fontFamily="monospace"
+          >
+            {mb >= 1024 ? `${(mb / 1024).toFixed(0)}G` : `${mb}M`}
+          </text>
+        </g>
+      ))}
+
+      {/* VRAM area fill */}
+      <polygon
+        points={`${toX(tMin)},${toY(0)} ${vramPoints} ${toX(tMax)},${toY(0)}`}
+        fill="currentColor" fillOpacity={0.08}
+      />
+
+      {/* VRAM line */}
+      <polyline
+        points={vramPoints}
+        fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5}
+      />
+
+      {/* Event markers */}
+      {eventSamples.map((s, i) => (
+        <circle
+          key={i}
+          cx={toX(s.t)} cy={toY(s.vram_used_mb)}
+          r={2.5} fill="hsl(var(--warning))"
+        >
+          <title>{s.event}</title>
+        </circle>
+      ))}
+    </svg>
+  )
+}
+
 export function AdminSystemPage() {
   const { t } = useTranslation('admin')
   const queryClient = useQueryClient()
   const [checkResults, setCheckResults] = useState<Record<string, CortexModelCheckResult>>({})
   const [checkingModel, setCheckingModel] = useState<string | null>(null)
   const [checkingAll, setCheckingAll] = useState(false)
+  const [unloading, setUnloading] = useState(false)
   const [eventsExpanded, setEventsExpanded] = useState(false)
+  const [timelineExpanded, setTimelineExpanded] = useState(false)
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['admin', 'cortex-status'],
     queryFn: fetchCortexStatus,
     refetchInterval: 30_000,
+  })
+
+  const { data: timeline } = useQuery({
+    queryKey: ['admin', 'cortex-timeline'],
+    queryFn: () => fetchCortexTimeline(300),
+    refetchInterval: 30_000,
+    enabled: data?.online === true && timelineExpanded,
   })
 
   const online = data?.online ?? false
@@ -93,11 +188,15 @@ export function AdminSystemPage() {
   const events = models?.events ?? []
   const inferenceStats = models?.inference_stats ?? {}
   const queue = health?.queue
+  const sharedMemoryWarning = health?.shared_memory_warning ?? false
   const uptime = models?.uptime_seconds ?? 0
 
   const handleRefresh = () => {
     setCheckResults({})
     queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-status'] })
+    if (timelineExpanded) {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-timeline'] })
+    }
   }
 
   const handleCheckAll = async () => {
@@ -127,6 +226,19 @@ export function AdminSystemPage() {
       toast.error(t('common.error'))
     } finally {
       setCheckingModel(null)
+    }
+  }
+
+  const handleUnloadAll = async () => {
+    setUnloading(true)
+    try {
+      await unloadAllCortexModels()
+      toast.success(t('system.unloadAllSuccess'))
+      handleRefresh()
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setUnloading(false)
     }
   }
 
@@ -201,6 +313,32 @@ export function AdminSystemPage() {
       render: (row) => (
         <span className="text-sm">
           {row.vram_delta_mb != null ? formatMB(row.vram_delta_mb) : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'workspace',
+      header: t('system.workspace'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.workspace_measured_mb != null
+            ? formatMB(row.workspace_measured_mb)
+            : row.workspace_mb > 0
+              ? `~${formatMB(row.workspace_mb)}`
+              : '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'inference_count',
+      header: t('system.inferenceCount'),
+      align: 'right',
+      hiddenOnMobile: true,
+      render: (row) => (
+        <span className="text-sm">
+          {row.inference_count != null ? row.inference_count : '-'}
         </span>
       ),
     },
@@ -384,11 +522,28 @@ export function AdminSystemPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">{t('system.title')}</h1>
         <div className="flex items-center gap-2">
+          {online && summary && summary.loaded > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={unloading}
+              onClick={handleUnloadAll}
+            >
+              {unloading ? t('common.loading') : t('system.unloadAll')}
+            </Button>
+          )}
           <Button variant="outline" size="sm" disabled={isFetching} onClick={handleRefresh}>
             {isFetching ? t('common.loading') : t('system.refresh')}
           </Button>
         </div>
       </div>
+
+      {/* Shared memory warning */}
+      {online && sharedMemoryWarning && (
+        <div className="rounded-md border border-warning/30 bg-warning-light px-4 py-3 text-sm text-warning">
+          {t('system.sharedMemoryWarning')}
+        </div>
+      )}
 
       {/* Connection status */}
       <div className="flex items-center gap-2 text-sm">
@@ -523,6 +678,28 @@ export function AdminSystemPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* VRAM Timeline */}
+          <Card>
+            <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>{t('system.vramTimeline')}</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTimelineExpanded(!timelineExpanded)}
+              >
+                {timelineExpanded ? t('system.hideTimeline') : t('system.showTimeline')}
+              </Button>
+            </CardHeader>
+            {timelineExpanded && (
+              <CardContent>
+                <VramTimelineChart
+                  samples={timeline?.samples ?? []}
+                  vramTotal={gpu.vram_total_mb}
+                />
+              </CardContent>
+            )}
+          </Card>
 
           {/* Models table */}
           <Card>

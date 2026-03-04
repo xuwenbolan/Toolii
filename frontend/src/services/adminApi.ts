@@ -193,6 +193,7 @@ export type CortexModelItem = {
   status: 'loaded' | 'available' | 'missing'
   required: boolean
   vram_mb: number
+  workspace_mb: number
   file_size_mb: number | null
   path: string
   last_used?: number
@@ -200,6 +201,8 @@ export type CortexModelItem = {
   loaded_at?: number
   load_time_ms?: number
   vram_delta_mb?: number
+  workspace_measured_mb?: number
+  inference_count?: number
 }
 
 export type CortexModelsSummary = {
@@ -255,7 +258,22 @@ export type CortexHealthResponse = {
     vram_budget_mb: number
   }
   queue: CortexQueueInfo
+  shared_memory_warning: boolean
   uptime_seconds: number
+}
+
+export type CortexVramSample = {
+  t: number
+  vram_used_mb: number
+  vram_total_mb: number
+  sys_ram_mb: number
+  models: number
+  event: string
+}
+
+export type CortexTimelineResponse = {
+  samples: CortexVramSample[]
+  shared_memory_detected: boolean
 }
 
 export type CortexStatusResponse = {
@@ -400,6 +418,21 @@ export async function checkCortexModels() {
 export async function checkCortexModel(modelName: string) {
   const res = await api.get<CortexModelCheckResult>(
     `/api/admin/system/cortex/models/${modelName}/check`,
+  )
+  return res.data
+}
+
+export async function unloadAllCortexModels() {
+  const res = await api.post<{ status: string; vram_mb: number }>(
+    '/api/admin/system/cortex/unload-all',
+  )
+  return res.data
+}
+
+export async function fetchCortexTimeline(last = 300) {
+  const res = await api.get<CortexTimelineResponse>(
+    '/api/admin/system/cortex/timeline',
+    { params: { last } },
   )
   return res.data
 }
