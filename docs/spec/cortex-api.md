@@ -1,6 +1,6 @@
 # Cortex GPU Inference Service — API Contract (v1)
 
-Status: final | Updated: 2026-03-03
+Status: final | Updated: 2026-03-04
 
 ## Common Conventions
 
@@ -15,6 +15,11 @@ Status: final | Updated: 2026-03-03
 }
 ```
 
+**Input limits**:
+
+- Payload size: max 20MB (configurable via `CORTEX_MAX_PAYLOAD_MB`)
+- Image pixels: max 4096×4096 = ~16.7M pixels (configurable via `CORTEX_MAX_IMAGE_PIXELS`)
+
 **Success response** (200):
 
 ```json
@@ -25,13 +30,22 @@ Status: final | Updated: 2026-03-03
     "model": "birefnet-general",
     "elapsed_ms": 142,
     "input_size": [1024, 768],
-    "output_size": [1024, 768]
+    "output_size": [1024, 768],
+    "gpu": {
+      "inference_ms": 130,
+      "vram_before_mb": 2048,
+      "vram_after_mb": 2100,
+      "gpu_utilization_pct": 85,
+      "temperature_c": 62,
+      "power_watts": 180.5
+    }
   }
 }
 ```
 
-`meta` is always present. Every endpoint returns at minimum:
-`engine`, `model`, `elapsed_ms`, `input_size`, `output_size`.
+`meta` is always present. Every inference endpoint returns at minimum:
+`engine`, `model`, `elapsed_ms`, `input_size`, `output_size`, `gpu`.
+The `gpu` object contains per-inference GPU profiling metrics.
 Endpoints may add extra fields to `meta` (documented per endpoint below).
 
 **Error response** (4xx/5xx):
@@ -39,13 +53,25 @@ Endpoints may add extra fields to `meta` (documented per endpoint below).
 ```json
 {
   "error": {
-    "code": "MODEL_LOAD_FAILED",
-    "message": "Failed to load birefnet model"
+    "code": "MODEL_NOT_FOUND",
+    "message": "Model 'xxx' not found"
   }
 }
 ```
 
-Error codes: `INVALID_INPUT`, `MODEL_LOAD_FAILED`, `MODEL_NOT_FOUND`, `INFERENCE_FAILED`, `CUDA_OOM`.
+Error codes:
+
+| Code | HTTP | Description |
+|------|------|-------------|
+| `INVALID_IMAGE` | 400 | Failed to decode image_b64 |
+| `MODEL_NOT_FOUND` | 400 | Requested model not found |
+| `PAYLOAD_TOO_LARGE` | 413 | Base64 payload exceeds size limit |
+| `IMAGE_TOO_LARGE` | 413 | Image pixel count exceeds limit |
+| `INFERENCE_FAILED` | 500 | Inference error |
+| `GPU_BUSY` | 503 | All GPU concurrency slots occupied |
+| `INFERENCE_TIMEOUT` | 504 | Inference exceeded timeout |
+
+**GPU concurrency control**: Max concurrent inferences (default 2) with queue timeout (default 30s) and per-inference timeout (default 120s). Configurable via `CORTEX_MAX_CONCURRENT`, `CORTEX_GPU_QUEUE_TIMEOUT`, `CORTEX_INFERENCE_TIMEOUT`.
 
 ---
 
@@ -252,7 +278,8 @@ Optical character recognition. Returns structured text, no image output.
     "elapsed_ms": 85,
     "input_size": [1024, 768],
     "lines_count": 2,
-    "det_only": false
+    "det_only": false,
+    "gpu": { ... }
   }
 }
 ```
@@ -295,7 +322,8 @@ Point labels: `1` = foreground, `0` = background, `2` = box top-left, `3` = box 
     "engine": "mobilesam",
     "elapsed_ms": 12,
     "input_size": [1024, 768],
-    "masks_count": 1
+    "masks_count": 1,
+    "gpu": { ... }
   }
 }
 ```
@@ -310,6 +338,8 @@ Model: MobileSAM encoder (~5MB) + decoder (~5MB)
 
 ## GET /health
 
+Service health check with GPU and model summary.
+
 ```json
 {
   "status": "ok",
@@ -318,21 +348,212 @@ Model: MobileSAM encoder (~5MB) + decoder (~5MB)
     "vram_total_mb": 12288,
     "vram_used_mb": 2550,
     "vram_free_mb": 9738,
-    "cuda_version": "12.1"
+    "gpu_utilization_pct": 15,
+    "memory_utilization_pct": 20,
+    "driver_version": "550.54.14",
+    "cuda_version": "12.4",
+    "temperature_c": 42,
+    "power_watts": 35.2
   },
   "models": {
     "loaded": ["birefnet-general", "realesrgan-x4plus"],
-    "available": [
-      "birefnet-general", "birefnet-portrait", "birefnet-lite", "birefnet-matting",
-      "realesrgan-x4plus", "realesrgan-x4v3", "realesrgan-anime",
-      "gfpgan-v1.4", "retinaface",
-      "nafnet-sidd-w64", "nafnet-sidd-w32", "nafnet-gopro-w64", "nafnet-gopro-w32",
-      "ddcolor-artistic", "ddcolor-modelscope", "ddcolor-tiny",
-      "lama", "migan",
-      "rapidocr-det", "rapidocr-cls", "rapidocr-rec",
-      "mobilesam-encoder", "mobilesam-decoder"
-    ]
+    "available": ["birefnet-general", "birefnet-portrait", "..."],
+    "vram_estimated_mb": 1200,
+    "vram_real_mb": 2550,
+    "vram_budget_mb": 9216
+  },
+  "queue": {
+    "max_concurrent": 2,
+    "active": 0,
+    "timeout_seconds": 30.0
+  },
+  "shared_memory_warning": false,
+  "uptime_seconds": 3600
+}
+```
+
+---
+
+## GET /models
+
+Detailed model registry with per-model load status, VRAM usage, and inference stats.
+
+```json
+{
+  "summary": {
+    "registered": 20,
+    "loaded": 2,
+    "vram_estimated_mb": 1200,
+    "vram_real_mb": 2550,
+    "vram_budget_mb": 9216,
+    "vram_utilization": 0.277
+  },
+  "models": [
+    {
+      "name": "birefnet-general",
+      "status": "loaded",
+      "required": true,
+      "vram_mb": 800,
+      "workspace_mb": 800,
+      "file_size_mb": 650.2,
+      "path": "/data/models/birefnet-general.onnx",
+      "last_used": 1709500000.0,
+      "idle_seconds": 120,
+      "loaded_at": 1709496400.0,
+      "load_time_ms": 1500,
+      "vram_delta_mb": 780,
+      "workspace_measured_mb": 650,
+      "inference_count": 42
+    },
+    {
+      "name": "realesrgan-anime",
+      "status": "available",
+      "required": false,
+      "vram_mb": 64,
+      "workspace_mb": 500,
+      "file_size_mb": 64.0,
+      "path": "/data/models/realesrgan-anime.onnx"
+    }
+  ],
+  "events": [
+    {
+      "timestamp": 1709496400.0,
+      "event": "loaded",
+      "model": "birefnet-general",
+      "vram_before_mb": 1770,
+      "vram_after_mb": 2550,
+      "detail": "est=800MB delta=780MB workspace=800MB load=1500ms provider=gpu"
+    }
+  ],
+  "gpu": { "...same as /health gpu..." },
+  "inference_stats": {
+    "remove-background": {
+      "calls": 42,
+      "errors": 1,
+      "avg_ms": 150,
+      "min_ms": 120,
+      "max_ms": 350,
+      "last_call": 1709500000.0
+    }
   },
   "uptime_seconds": 3600
 }
+```
+
+Model `status`: `"loaded"` | `"available"` | `"missing"`.
+Event types: `"loaded"`, `"evicted_lru"`, `"evicted_budget"`, `"evicted_idle"`, `"evicted_workspace"`, `"oom_retry"`, `"workspace_warning"`.
+
+---
+
+## GET /models/check
+
+Validate all registered models (file existence + ONNX integrity).
+
+```json
+{
+  "healthy": true,
+  "healthy_count": 20,
+  "total": 20,
+  "models": [
+    {
+      "name": "birefnet-general",
+      "required": true,
+      "vram_mb": 800,
+      "workspace_mb": 800,
+      "path": "/data/models/birefnet-general.onnx",
+      "file_size_mb": 650.2,
+      "healthy": true,
+      "status": "loaded",
+      "inputs": [{"name": "input", "shape": [1, 3, 1024, 1024], "dtype": "tensor(float)"}],
+      "outputs": [{"name": "output", "shape": [1, 1, 1024, 1024], "dtype": "tensor(float)"}],
+      "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    }
+  ],
+  "gpu": { "...basic gpu info..." }
+}
+```
+
+---
+
+## GET /models/{model_name}/check
+
+Validate a single model by name. Returns the same per-model object as `/models/check`.
+
+---
+
+## GET /stats
+
+Lightweight inference statistics and GPU queue status.
+
+```json
+{
+  "inference": {
+    "remove-background": {
+      "calls": 42,
+      "errors": 1,
+      "avg_ms": 150,
+      "min_ms": 120,
+      "max_ms": 350,
+      "last_call": 1709500000.0
+    }
+  },
+  "queue": {
+    "max_concurrent": 2,
+    "active": 0,
+    "timeout_seconds": 30.0
+  },
+  "gpu": { "...extended gpu info..." },
+  "uptime_seconds": 3600
+}
+```
+
+---
+
+## GET /stats/timeline
+
+Recent VRAM timeline samples for monitoring GPU memory over time.
+
+**Query params**: `last` (int, default 300) — number of recent samples to return.
+
+```json
+{
+  "samples": [
+    {
+      "t": 1709500000.0,
+      "vram_used_mb": 2550,
+      "vram_total_mb": 12288,
+      "sys_ram_mb": 8192,
+      "models": 2,
+      "event": "inference:remove-background"
+    }
+  ],
+  "shared_memory_detected": false
+}
+```
+
+Samples are collected every ~1 second. `event` is empty for regular samples;
+tagged with `"inference:{endpoint}"` when an inference occurs.
+
+---
+
+## POST /admin/unload-all
+
+Unload all loaded models and free VRAM.
+
+```json
+{"status": "ok", "vram_mb": 1770}
+```
+
+---
+
+## POST /admin/save-profile
+
+Save VRAM profile data (used by test/profile scripts).
+
+**Request body**: JSON object with per-model profiling data.
+
+**Response**:
+
+```json
+{"status": "ok", "path": "/data/vram_profile.json", "models": 20}
 ```

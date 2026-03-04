@@ -50,3 +50,28 @@ async def cortex_model_check(
     except Exception:
         logger.warning("Cortex unavailable for model check: %s", model_name, exc_info=True)
         return {"name": model_name, "healthy": False, "error": "cortex_unavailable"}
+
+
+@router.post("/cortex/unload-all")
+async def cortex_unload_all(
+    admin: User = Depends(get_admin_user),  # noqa: ARG001
+) -> dict[str, Any]:
+    """Unload all Cortex models to free VRAM."""
+    try:
+        return await cortex_client.unload_all()
+    except Exception:
+        logger.warning("Cortex unavailable for unload-all", exc_info=True)
+        return {"status": "error", "error": "cortex_unavailable"}
+
+
+@router.get("/cortex/timeline")
+async def cortex_timeline(
+    last: int = 300,
+    admin: User = Depends(get_admin_user),  # noqa: ARG001
+) -> dict[str, Any]:
+    """Fetch recent VRAM timeline samples from Cortex."""
+    try:
+        return await cortex_client.fetch_timeline(last)
+    except Exception:
+        logger.warning("Cortex unavailable for timeline", exc_info=True)
+        return {"samples": [], "shared_memory_detected": False}

@@ -129,6 +129,22 @@ async def model_check(model_name: str) -> dict[str, Any]:
     return resp.json()
 
 
+async def unload_all() -> dict[str, Any]:
+    """Unload all models on Cortex to free VRAM."""
+    client = _get_client()
+    resp = await client.post("/admin/unload-all")
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def fetch_timeline(last: int = 300) -> dict[str, Any]:
+    """Fetch recent VRAM timeline samples from Cortex."""
+    client = _get_client()
+    resp = await client.get("/stats/timeline", params={"last": last})
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def close() -> None:
     """Close the HTTP client connection pool."""
     global _client  # noqa: PLW0603

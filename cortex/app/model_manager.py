@@ -449,6 +449,8 @@ class OnnxModelManager:
 
         workspace_peak = max(0, peak_vram[0] - baseline_vram - load_vram)
         workspace_retained = max(0, post_inference_vram - post_load_vram)
+        # Sampling may miss short-lived peaks; retained is a guaranteed lower bound
+        workspace_peak = max(workspace_peak, workspace_retained)
         ram_delta = max(0, post_inference_ram - baseline_ram)
 
         file_size_mb = round(info.onnx_path.stat().st_size / (1024 * 1024), 1)
