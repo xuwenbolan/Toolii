@@ -57,6 +57,11 @@
     "seoTitle": "Page Not Found",
     "backHome": "Back to Home"
   },
+  "toolDisabled": {
+    "title": "Tool Unavailable",
+    "description": "This tool is currently unavailable. Please try again later or use another tool.",
+    "backHome": "Back to Home"
+  },
   "seo": {
     "defaultDescription": "Toolii online toolkit: ID photo processing, image tools, and PDF tools."
   },

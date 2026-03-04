@@ -22,6 +22,7 @@ export function FormatConvertPage({ slug, i18nKey, apiFormat, acceptMime }: Prop
       <ConvertForm
         title={t(`${i18nKey}.title`)}
         description={t(`${i18nKey}.description`)}
+        toolName="image/convert"
         fixedFormat={apiFormat as 'jpeg' | 'png' | 'webp'}
         acceptMime={acceptMime}
       />

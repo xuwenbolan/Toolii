@@ -17,9 +17,11 @@ import { PdfWorkspaceGrid } from '@/components/pdf/PdfWorkspaceGrid'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
+import { ToolDisabledBanner } from '@/components/tools/ToolDisabledBanner'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { Button } from '@/components/ui/button'
+import { useToolStore } from '@/stores/toolStore'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useMultiPdfThumbnails } from '@/hooks/useMultiPdfThumbnails'
@@ -43,6 +45,8 @@ async function downloadResultAsFile(result: FileResult): Promise<File> {
 
 export function PdfToolsPage() {
   const { t } = useTranslation(['tools', 'common'])
+  const { isToolEnabled, loaded: toolStoreLoaded } = useToolStore()
+  const isDisabled = toolStoreLoaded && !isToolEnabled('pdf/tools')
   const download = useFileDownload()
   const workspace = usePdfWorkspace()
   const { thumbnails, pageCounts, loading: thumbsLoading } = useMultiPdfThumbnails(
@@ -245,6 +249,23 @@ export function PdfToolsPage() {
         jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('pdf.title'), path: '/pdf-tools' }])}
       />
 
+      {isDisabled ? (
+        <div className="mx-auto w-full max-w-[96rem] space-y-4">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
+              <Link to="/" className="inline-flex items-center gap-1.5">
+                <ArrowLeft className="h-4 w-4" />
+                <span>{t('common:actions.back')}</span>
+              </Link>
+            </Button>
+            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
+              {t('pdf.workspace.title')}
+            </h1>
+          </div>
+          <ToolDisabledBanner />
+        </div>
+      ) : (
+      <>
       <div className="mx-auto w-full max-w-[96rem] space-y-4">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -261,7 +282,6 @@ export function PdfToolsPage() {
           </div>
         </div>
 
-        {/* Workspace */}
         {!hasPages && !thumbsLoading ? (
           <PdfWorkspaceEmpty onFiles={(f) => void handleAddFiles(f)} />
         ) : (
@@ -435,6 +455,8 @@ export function PdfToolsPage() {
           </button>
         </div>
       </div>
+      </>
+      )}
     </>
   )
 }

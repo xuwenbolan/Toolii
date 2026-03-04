@@ -6,6 +6,8 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { useToolStore } from '@/stores/toolStore'
+import { ToolDisabledBanner } from '@/components/tools/ToolDisabledBanner'
 
 type ToolPageLayout = 'compact' | 'split' | 'workspace'
 type ToolPageWidth = 'content' | 'wide' | 'full'
@@ -21,6 +23,8 @@ type Props = {
   contentClassName?: string
   sidebarClassName?: string
   children: ReactNode
+  /** Backend tool name (e.g. "image/compress") for disabled-state check */
+  toolName?: string
 }
 
 const WIDTH_CLASS_MAP: Record<ToolPageWidth, string> = {
@@ -45,8 +49,11 @@ export function ToolPageShell({
   contentClassName,
   sidebarClassName,
   children,
+  toolName,
 }: Props) {
   const { t } = useTranslation('common')
+  const { isToolEnabled, loaded } = useToolStore()
+  const isDisabled = toolName && loaded && !isToolEnabled(toolName)
   const useSidebar = Boolean(sidebar) && layout !== 'compact'
 
   return (
@@ -70,7 +77,13 @@ export function ToolPageShell({
         </div>
       </div>
 
-      {useSidebar ? (
+      {isDisabled ? (
+        <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">
+          <CardContent className="px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5">
+            <ToolDisabledBanner />
+          </CardContent>
+        </Card>
+      ) : useSidebar ? (
         <div className={cn('grid items-start gap-4 xl:gap-5', GRID_CLASS_MAP[layout])}>
           <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">
             <CardContent className={cn('px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5', contentClassName)}>

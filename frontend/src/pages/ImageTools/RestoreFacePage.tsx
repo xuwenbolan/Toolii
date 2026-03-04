@@ -18,7 +18,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { restoreFace, type FileResult } from '@/services/imageApi'
 
 export function RestoreFacePage() {
@@ -60,7 +60,7 @@ export function RestoreFacePage() {
   return (
     <>
       <SEOHead title={t('restoreFace.seoTitle')} description={t('restoreFace.seoDescription')} keywords={t('restoreFace.seoKeywords')} canonicalPath="/image-tools/restore-face" jsonLd={[buildToolJsonLd({ name: t('restoreFace.seoTitle'), description: t('restoreFace.seoDescription'), url: '/image-tools/restore-face' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('restoreFace.title'), path: '/image-tools/restore-face' }])]} />
-      <ToolPageShell title={t('restoreFace.title')} description={t('restoreFace.description')} backTo="/image-tools">
+      <ToolPageShell title={t('restoreFace.title')} description={t('restoreFace.description')} toolName="image/restore-face" backTo="/image-tools">
         <div className="space-y-5">
           <FileDropzone
             accept="image/*"
@@ -122,7 +122,7 @@ export function RestoreFacePage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="restore_face" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

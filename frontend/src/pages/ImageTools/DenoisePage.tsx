@@ -18,7 +18,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { denoiseImage, type FileResult } from '@/services/imageApi'
 
 export function DenoisePage() {
@@ -60,7 +60,7 @@ export function DenoisePage() {
   return (
     <>
       <SEOHead title={t('denoise.seoTitle')} description={t('denoise.seoDescription')} keywords={t('denoise.seoKeywords')} canonicalPath="/image-tools/denoise" jsonLd={[buildToolJsonLd({ name: t('denoise.seoTitle'), description: t('denoise.seoDescription'), url: '/image-tools/denoise' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('denoise.title'), path: '/image-tools/denoise' }])]} />
-      <ToolPageShell title={t('denoise.title')} description={t('denoise.description')} backTo="/image-tools">
+      <ToolPageShell title={t('denoise.title')} description={t('denoise.description')} toolName="image/denoise" backTo="/image-tools">
         <div className="space-y-5">
           <FileDropzone
             accept="image/*"
@@ -122,7 +122,7 @@ export function DenoisePage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="denoise" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

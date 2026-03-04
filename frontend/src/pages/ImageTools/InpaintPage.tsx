@@ -17,7 +17,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { cn } from '@/lib/utils'
 import { inpaintImage, type FileResult } from '@/services/imageApi'
 
@@ -355,7 +355,7 @@ export function InpaintPage() {
         canonicalPath="/image-tools/inpaint"
         jsonLd={[buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('inpaint.title'), path: '/image-tools/inpaint' }])]}
       />
-      <ToolPageShell title={t('inpaint.title')} description={t('inpaint.description')} backTo="/image-tools" layout="workspace" width="wide">
+      <ToolPageShell title={t('inpaint.title')} description={t('inpaint.description')} toolName="image/inpaint" backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
@@ -481,7 +481,7 @@ export function InpaintPage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="inpaint" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

@@ -18,7 +18,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { compressImage, type FileResult } from '@/services/imageApi'
 
 const PREVIEW_MAX_DIMENSION = 2200
@@ -224,6 +224,7 @@ export function CompressPage() {
       <ToolPageShell
         title={t('compress.title')}
         description={t('compress.description')}
+        toolName="image/compress"
         backTo="/image-tools"
         layout="workspace"
         width="wide"
@@ -335,7 +336,7 @@ export function CompressPage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="compress" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

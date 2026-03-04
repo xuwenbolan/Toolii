@@ -15,7 +15,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { colorizeImage, type FileResult } from '@/services/imageApi'
 
@@ -56,7 +56,7 @@ export function ColorizePage() {
   return (
     <>
       <SEOHead title={t('colorize.seoTitle')} description={t('colorize.seoDescription')} keywords={t('colorize.seoKeywords')} canonicalPath="/image-tools/colorize" jsonLd={[buildToolJsonLd({ name: t('colorize.seoTitle'), description: t('colorize.seoDescription'), url: '/image-tools/colorize' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('colorize.title'), path: '/image-tools/colorize' }])]} />
-      <ToolPageShell title={t('colorize.title')} description={t('colorize.description')} backTo="/image-tools">
+      <ToolPageShell title={t('colorize.title')} description={t('colorize.description')} toolName="image/colorize" backTo="/image-tools">
         <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
@@ -105,7 +105,7 @@ export function ColorizePage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="colorize" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

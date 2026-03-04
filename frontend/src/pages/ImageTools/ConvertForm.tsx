@@ -37,6 +37,7 @@ type ConvertFormProps = {
   description: string
   fixedFormat?: Format
   acceptMime?: string
+  toolName?: string
 }
 
 const CONCURRENCY = 3
@@ -81,7 +82,7 @@ function getProgressForStatus(item: BatchItem) {
   return 100
 }
 
-export function ConvertForm({ title, description, fixedFormat, acceptMime }: ConvertFormProps) {
+export function ConvertForm({ title, description, fixedFormat, acceptMime, toolName }: ConvertFormProps) {
   const { t } = useTranslation(['tools', 'common'])
   const [format, setFormat] = useState<Format>(fixedFormat ?? 'jpeg')
   const [qualityInput, setQualityInput] = useState('92')
@@ -316,6 +317,7 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime }: Con
       <ToolPageShell
         title={title}
         description={description}
+        toolName={toolName}
         backTo="/image-tools"
         layout="split"
         width="wide"

@@ -454,7 +454,7 @@ export function MosaicPage() {
   return (
     <>
       <SEOHead title={t('mosaic.seoTitle')} description={t('mosaic.seoDescription')} keywords={t('mosaic.seoKeywords')} canonicalPath="/image-tools/mosaic" jsonLd={[buildToolJsonLd({ name: t('mosaic.seoTitle'), description: t('mosaic.seoDescription'), url: '/image-tools/mosaic' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('mosaic.title'), path: '/image-tools/mosaic' }])]} />
-      <ToolPageShell title={t('mosaic.title')} description={t('mosaic.description')} backTo="/image-tools" layout="workspace" width="wide">
+      <ToolPageShell title={t('mosaic.title')} description={t('mosaic.description')} toolName="image/mosaic" backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}

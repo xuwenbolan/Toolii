@@ -16,7 +16,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { enhanceScan, type FileResult } from '@/services/imageApi'
 
 type Mode = 'bw' | 'color'
@@ -63,7 +63,7 @@ export function ScanEnhancePage() {
   return (
     <>
       <SEOHead title={t('scanEnhance.seoTitle')} description={t('scanEnhance.seoDescription')} keywords={t('scanEnhance.seoKeywords')} canonicalPath="/image-tools/scan-enhance" jsonLd={[buildToolJsonLd({ name: t('scanEnhance.seoTitle'), description: t('scanEnhance.seoDescription'), url: '/image-tools/scan-enhance' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('scanEnhance.title'), path: '/image-tools/scan-enhance' }])]} />
-      <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')} backTo="/image-tools">
+      <ToolPageShell title={t('scanEnhance.title')} description={t('scanEnhance.description')} toolName="image/scan-enhance" backTo="/image-tools">
       <div className="space-y-5">
         <FileDropzone
           accept="image/*"
@@ -155,7 +155,7 @@ export function ScanEnhancePage() {
             <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
               {t('common:actions.back')}
             </Button>
-            <ShareTransferButton fileId={result.file_id} className="w-auto" />
+            <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="scan_enhance" className="w-auto" />
             <DownloadButton url={result.download_url} className="w-auto" />
           </div>
         </div>

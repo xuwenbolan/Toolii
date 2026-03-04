@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildWebSiteJsonLd } from '@/lib/jsonLd'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useToolStore } from '@/stores/toolStore'
 
 const TOOL_CATEGORIES = [
   {
@@ -20,6 +21,7 @@ const TOOL_CATEGORIES = [
     titleKey: 'home.pdfTools',
     descKey: 'home.pdfToolsDesc',
     to: '/pdf-tools',
+    toolName: 'pdf/tools',
   },
   {
     titleKey: 'home.textTools',
@@ -35,11 +37,13 @@ const TOOL_CATEGORIES = [
     titleKey: 'home.faceMap',
     descKey: 'home.faceMapDesc',
     to: '/facemap',
+    toolName: 'facemap/profile',
   },
   {
     titleKey: 'home.faceSimilarity',
     descKey: 'home.faceSimilarityDesc',
     to: '/face-similarity',
+    toolName: 'facemap/similarity',
   },
 ]
 
@@ -47,6 +51,11 @@ const TRUST_KEYS = ['home.trustLocal', 'home.trustFree', 'home.trustNoSignup'] a
 
 export function HomePage() {
   const { t } = useTranslation('common')
+  const { isToolEnabled, loaded } = useToolStore()
+
+  const visibleCategories = loaded
+    ? TOOL_CATEGORIES.filter((c) => !c.toolName || isToolEnabled(c.toolName))
+    : TOOL_CATEGORIES
 
   return (
     <div className="space-y-8">
@@ -80,7 +89,7 @@ export function HomePage() {
 
       {/* Tool category cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {TOOL_CATEGORIES.map((item) => (
+        {visibleCategories.map((item) => (
           <Link
             key={item.titleKey}
             to={item.to}

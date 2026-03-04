@@ -17,7 +17,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { cn } from '@/lib/utils'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { removeBackground, type FileResult } from '@/services/imageApi'
 
 type BgMode = 'transparent' | 'white' | 'custom'
@@ -66,7 +66,7 @@ export function RemoveBgPage() {
   return (
     <>
       <SEOHead title={t('removeBg.seoTitle')} description={t('removeBg.seoDescription')} keywords={t('removeBg.seoKeywords')} canonicalPath="/image-tools/remove-bg" jsonLd={[buildToolJsonLd({ name: t('removeBg.seoTitle'), description: t('removeBg.seoDescription'), url: '/image-tools/remove-bg' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('removeBg.title'), path: '/image-tools/remove-bg' }])]} />
-      <ToolPageShell title={t('removeBg.title')} description={t('removeBg.description')} backTo="/image-tools" width="wide" layout="split">
+      <ToolPageShell title={t('removeBg.title')} description={t('removeBg.description')} toolName="image/remove-bg" backTo="/image-tools" width="wide" layout="split">
         <div className="space-y-5">
           <ToolWorkspaceDropzone
             accept={{ 'image/*': [] }}
@@ -230,7 +230,7 @@ export function RemoveBgPage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="remove_bg" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>

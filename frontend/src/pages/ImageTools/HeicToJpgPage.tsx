@@ -23,6 +23,7 @@ export function HeicToJpgPage() {
       <ConvertForm
         title={t('heicToJpg.title')}
         description={t('heicToJpg.description')}
+        toolName="image/heic-to-jpg"
         fixedFormat="jpeg"
         acceptMime="image/heic,image/heif,.heic,.heif,image/heic-sequence,image/heif-sequence"
       />

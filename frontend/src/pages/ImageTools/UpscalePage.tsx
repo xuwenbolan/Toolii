@@ -16,7 +16,7 @@ import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareTransferButton } from '@/components/tools/ShareTransferButton'
+import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { upscaleImage, type FileResult } from '@/services/imageApi'
 
 type Scale = 2 | 4
@@ -59,7 +59,7 @@ export function UpscalePage() {
   return (
     <>
       <SEOHead title={t('upscale.seoTitle')} description={t('upscale.seoDescription')} keywords={t('upscale.seoKeywords')} canonicalPath="/image-tools/upscale" jsonLd={[buildToolJsonLd({ name: t('upscale.seoTitle'), description: t('upscale.seoDescription'), url: '/image-tools/upscale' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('upscale.title'), path: '/image-tools/upscale' }])]} />
-      <ToolPageShell title={t('upscale.title')} description={t('upscale.description')} backTo="/image-tools">
+      <ToolPageShell title={t('upscale.title')} description={t('upscale.description')} toolName="image/upscale" backTo="/image-tools">
         <div className="space-y-5">
           <FileDropzone
             accept="image/*"
@@ -132,7 +132,7 @@ export function UpscalePage() {
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareTransferButton fileId={result.file_id} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="upscale" className="w-auto" />
               <DownloadButton url={result.download_url} className="w-auto" />
             </div>
           </div>
