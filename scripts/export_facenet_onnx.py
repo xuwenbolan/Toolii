@@ -6,7 +6,7 @@ Usage:
         python scripts/export_facenet_onnx.py
 
 Output:
-    models/facenet512.onnx (~90 MB, single file with embedded weights)
+    data/models/facenet512.onnx (~90 MB, single file with embedded weights)
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ import onnx
 import torch
 
 INPUT_SHAPE = (1, 3, 160, 160)
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "models"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "models"
 OUTPUT_PATH = OUTPUT_DIR / "facenet512.onnx"
 
 

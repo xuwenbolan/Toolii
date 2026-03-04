@@ -14,7 +14,6 @@ services:
       CORS_ORIGINS: http://localhost
     volumes:
       - ../data:/app/data
-      - ../models:/app/models
     expose:
       - "8000"
     networks:
@@ -55,9 +54,9 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.cortex
     volumes:
-      - ../models/cortex:/app/models:ro
+      - ../data/cortex:/app/data
     environment:
-      - CORTEX_MODEL_DIR=/app/models
+      - CORTEX_DATA_DIR=/app/data
       - CORTEX_LOG_LEVEL=INFO
     ports:
       - "9100:9100"

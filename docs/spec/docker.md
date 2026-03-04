@@ -1,6 +1,6 @@
 # Docker Deployment Spec
 
-Status: draft | Updated: 2026-03-03
+Status: draft | Updated: 2026-03-04
 
 All Docker configs live in root `docker/` directory for unified management.
 
@@ -42,7 +42,6 @@ services:
       FILE_STORAGE_DIR: ../data/files
     volumes:
       - ../data:/app/data
-      - ../models:/app/models
     expose:
       - "8000"
     restart: unless-stopped
@@ -79,11 +78,10 @@ services:
     ports:
       - "9100:9100"
     volumes:
-      - ../models/cortex:/app/models
+      - ../data/cortex:/app/data
     environment:
-      MODEL_DIR: /app/models
-      VRAM_BUDGET_MB: 11000
-      PORT: 9100
+      CORTEX_DATA_DIR: /app/data
+      CORTEX_LOG_LEVEL: INFO
     deploy:
       resources:
         reservations:
@@ -128,9 +126,8 @@ CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "910
 
 | Volume | Container | Mount | Purpose |
 |--------|-----------|-------|---------|
-| `../data` | backend | `/app/data` | SQLite DB, uploaded files, transfers |
-| `../models` | backend | `/app/models` | FaceNet512 ONNX (CPU) |
-| `../models/cortex` | cortex | `/app/models` | All GPU ONNX models |
+| `../data` | backend | `/app/data` | SQLite DB, uploaded files, FaceNet512 ONNX |
+| `../data/cortex` | cortex | `/app/data` | GPU ONNX models, stats, VRAM profile |
 
 ## Networking
 

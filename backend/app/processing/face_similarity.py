@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Facenet512 ONNX model management
 # ---------------------------------------------------------------------------
 
-_FACENET_MODEL_PATH = Path(__file__).resolve().parents[3] / "models" / "facenet512.onnx"
+_FACENET_MODEL_PATH = Path(__file__).resolve().parents[3] / "data" / "models" / "facenet512.onnx"
 
 _session_lock = threading.Lock()
 _session_instance: Any = None

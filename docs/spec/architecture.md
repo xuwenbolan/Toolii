@@ -217,11 +217,14 @@ Toolii/
 │   ├── docker-compose.yml    # backend + web
 │   ├── docker-compose.cortex.yml  # Cortex (separate lifecycle)
 │   └── nginx.conf
-├── models/                   # AI model files (git-ignored, Docker volume mount)
-│   ├── facenet512.onnx
-│   └── cortex/
-├── data/                     # Data directory (git-ignored)
-│   ├── uploads/              # User uploaded files
+├── data/                     # All runtime data (git-ignored, Docker volume mount)
+│   ├── models/               # Backend AI models (CPU)
+│   │   └── facenet512.onnx
+│   ├── cortex/               # Cortex GPU service data
+│   │   ├── models/           # GPU ONNX models
+│   │   ├── stats.json
+│   │   └── vram_profile.json
+│   ├── files/                # User uploaded files
 │   └── toolii.db             # SQLite database
 ├── docs/                     # Project documentation
 │   ├── spec/                 # Specifications by module

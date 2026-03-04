@@ -18,7 +18,7 @@ _MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
     "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
 )
-_MODELS_DIR = Path(__file__).resolve().parents[3] / "models"
+_MODELS_DIR = Path(__file__).resolve().parents[3] / "data" / "models"
 _MODEL_PATH = _MODELS_DIR / "face_landmarker.task"
 
 _landmarker_lock = threading.Lock()

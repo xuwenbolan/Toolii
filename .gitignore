@@ -24,3 +24,4 @@ __pycache__/
 
 client_secret_*.json
 backend/toolii.db
+cortex/test_report.txt
