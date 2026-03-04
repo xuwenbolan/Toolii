@@ -17,7 +17,10 @@ _INFER_SIZE = 512
 class LaMaEngine(BaseEngine):
     def get_models(self) -> list[ModelInfo]:
         return [
-            ModelInfo("lama", settings.model_dir / "inpaint/lama.onnx", 102, True),
+            # cpu_only: LaMa uses 144 DFT (FFT) ops that lack CUDA kernels,
+            # causing GPU->CPU->GPU copies per op and 120s+ timeouts on GPU.
+            # CPU-only runs in ~5s for 512x512.
+            ModelInfo("lama", settings.model_dir / "inpaint/lama.onnx", cpu_only=True),
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:

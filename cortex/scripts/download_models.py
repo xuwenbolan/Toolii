@@ -27,6 +27,8 @@ _console = Console()
 _checksums_lock = Lock()
 _MB = 1 << 20
 
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_DEFAULT_MODEL_DIR = _PROJECT_ROOT / "data" / "cortex" / "models"
 CHECKSUMS_FILE = Path(__file__).parent / "model_checksums.json"
 
 
@@ -97,15 +99,19 @@ OPTIONAL: dict[str, Model] = {
     "realesrgan/realesrgan-anime.onnx": Model(
         "https://huggingface.co/T8RIN/ddcolor-onnx/resolve/main/upscalers/RealESR-AnimeVideo-x4v3.onnx",
     ),
-    "nafnet/nafnet-sidd-w32.onnx": Model(""),
+    "nafnet/nafnet-sidd-w32.onnx": Model(
+        "https://storage.googleapis.com/ailia-models/nafnet/NAFNet-SIDD-width32.onnx",
+    ),
     "nafnet/nafnet-gopro-w64.onnx": Model(
         "https://huggingface.co/deepghs/image_restoration/resolve/main/NAFNet-GoPro-width64.onnx",
     ),
-    "nafnet/nafnet-gopro-w32.onnx": Model(""),  # no ONNX available, needs PyTorch conversion
+    "nafnet/nafnet-gopro-w32.onnx": Model(
+        "https://storage.googleapis.com/ailia-models/nafnet/NAFNet-GoPro-width32.onnx",
+    ),
     "ddcolor/ddcolor-modelscope.onnx": Model(
         "https://huggingface.co/facefusion/models-3.0.0/resolve/main/ddcolor.onnx",
     ),
-    "ddcolor/ddcolor-tiny.onnx": Model(""),  # no ONNX available, needs PyTorch conversion
+    # ddcolor-tiny: no ONNX available, needs PyTorch conversion
 }
 
 
@@ -269,8 +275,8 @@ def verify_one(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Download ONNX models for Cortex")
     parser.add_argument(
-        "--model-dir", type=Path, default=Path("models"),
-        help="Target directory (default: models/)",
+        "--model-dir", type=Path, default=_DEFAULT_MODEL_DIR,
+        help=f"Target directory (default: {_DEFAULT_MODEL_DIR})",
     )
     parser.add_argument("--all", action="store_true", help="Include optional models")
     parser.add_argument("--verify", action="store_true", help="Verify only, no download")

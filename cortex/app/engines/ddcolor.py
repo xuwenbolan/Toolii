@@ -12,9 +12,9 @@ from app.model_manager import ModelInfo, OnnxModelManager
 from app.utils import encode_png
 
 _VARIANTS = {
-    "artistic":   ("ddcolor/ddcolor-artistic.onnx",   100, True),
-    "modelscope": ("ddcolor/ddcolor-modelscope.onnx", 200, False),
-    "tiny":       ("ddcolor/ddcolor-tiny.onnx",        28, False),
+    "artistic":   ("ddcolor/ddcolor-artistic.onnx",   True),
+    "modelscope": ("ddcolor/ddcolor-modelscope.onnx", False),
+    # "tiny" disabled: no ONNX model available yet
 }
 
 
@@ -24,10 +24,9 @@ class DDColorEngine(BaseEngine):
             ModelInfo(
                 name=f"ddcolor-{name}",
                 onnx_path=settings.model_dir / path,
-                vram_mb=vram,
                 required=req,
             )
-            for name, (path, vram, req) in _VARIANTS.items()
+            for name, (path, req) in _VARIANTS.items()
         ]
 
     def run(self, manager: OnnxModelManager, image: np.ndarray, **kwargs: Any) -> dict[str, Any]:
