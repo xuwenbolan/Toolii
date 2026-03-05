@@ -200,6 +200,7 @@ function seoPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), tailwindcss(), seoPlugin()],
   build: {
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
