@@ -32,7 +32,7 @@ function formatBytes(bytes: number): string {
 const TRANSFER_STATUSES = ['active', 'expired', 'burned', 'deleted']
 
 function FileTransfersTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
   const [status, setStatus] = useState('all')
   const [offset, setOffset] = useState(0)
@@ -197,7 +197,7 @@ const SHARE_TYPES = [
 ]
 
 function ResultSharesTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
   const [shareType, setShareType] = useState('all')
   const [expiredFilter, setExpiredFilter] = useState('all')
@@ -347,7 +347,7 @@ function ResultSharesTab() {
 // -- Main Page ---------------------------------------------------------------
 
 export function AdminTransfersPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
 
   return (
     <div className="space-y-6">

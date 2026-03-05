@@ -28,7 +28,7 @@ function formatDateTick(value: string, isMobile: boolean) {
 }
 
 export function AdminDashboardPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const isMobile = useIsMobile()
 
   const { data, isLoading, isError, refetch } = useQuery<DashboardStats>({

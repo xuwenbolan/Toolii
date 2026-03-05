@@ -45,7 +45,7 @@ export function DataTable<T>({
   renderExpanded,
   renderMobileCard,
 }: Props<T>) {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const isMobile = useIsMobile()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [canScrollRight, setCanScrollRight] = useState(false)

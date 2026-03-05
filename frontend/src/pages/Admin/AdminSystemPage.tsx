@@ -76,7 +76,7 @@ function formatEventTime(timestamp: number): string {
 // -- VRAM Timeline mini chart (pure SVG, no library) --
 
 function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   if (samples.length < 2) {
@@ -230,7 +230,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
 }
 
 export function AdminSystemPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
   const [checkResults, setCheckResults] = useState<Record<string, CortexModelCheckResult>>({})
   const [checkingModel, setCheckingModel] = useState<string | null>(null)

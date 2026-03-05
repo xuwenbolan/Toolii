@@ -11,7 +11,7 @@ void i18n
     fallbackLng: 'zh-CN',
     supportedLngs: ['zh-CN', 'zh', 'en'],
     load: 'currentOnly',
-    ns: ['common', 'tools', 'idPhoto', 'credits', 'auth', 'legal', 'consent', 'admin', 'textTools', 'transfer', 'faceMap', 'resultShare'],
+    ns: ['common', 'tools', 'idPhoto', 'credits', 'auth', 'legal', 'consent', 'console', 'textTools', 'transfer', 'faceMap', 'resultShare'],
     defaultNS: 'common',
     debug: import.meta.env.DEV,
     detection: {

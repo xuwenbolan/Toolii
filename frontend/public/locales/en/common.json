@@ -11,7 +11,8 @@
     "login": "Log in",
     "register": "Sign up",
     "logout": "Log out",
-    "logoutFull": "Log out"
+    "logoutFull": "Log out",
+    "console": "Console"
   },
   "footer": {
     "privacy": "Privacy Policy",

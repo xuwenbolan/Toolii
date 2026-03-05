@@ -21,7 +21,7 @@ const STATUSES: FeedbackStatus[] = ['pending', 'reviewed', 'resolved']
 const PAGE_SIZE = 20
 
 export function AdminFeedbackPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
 
   const [statusFilter, setStatusFilter] = useState('all')

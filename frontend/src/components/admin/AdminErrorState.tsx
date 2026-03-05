@@ -8,7 +8,7 @@ type Props = {
 }
 
 export function AdminErrorState({ onRetry }: Props) {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">

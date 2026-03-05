@@ -22,9 +22,9 @@ export function Header() {
           {user ? (
             <>
               {user.is_admin && (
-                <NavLink to="/admin">
+                <NavLink to="/console">
                   <Button variant="ghost" size="sm">
-                    {t('nav.admin', 'Admin')}
+                    {t('nav.console', 'Console')}
                   </Button>
                 </NavLink>
               )}

@@ -10,7 +10,7 @@ type Props = {
 }
 
 export function Pagination({ offset, limit, total, onOffsetChange }: Props) {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
 
   if (total <= limit) return null
 

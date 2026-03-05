@@ -31,7 +31,7 @@ function statusCount(summary: { status_counts: { status: string; count: number }
 }
 
 export function AdminCardsPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
 
   // Generate panel state

@@ -1,5 +1,5 @@
 {
-  "title": "Admin Panel",
+  "title": "Console",
   "backToSite": "Back to site",
   "nav": {
     "dashboard": "Dashboard",
@@ -11,7 +11,14 @@
     "system": "System",
     "storage": "Storage",
     "transfers": "Transfers",
+    "files": "Files",
     "menu": "Menu"
+  },
+  "navGroup": {
+    "overview": "Overview",
+    "management": "Management",
+    "content": "Content",
+    "system": "System"
   },
   "dashboard": {
     "totalUsers": "Total Users",
@@ -106,6 +113,7 @@
     "title": "Operations Data",
     "tabs": {
       "toolUsage": "Tool Usage",
+      "usageLog": "Usage Log",
       "transactions": "Transactions",
       "shareLinks": "Share Links",
       "revenue": "Revenue"
@@ -118,6 +126,17 @@
       "total": "Total",
       "success": "Success",
       "fail": "Failed"
+    },
+    "usageLog": {
+      "allStatus": "All Status",
+      "tool": "Tool",
+      "user": "User",
+      "status": "Status",
+      "time": "Time",
+      "statuses": {
+        "done": "Done",
+        "failed": "Failed"
+      }
     },
     "transactions": {
       "allTypes": "All Types",
@@ -332,15 +351,7 @@
     "cleanup": "Clean Up Expired Files",
     "cleanupConfirmTitle": "Confirm Cleanup",
     "cleanupConfirmDesc": "This will clean up expired files, transfers, and shares across all directories. This action cannot be undone.",
-    "cleanupEmpty": "No files to clean up",
-    "processingHistory": "Processing History",
-    "allStatus": "All Status",
-    "statusDone": "Done",
-    "statusFailed": "Failed",
-    "tool": "Tool",
-    "user": "User",
-    "status": "Status",
-    "time": "Time"
+    "cleanupEmpty": "No files to clean up"
   },
   "transfers": {
     "title": "Transfers & Shares",
@@ -368,6 +379,18 @@
     "shareExpired": "Expired",
     "deleteShareConfirmTitle": "Confirm Delete Share",
     "deleteShareConfirmDesc": "This will delete the share record and associated image. This action cannot be undone."
+  },
+  "files": {
+    "title": "File Browser",
+    "filename": "Filename",
+    "type": "Type",
+    "size": "Size",
+    "time": "Created",
+    "actions": "Actions",
+    "preview": "Preview",
+    "download": "Download",
+    "searchPlaceholder": "Search filename...",
+    "totalCount": "{{count}} files"
   },
   "common": {
     "loading": "Loading...",

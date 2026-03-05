@@ -1,17 +1,24 @@
 {
-  "title": "管理后台",
-  "backToSite": "返回前台",
+  "title": "\u63a7\u5236\u53f0",
+  "backToSite": "\u8fd4\u56de\u524d\u53f0",
   "nav": {
-    "dashboard": "仪表盘",
-    "users": "用户管理",
-    "cards": "卡密管理",
-    "operations": "运营数据",
-    "feedback": "用户反馈",
-    "tools": "工具管理",
-    "system": "系统状态",
-    "storage": "存储管理",
-    "transfers": "传输管理",
-    "menu": "菜单"
+    "dashboard": "\u4eea\u8868\u76d8",
+    "users": "\u7528\u6237\u7ba1\u7406",
+    "cards": "\u5361\u5bc6\u7ba1\u7406",
+    "operations": "\u8fd0\u8425\u6570\u636e",
+    "feedback": "\u7528\u6237\u53cd\u9988",
+    "tools": "\u5de5\u5177\u7ba1\u7406",
+    "system": "\u7cfb\u7edf\u72b6\u6001",
+    "storage": "\u5b58\u50a8\u7ba1\u7406",
+    "transfers": "\u4f20\u8f93\u7ba1\u7406",
+    "files": "\u6587\u4ef6\u6d4f\u89c8",
+    "menu": "\u83dc\u5355"
+  },
+  "navGroup": {
+    "overview": "\u6982\u89c8",
+    "management": "\u7ba1\u7406",
+    "content": "\u5185\u5bb9",
+    "system": "\u7cfb\u7edf"
   },
   "dashboard": {
     "totalUsers": "用户总数",
@@ -106,6 +113,7 @@
     "title": "运营数据",
     "tabs": {
       "toolUsage": "工具使用",
+      "usageLog": "使用记录",
       "transactions": "流水查询",
       "shareLinks": "分享链接",
       "revenue": "收入报表"
@@ -118,6 +126,17 @@
       "total": "总数",
       "success": "成功",
       "fail": "失败"
+    },
+    "usageLog": {
+      "allStatus": "全部状态",
+      "tool": "工具",
+      "user": "用户",
+      "status": "状态",
+      "time": "时间",
+      "statuses": {
+        "done": "成功",
+        "failed": "失败"
+      }
     },
     "transactions": {
       "allTypes": "全部类型",
@@ -332,15 +351,7 @@
     "cleanup": "清理过期文件",
     "cleanupConfirmTitle": "确认清理",
     "cleanupConfirmDesc": "将清理所有目录中的过期文件、过期传输和过期分享。此操作不可撤销。",
-    "cleanupEmpty": "没有需要清理的文件",
-    "processingHistory": "处理历史",
-    "allStatus": "全部状态",
-    "statusDone": "成功",
-    "statusFailed": "失败",
-    "tool": "工具",
-    "user": "用户",
-    "status": "状态",
-    "time": "时间"
+    "cleanupEmpty": "没有需要清理的文件"
   },
   "transfers": {
     "title": "传输与分享",
@@ -368,6 +379,18 @@
     "shareExpired": "已过期",
     "deleteShareConfirmTitle": "确认删除分享",
     "deleteShareConfirmDesc": "此操作将删除分享记录和关联图片，不可撤销。"
+  },
+  "files": {
+    "title": "文件浏览",
+    "filename": "文件名",
+    "type": "类型",
+    "size": "大小",
+    "time": "创建时间",
+    "actions": "操作",
+    "preview": "预览",
+    "download": "下载",
+    "searchPlaceholder": "搜索文件名...",
+    "totalCount": "共 {{count}} 个文件"
   },
   "common": {
     "loading": "加载中...",

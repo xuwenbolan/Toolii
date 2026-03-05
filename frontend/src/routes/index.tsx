@@ -4,8 +4,8 @@ import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AdminRoute } from '@/components/auth/AdminRoute'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { FORMAT_PAIRS } from '@/config/formatPairs'
-import { AdminLayout } from '@/layouts/AdminLayout'
 import { AuthLayout } from '@/layouts/AuthLayout'
+import { ConsoleLayout } from '@/layouts/ConsoleLayout'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
 import { RootLayout } from '@/layouts/RootLayout'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -67,6 +67,7 @@ const AdminToolsPage = lazy(() => import('@/pages/Admin/AdminToolsPage').then((m
 const AdminSystemPage = lazy(() => import('@/pages/Admin/AdminSystemPage').then((m) => ({ default: m.AdminSystemPage })))
 const AdminStoragePage = lazy(() => import('@/pages/Admin/AdminStoragePage').then((m) => ({ default: m.AdminStoragePage })))
 const AdminTransfersPage = lazy(() => import('@/pages/Admin/AdminTransfersPage').then((m) => ({ default: m.AdminTransfersPage })))
+const AdminFilesPage = lazy(() => import('@/pages/Admin/AdminFilesPage').then((m) => ({ default: m.AdminFilesPage })))
 
 export const router = createBrowserRouter([
   {
@@ -154,27 +155,31 @@ export const router = createBrowserRouter([
           { path: 'transfers', element: <TransferListPage /> },
         ],
       },
-      {
-        path: 'admin',
-        element: (
-          <AdminRoute>
-            <AdminLayout />
-          </AdminRoute>
-        ),
-        children: [
-          { index: true, element: <AdminDashboardPage /> },
-          { path: 'users', element: <AdminUsersPage /> },
-          { path: 'users/:id', element: <AdminUserDetailPage /> },
-          { path: 'cards', element: <AdminCardsPage /> },
-          { path: 'tools', element: <AdminToolsPage /> },
-          { path: 'operations', element: <AdminOperationsPage /> },
-          { path: 'feedback', element: <AdminFeedbackPage /> },
-          { path: 'system', element: <AdminSystemPage /> },
-          { path: 'storage', element: <AdminStoragePage /> },
-          { path: 'transfers', element: <AdminTransfersPage /> },
-        ],
-      },
     ],
   },
+  // Console (admin) — independent top-level route, no RootLayout wrapper
+  {
+    path: 'console',
+    element: (
+      <AdminRoute>
+        <ConsoleLayout />
+      </AdminRoute>
+    ),
+    children: [
+      { index: true, element: <AdminDashboardPage /> },
+      { path: 'users', element: <AdminUsersPage /> },
+      { path: 'users/:id', element: <AdminUserDetailPage /> },
+      { path: 'cards', element: <AdminCardsPage /> },
+      { path: 'tools', element: <AdminToolsPage /> },
+      { path: 'operations', element: <AdminOperationsPage /> },
+      { path: 'feedback', element: <AdminFeedbackPage /> },
+      { path: 'system', element: <AdminSystemPage /> },
+      { path: 'storage', element: <AdminStoragePage /> },
+      { path: 'transfers', element: <AdminTransfersPage /> },
+      { path: 'files', element: <AdminFilesPage /> },
+    ],
+  },
+  // Redirect old /admin paths to /console
+  { path: 'admin/*', element: <Navigate to="/console" replace /> },
   { path: '*', element: <NotFoundPage /> },
 ])

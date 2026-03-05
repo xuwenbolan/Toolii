@@ -65,7 +65,7 @@ function getAccessSummary(tool: AdminToolItem, t: (key: string, opts?: Record<st
 
 
 export function AdminToolsPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
 
   const [filterCategory, setFilterCategory] = useState('all')

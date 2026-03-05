@@ -17,7 +17,7 @@ const PAGE_SIZE = 20
 type StatusFilter = 'all' | 'active' | 'disabled'
 
 export function AdminUsersPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const queryClient = useQueryClient()
 
   const [search, setSearch] = useState('')
@@ -104,7 +104,7 @@ export function AdminUsersPage() {
         header: t('users.actions'),
         render: (u) => (
           <div className="flex items-center gap-2">
-            <Link to={`/admin/users/${u.id}`} className="text-primary hover:underline text-sm">
+            <Link to={`/console/users/${u.id}`} className="text-primary hover:underline text-sm">
               {t('users.viewDetail')}
             </Link>
             {u.is_admin ? (
@@ -173,7 +173,7 @@ export function AdminUsersPage() {
             <div className="mt-2 flex items-center justify-between text-sm">
               <span className="text-muted-foreground">{t('users.balance')}: <span className="font-medium text-foreground">{u.balance}</span></span>
               <div className="flex items-center gap-2">
-                <Link to={`/admin/users/${u.id}`} className="text-primary hover:underline text-sm">
+                <Link to={`/console/users/${u.id}`} className="text-primary hover:underline text-sm">
                   {t('users.viewDetail')}
                 </Link>
                 {u.is_admin ? (

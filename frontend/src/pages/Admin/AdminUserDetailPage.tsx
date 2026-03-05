@@ -22,7 +22,7 @@ import type {
 } from '@/services/adminApi'
 
 export function AdminUserDetailPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
 
@@ -163,7 +163,7 @@ export function AdminUserDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/admin/users" className="text-sm text-primary hover:underline">
+      <Link to="/console/users" className="text-sm text-primary hover:underline">
         &larr; {t('users.detail.back')}
       </Link>
 

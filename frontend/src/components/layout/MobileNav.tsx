@@ -83,16 +83,16 @@ export function MobileNav() {
             <>
               {user.is_admin && (
                 <Link
-                  to="/admin"
+                  to="/console"
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-                    isActive('/admin')
+                    isActive('/console')
                       ? 'bg-accent font-medium text-accent-foreground'
                       : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                   }`}
                 >
                   <Settings className="h-4 w-4" />
-                  {t('nav.admin', 'Admin')}
+                  {t('nav.console', 'Console')}
                 </Link>
               )}
               {AUTH_NAV.map((item) => (

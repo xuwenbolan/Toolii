@@ -33,7 +33,7 @@ export function ConfirmDialog({
   loading,
   onConfirm,
 }: Props) {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
