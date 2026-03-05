@@ -24,11 +24,13 @@ import {
   fetchGlobalTransactions,
   fetchAdminShareLinks,
   fetchRevenue,
+  fetchUsageLog,
 } from '@/services/adminApi'
 import type {
   ToolUsageItem,
   GlobalTransactionItem,
   AdminShareLinkItem,
+  AdminProcessingHistoryListItem,
   RevenueItem,
 } from '@/services/adminApi'
 
@@ -37,7 +39,7 @@ const PAGE_SIZE = 20
 // -- Tab 1: Tool Usage -------------------------------------------------------
 
 function ToolUsageTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const isMobile = useIsMobile()
   const [days, setDays] = useState(30)
   const [toolName, setToolName] = useState('')
@@ -165,7 +167,7 @@ function ToolUsageTab() {
 const TX_TYPES = ['redeem', 'consume', 'admin_adjust', 'share_send', 'share_receive']
 
 function TransactionsTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const [txType, setTxType] = useState('all')
   const [offset, setOffset] = useState(0)
 
@@ -281,7 +283,7 @@ function TransactionsTab() {
 const SHARE_STATUSES = ['pending', 'claimed', 'canceled']
 
 function ShareLinksTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const [status, setStatus] = useState('all')
   const [offset, setOffset] = useState(0)
 
@@ -376,7 +378,7 @@ function ShareLinksTab() {
 // -- Tab 4: Revenue ----------------------------------------------------------
 
 function RevenueTab() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
   const isMobile = useIsMobile()
   const [granularity, setGranularity] = useState('day')
   const [days, setDays] = useState(30)
@@ -475,10 +477,106 @@ function RevenueTab() {
   )
 }
 
+// -- Tab 5: Usage Log --------------------------------------------------------
+
+const USAGE_STATUSES = ['done', 'failed']
+
+function UsageLogTab() {
+  const { t } = useTranslation('console')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [offset, setOffset] = useState(0)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'usage-log', { statusFilter, offset }],
+    queryFn: () => {
+      const params: { limit: number; offset: number; status?: string } = { limit: PAGE_SIZE, offset }
+      if (statusFilter !== 'all') params.status = statusFilter
+      return fetchUsageLog(params)
+    },
+  })
+
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+
+  const filterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('operations.usageLog.allStatus') },
+      ...USAGE_STATUSES.map((s) => ({ value: s, label: t(`operations.usageLog.statuses.${s}`) })),
+    ],
+    [t],
+  )
+
+  const columns: Column<AdminProcessingHistoryListItem>[] = useMemo(
+    () => [
+      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
+      { key: 'tool', header: t('operations.usageLog.tool'), render: (i) => i.display_name },
+      { key: 'user', header: t('operations.usageLog.user'), hiddenOnMobile: true, render: (i) => i.user_email ?? '-' },
+      {
+        key: 'status',
+        header: t('operations.usageLog.status'),
+        render: (i) => <StatusBadge status={i.status} />,
+      },
+      {
+        key: 'ip',
+        header: 'IP',
+        hiddenOnMobile: true,
+        render: (i) => i.ip ?? '-',
+      },
+      {
+        key: 'ua',
+        header: 'UA',
+        className: 'max-w-[200px] truncate',
+        hiddenOnMobile: true,
+        render: (i) => i.user_agent ?? '-',
+      },
+      {
+        key: 'time',
+        header: t('operations.usageLog.time'),
+        className: 'whitespace-nowrap',
+        render: (i) => new Date(i.created_at).toLocaleString(),
+      },
+    ],
+    [t],
+  )
+
+  return (
+    <div className="space-y-4">
+      <AdminFilter
+        value={statusFilter}
+        options={filterOptions}
+        onChange={(v) => { setStatusFilter(v); setOffset(0) }}
+      />
+
+      <DataTable
+        columns={columns}
+        data={items}
+        rowKey={(i) => i.id}
+        loading={isLoading}
+        renderMobileCard={(i) => (
+          <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">{i.display_name}</span>
+              <StatusBadge status={i.status} />
+            </div>
+            {i.user_email && (
+              <div className="text-xs text-muted-foreground">{i.user_email}</div>
+            )}
+            {i.ip && (
+              <div className="text-xs text-muted-foreground">IP: {i.ip}</div>
+            )}
+            <div className="text-[11px] text-muted-foreground">{new Date(i.created_at).toLocaleString()}</div>
+          </div>
+        )}
+      />
+      <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+    </div>
+  )
+}
+
 // -- Main Page Component -----------------------------------------------------
 
 export function AdminOperationsPage() {
-  const { t } = useTranslation('admin')
+  const { t } = useTranslation('console')
 
   return (
     <div className="space-y-6">
@@ -488,6 +586,7 @@ export function AdminOperationsPage() {
         <div className="overflow-x-auto no-scrollbar">
           <TabsList>
             <TabsTrigger value="toolUsage">{t('operations.tabs.toolUsage')}</TabsTrigger>
+            <TabsTrigger value="usageLog">{t('operations.tabs.usageLog')}</TabsTrigger>
             <TabsTrigger value="transactions">{t('operations.tabs.transactions')}</TabsTrigger>
             <TabsTrigger value="shareLinks">{t('operations.tabs.shareLinks')}</TabsTrigger>
             <TabsTrigger value="revenue">{t('operations.tabs.revenue')}</TabsTrigger>
@@ -495,6 +594,7 @@ export function AdminOperationsPage() {
         </div>
 
         <TabsContent value="toolUsage"><ToolUsageTab /></TabsContent>
+        <TabsContent value="usageLog"><UsageLogTab /></TabsContent>
         <TabsContent value="transactions"><TransactionsTab /></TabsContent>
         <TabsContent value="shareLinks"><ShareLinksTab /></TabsContent>
         <TabsContent value="revenue"><RevenueTab /></TabsContent>

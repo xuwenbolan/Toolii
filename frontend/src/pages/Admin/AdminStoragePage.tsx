@@ -1,20 +1,15 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
-import { AdminFilter, ConfirmDialog, DataTable, Pagination, StatusBadge } from '@/components/admin'
-import type { Column } from '@/components/admin'
+import { ConfirmDialog } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import {
   fetchStorageOverview,
-  fetchProcessingHistory,
   triggerStorageCleanup,
 } from '@/services/adminApi'
-import type { AdminProcessingHistoryListItem } from '@/services/adminApi'
 import { getTranslatedApiError } from '@/lib/apiErrors'
-
-const PAGE_SIZE = 20
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -31,12 +26,10 @@ const DIR_LABELS: Record<string, { zh: string; en: string }> = {
 }
 
 export function AdminStoragePage() {
-  const { t, i18n } = useTranslation('admin')
+  const { t, i18n } = useTranslation('console')
   const queryClient = useQueryClient()
   const isZh = i18n.language.startsWith('zh')
 
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [offset, setOffset] = useState(0)
   const [confirmCleanup, setConfirmCleanup] = useState(false)
 
   // Overview
@@ -44,22 +37,6 @@ export function AdminStoragePage() {
     queryKey: ['admin', 'storage-overview'],
     queryFn: fetchStorageOverview,
   })
-
-  // Processing history
-  const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'processing-history', { statusFilter, offset }],
-    queryFn: () => {
-      const params: { limit: number; offset: number; status?: string } = {
-        limit: PAGE_SIZE,
-        offset,
-      }
-      if (statusFilter !== 'all') params.status = statusFilter
-      return fetchProcessingHistory(params)
-    },
-  })
-
-  const items = data?.items ?? []
-  const total = data?.total ?? 0
 
   // Cleanup mutation
   const cleanupMutation = useMutation({
@@ -76,35 +53,6 @@ export function AdminStoragePage() {
       toast.error(getTranslatedApiError(err, t('common.error')))
     },
   })
-
-  const statusOptions = useMemo(
-    () => [
-      { value: 'all', label: t('storage.allStatus') },
-      { value: 'done', label: t('storage.statusDone') },
-      { value: 'failed', label: t('storage.statusFailed') },
-    ],
-    [t],
-  )
-
-  const columns: Column<AdminProcessingHistoryListItem>[] = useMemo(
-    () => [
-      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
-      { key: 'tool', header: t('storage.tool'), render: (i) => i.display_name },
-      { key: 'user', header: t('storage.user'), hiddenOnMobile: true, render: (i) => i.user_email ?? '-' },
-      {
-        key: 'status',
-        header: t('storage.status'),
-        render: (i) => <StatusBadge status={i.status} />,
-      },
-      {
-        key: 'time',
-        header: t('storage.time'),
-        className: 'whitespace-nowrap',
-        render: (i) => new Date(i.created_at).toLocaleString(),
-      },
-    ],
-    [t],
-  )
 
   return (
     <div className="space-y-6">
@@ -155,36 +103,6 @@ export function AdminStoragePage() {
         loading={cleanupMutation.isPending}
         onConfirm={() => cleanupMutation.mutate()}
       />
-
-      {/* Processing history */}
-      <div className="space-y-4">
-        <h2 className="text-base font-medium">{t('storage.processingHistory')}</h2>
-        <AdminFilter
-          value={statusFilter}
-          options={statusOptions}
-          onChange={(v) => { setStatusFilter(v); setOffset(0) }}
-        />
-
-        <DataTable
-          columns={columns}
-          data={items}
-          rowKey={(i) => i.id}
-          loading={isLoading}
-          renderMobileCard={(i) => (
-            <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{i.display_name}</span>
-                <StatusBadge status={i.status} />
-              </div>
-              {i.user_email && (
-                <div className="text-xs text-muted-foreground">{i.user_email}</div>
-              )}
-              <div className="text-[11px] text-muted-foreground">{new Date(i.created_at).toLocaleString()}</div>
-            </div>
-          )}
-        />
-        <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
-      </div>
     </div>
   )
 }

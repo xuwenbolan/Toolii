@@ -200,6 +200,8 @@ export type AdminProcessingHistoryListItem = {
   tool_name: string
   display_name: string
   status: string
+  ip: string | null
+  user_agent: string | null
   input_file_id: string | null
   output_file_id: string | null
   created_at: string
@@ -260,6 +262,23 @@ export type AdminResultShareListResponse = {
   total: number
   limit: number
   offset: number
+}
+
+// ── File Browser types ────────────────────────────────────
+
+export type AdminFileItem = {
+  file_id: string
+  original_filename: string
+  content_type: string
+  size: number
+  created_at: number
+  previewable: boolean
+}
+
+export type AdminFileListResponse = {
+  items: AdminFileItem[]
+  total: number
+  directory: string
 }
 
 // ── Cortex / System types ─────────────────────────────────
@@ -533,21 +552,21 @@ export async function fetchStorageOverview() {
   return res.data
 }
 
-export async function fetchProcessingHistory(params?: {
+export async function triggerStorageCleanup(target: string) {
+  const res = await api.post<StorageCleanupResponse>('/api/admin/storage/cleanup', { target })
+  return res.data
+}
+
+export async function fetchUsageLog(params?: {
   limit?: number
   offset?: number
   tool_name?: string
   status?: string
 }) {
   const res = await api.get<AdminProcessingHistoryListResponse>(
-    '/api/admin/storage/processing-history',
+    '/api/admin/operations/usage-log',
     { params },
   )
-  return res.data
-}
-
-export async function triggerStorageCleanup(target: string) {
-  const res = await api.post<StorageCleanupResponse>('/api/admin/storage/cleanup', { target })
   return res.data
 }
 
@@ -590,5 +609,25 @@ export async function fetchResultShares(params?: {
 
 export async function deleteResultShare(shareId: number) {
   const res = await api.delete(`/api/admin/transfers/result-shares/${shareId}`)
+  return res.data
+}
+
+// ── File Browser ─────────────────────────────────────────
+
+export async function fetchAdminFiles(params: {
+  directory: string
+  limit?: number
+  offset?: number
+  search?: string
+}) {
+  const res = await api.get<AdminFileListResponse>('/api/admin/files', { params })
+  return res.data
+}
+
+export async function fetchAdminFileDownloadUrl(fileId: string, directory: string) {
+  const res = await api.get<{ download_url: string }>(
+    `/api/admin/files/${fileId}/download`,
+    { params: { directory } },
+  )
   return res.data
 }
