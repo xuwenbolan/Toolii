@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
@@ -71,7 +72,7 @@ def decode_jwt_token(token: str) -> DecodedToken:
             algorithms=[settings.jwt_algorithm],
             options={"verify_aud": False},
         )
-    except JWTError as exc:  # includes ExpiredSignatureError
+    except PyJWTError as exc:  # includes ExpiredSignatureError
         raise UnauthorizedError("Invalid or expired token") from exc
 
     sub = payload.get("sub")

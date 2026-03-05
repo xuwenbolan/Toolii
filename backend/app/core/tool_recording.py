@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 
 from fastapi.routing import APIRoute
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -49,7 +50,7 @@ def _try_extract_user_id(request: Request) -> int | None:
         if payload.get("type") != "access":
             return None
         return int(payload["sub"])
-    except (JWTError, KeyError, ValueError, TypeError):
+    except (PyJWTError, KeyError, ValueError, TypeError):
         return None
 
 
@@ -180,8 +181,9 @@ class ToolGatewayRoute(APIRoute):
                     )
                 await _check_balance(user_id, tool.credit_cost)
 
-            # Store credit info on request.state for downstream service use
+            # Store credit/user info on request.state for downstream service use
             request.state.tool_credit_cost = tool.credit_cost
+            request.state.tool_user_id = user_id
 
             # 5. Execute the actual handler
             response = await original(request)
