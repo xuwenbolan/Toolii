@@ -19,8 +19,10 @@ __pycache__/
 
 # toolii runtime
 /data/
-**/models/
+/models/
 /ssl/
+*.task
+*.onnx
 
 client_secret_*.json
 backend/toolii.db

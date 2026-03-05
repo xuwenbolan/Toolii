@@ -214,36 +214,71 @@
 
 ---
 
-## 修复优先级路线图
+## 修复进度
 
-### 第一阶段：立即 (本周)
-| 编号 | 修复项 | 工作量 |
-|------|--------|--------|
-| C-02 | Cortex 端口绑定到 127.0.0.1 | 1 行 |
-| C-03 | dev 环境 JWT secret 改为随机生成 | 5 行 |
-| H-10 | 移除 docker-compose 中硬编码 CORS_ORIGINS | 1 行 |
-| H-08 | cv2 解码后添加像素限制检查 | 10 行 |
-| M-01 | 所有密码/token 字段添加 max_length | 10 行 |
-| L-05 | 生产环境禁用 /docs /redoc | 3 行 |
+### 已修复 (2026-03-05)
 
-### 第二阶段：短期 (2 周内)
-| 编号 | 修复项 | 工作量 |
-|------|--------|--------|
-| C-01 | 密钥轮换 + 生产密钥管理方案 | 中 |
-| H-01 | Refresh Token Rotation | 中 |
-| H-03 | 移除 dev token 响应泄露 | 小 |
-| H-04/05 | 管理员积分/卡密操作限制 | 小 |
-| H-06 | 管理 API 速率限制 | 小 |
-| H-09 | Docker 非 root 用户 | 小 |
-| M-02 | 图片格式统一尺寸检查 | 小 |
-| M-07/08 | nginx 安全头修复 | 小 |
+| 编号 | 修复项 | 修改文件 |
+|------|--------|---------|
+| C-02 | Cortex API Key 认证 + 端口绑定到可配置 IP | `cortex/app/config.py`, `cortex/app/main.py`, `backend/app/core/config.py`, `backend/app/services/cortex_client.py`, `docker/docker-compose.yml` |
+| C-03 | JWT secret / download_signing_secret 默认值改为 `secrets.token_hex(32)` | `backend/app/core/config.py` |
+| H-03 | dev token 不再返回响应体，改为 logger.info | `backend/app/routers/auth.py` |
+| H-04 | 管理员禁止给自己调整积分 | `backend/app/routers/admin/users.py` |
+| H-05 | 卡密积分上限 `le=100000`，调整积分范围 `[-100000, 100000]` | `backend/app/schemas/admin.py` |
+| H-08 | cv2 解码后检查像素数（30MP 上限），3 处 imdecode 全覆盖 | `backend/app/core/file_validation.py`, `backend/app/processing/scan_enhance.py`, `backend/app/processing/face_detection.py`, `backend/app/processing/face_compliance.py` |
+| H-10 | 移除 docker-compose 硬编码 CORS_ORIGINS | `docker/docker-compose.yml` |
+| M-01 | 所有密码字段 `max_length=128`，token 字段 `max_length=4096` | `backend/app/schemas/auth.py`, `backend/app/schemas/user.py` |
+| M-02 | WebP/GIF/BMP/TIFF/HEIC 统一 Pillow 尺寸检查 | `backend/app/core/file_validation.py` |
+| M-05 | bcrypt 预哈希改用 base64 编码避免 null byte 截断 | `backend/app/core/security.py` |
+| M-09 | Transfer message 字段 `max_length=500` | `backend/app/routers/transfer.py` |
+| L-04 | download_signing_secret 随机默认值（同 C-03） | `backend/app/core/config.py` |
+| L-05 | 非 dev 环境禁用 /docs /redoc | `backend/app/main.py` |
+| L-08 | robots.txt 移除 /console/ 管理后台路径暴露 | `frontend/public/robots.txt` |
+| L-10 | window.open 添加 noopener,noreferrer | `frontend/src/pages/Admin/AdminFilesPage.tsx` |
 
-### 第三阶段：中期 (1 月内)
-| 编号 | 修复项 | 工作量 |
-|------|--------|--------|
-| H-02 | LoginGuard IP 维度 + 持久化 | 中 |
-| H-07 | 审计日志事务化 | 中 |
-| M-03 | PDF 页数限制 + 超时 | 小 |
-| M-04 | Google OAuth id_token 验证 | 中 |
-| M-05 | bcrypt 预哈希 base64 编码 | 小 |
-| M-06 | 管理员权限分级设计 | 大 |
+**部署注意**: M-05 修改了密码哈希预处理方式，已有用户密码需重置。
+
+### 已修复 (第二批)
+
+| 编号 | 修复项 | 修改文件 |
+|------|--------|---------|
+| H-01 | Refresh Token Rotation — 刷新后旧 token JTI 加入黑名单 | `backend/app/services/auth_service.py` |
+| H-06 | 管理 API 写操作速率限制 `10/minute`（卡密生成、积分调整、删除等 12 个端点） | `backend/app/core/config.py`, `backend/app/core/rate_limiter.py`, `backend/app/routers/admin/{cards,users,system,storage,transfers,feedback,tools}.py` |
+| M-03 | PDF 页数限制 500 页上限（`check_pdf_page_count`） | `backend/app/core/config.py`, `backend/app/core/file_validation.py`, `backend/app/routers/pdf.py` |
+| M-10 | Download unlock 所有权验证 — 文件 metadata 记录 `owner_user_id`，unlock 时校验 | `backend/app/core/tool_recording.py`, `backend/app/services/image_service.py`, `backend/app/services/pdf_service.py`, `backend/app/routers/{image,pdf,download}.py` |
+| M-11 | 请求体大小限制统一 — nginx 和后端中间件均为 550MB | `docker/nginx.conf`, `backend/app/core/security_headers.py` |
+| M-13 | DevEmailService 非 dev 环境拒绝初始化（RuntimeError） | `backend/app/services/email/factory.py` |
+| L-01 | 密码复杂度要求 — 至少含大写、小写、数字 | `backend/app/schemas/validators.py` (new), `backend/app/schemas/auth.py`, `backend/app/schemas/user.py` |
+| L-02 | Transfer 提取码从 4 位纯数字改为 6 位字母+数字 (2.18B 组合) | `backend/app/services/transfer_service.py` |
+| L-06 | .gitignore models 规则优化 — `**/models/` → `/models/` + `*.task` + `*.onnx` | `.gitignore` |
+| L-07 | Source Map 显式禁用 `sourcemap: false` | `frontend/vite.config.ts` |
+| L-09 | python-jose → PyJWT 迁移 | `backend/app/core/security.py`, `backend/app/core/tool_recording.py`, `backend/pyproject.toml` |
+
+### 已修复 (第三批)
+
+| 编号 | 修复项 | 修改文件 |
+|------|--------|---------|
+| M-07 | nginx 嵌套 location 安全头继承 — 提取共享 `security-headers.conf` 片段，在静态资源 location 中 include | `docker/security-headers.conf` (new), `docker/nginx.conf`, `docker/Dockerfile.web` |
+| M-08 | CSP `script-src` 移除 `'unsafe-inline'` — 前端为 Vite 打包的纯外部 module script，无需 inline | `docker/security-headers.conf` |
+
+**部署注意 (第三批)**:
+- M-07/08: 需 Docker 重建 web 容器生效。如果 GTM 注入 inline script 导致被 CSP 阻断，需在 `security-headers.conf` 的 `script-src` 中加回 `'unsafe-inline'`
+
+**部署注意 (第二批)**:
+- L-01: 已有用户不受影响（仅新设密码时校验），但建议提示弱密码用户更新
+- L-02: 已有 transfer 提取码不变，仅新创建的 transfer 使用 6 位码
+- L-09: python-jose 已移除，PyJWT 替代，JWT 格式完全兼容
+- M-11: nginx `client_max_body_size` 需在 Docker 重建后生效
+
+### 待修复 — 需要运维/设计决策
+
+| 编号 | 修复项 | 说明 |
+|------|--------|------|
+| C-01 | 密钥轮换 + 生产密钥管理 | 纯运维操作 |
+| H-02 | LoginGuard IP 维度 + 持久化 | 需 Redis/DB 方案决策 |
+| H-07 | 审计日志事务化 | 需确认高危操作范围 |
+| H-09 | Docker 非 root 用户 | 需改 Dockerfile + 重建 |
+| M-04 | Google OAuth id_token 验证 | 需确认是否影响现有登录流程 |
+| M-06 | 管理员权限分级 RBAC | 大改动，需架构设计 |
+| ~~M-07/08~~ | ~~nginx 安全头 + CSP~~ | 已修复 (第三批) |
+| M-12 | PII 脱敏 / IP 定期清理 | 需产品决策 |
