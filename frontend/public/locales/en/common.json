@@ -76,7 +76,10 @@
     "takePhoto": "Take Photo",
     "processing": "Processing...",
     "processingWait": "Processing, please wait...",
-    "close": "Close"
+    "close": "Close",
+    "viewResult": "View Result",
+    "creditCost_one": "{{count}} credit",
+    "creditCost_other": "{{count}} credits"
   },
   "upload": {
     "dropHere": "Drop files here",

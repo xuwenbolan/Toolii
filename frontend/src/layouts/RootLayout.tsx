@@ -47,7 +47,7 @@ export function RootLayout() {
 
   if (isBootstrapping) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background text-foreground">
+      <div className="flex min-h-svh items-center justify-center bg-background text-foreground">
         <div className="text-muted-foreground text-sm" role="status" aria-live="polite">
           {t('actions.processingWait')}
         </div>
@@ -56,7 +56,7 @@ export function RootLayout() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background text-foreground">
+    <div className="flex min-h-svh flex-col bg-background text-foreground">
       <Header />
       <EmailVerificationBanner />
       <main

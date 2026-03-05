@@ -5,15 +5,16 @@
     "badge": "Privacy & Data Protection",
     "title": "Privacy Policy",
     "subtitle": "We only process your information to the extent necessary to provide our services.",
-    "lastUpdated": "Last updated: 2026-02-27",
+    "lastUpdated": "Last updated: 2026-03-04",
     "summary": "Toolii provides online image and PDF processing services. Files you upload are used solely to fulfill your processing requests and are automatically cleaned up according to system retention policies. We do not use your files for advertising or unrelated purposes.",
     "sections": [
       {
         "title": "1. Information We Collect",
         "paragraphs": [
-          "Account information: When you sign up and log in, we store your email address, encrypted password, and basic account status.",
+          "Account information: When you sign up and log in, we store your email address, encrypted password, and basic account status. If you use Google Sign-In, we store your OAuth identifier.",
           "Usage information: This includes tool type, processing time, file size, error logs, etc., used for troubleshooting and service optimization.",
-          "Payment and credits information: Redemption codes, balance changes, and sharing records are kept for auditing and risk control."
+          "Payment and credits information: Redemption codes, balance changes, and sharing records are kept for auditing and risk control.",
+          "Basic logs: IP address, User-Agent, request time, and path are automatically collected by the server, used solely for security and troubleshooting, and automatically deleted after 90 days."
         ]
       },
       {
@@ -24,12 +25,22 @@
         ],
         "bullets": [
           "Default file retention period: 24 hours",
+          "Visa package user file retention: 30 days (users can manually delete earlier)",
           "Default download link validity: 1 hour",
-          "Expired files are cleaned up in batch by background tasks"
+          "Expired files are cleaned up in batch by background tasks",
+          "File size limits: Images 20MB / PDFs 50MB"
         ]
       },
       {
-        "title": "3. How We Use Your Information",
+        "title": "3. Face Detection Technology",
+        "paragraphs": [
+          "The ID photo processing feature uses face detection technology (MediaPipe Face Detection) for compliance checks (such as frontal face detection, closed eyes/open mouth detection) and crop positioning (head proportion, eye position).",
+          "Face detection data (facial landmark coordinates, etc.) exists only in memory during processing and is released immediately upon completion. Our database and file system do not store any facial landmarks, feature vectors, or derived biometric data.",
+          "This technology is not used for identity recognition, face comparison, face search, or any identity-related purpose."
+        ]
+      },
+      {
+        "title": "4. How We Use Your Information",
         "bullets": [
           "Provide core features including ID photos, image tools, and PDF tools",
           "Ensure account security, balance consistency, and transaction traceability",
@@ -37,25 +48,36 @@
         ]
       },
       {
-        "title": "4. Cookies & Local Storage",
+        "title": "5. Cookies & Local Storage",
         "paragraphs": [
           "We use local storage to maintain login tokens, cookie consent status, and other essential information to ensure a stable experience across browsers.",
-          "You can choose to accept or reject non-essential analytics in the initial consent prompt."
+          "You can choose to accept or reject non-essential analytics in the initial consent prompt. You can also change your preferences at any time via the \"Cookie Settings\" link in the footer."
         ]
       },
       {
-        "title": "5. Third-Party Services",
+        "title": "6. Third-Party Services",
         "paragraphs": [
           "If you use Google Sign-In, authentication follows Google's authorization flow.",
-          "If Google Analytics is enabled, analytics scripts are only loaded after you explicitly consent."
+          "If Google Analytics is enabled, analytics scripts are only loaded after you explicitly consent. Analytics data retention follows Google Analytics default settings."
         ]
       },
       {
-        "title": "6. Your Rights",
+        "title": "7. Data Security",
+        "bullets": [
+          "Full-site HTTPS encrypted transport",
+          "Passwords stored using bcrypt hashing, never in plaintext",
+          "Redemption codes stored as hash values, verified by hash comparison",
+          "Upload directory permissions minimized, accessible only by the application process",
+          "Logs do not record request body content, only necessary request metadata"
+        ]
+      },
+      {
+        "title": "8. Your Rights",
         "bullets": [
           "View and correct your account information",
-          "Request deletion of your account and related personal data",
-          "Withdraw consent for non-essential analytics"
+          "Request deletion of your account and related personal data (all associated data cleared within 30 days of deletion)",
+          "Withdraw consent for non-essential analytics",
+          "For any privacy-related questions, contact us at contact@toolii.cc"
         ]
       }
     ]
@@ -66,7 +88,7 @@
     "badge": "Terms of Service",
     "title": "Terms of Service",
     "subtitle": "By using Toolii, you agree to the following terms.",
-    "lastUpdated": "Last updated: 2026-02-27",
+    "lastUpdated": "Last updated: 2026-03-04",
     "summary": "Toolii provides online file processing services for individual users. Please ensure the content you upload is lawful and that you have the right to process it. We strive to maintain service stability but cannot guarantee uninterrupted or error-free operation in all circumstances.",
     "sections": [
       {
@@ -81,7 +103,8 @@
         "bullets": [
           "Only upload files you have the right to process",
           "Do not upload illegal, infringing, or malicious content",
-          "Do not abuse APIs through scripts, bypass rate limits, or attack the system"
+          "Do not abuse APIs through scripts, bypass rate limits, or attack the system",
+          "Comply with file size limits: Images 20MB / PDFs 50MB"
         ]
       },
       {
@@ -96,14 +119,28 @@
         ]
       },
       {
-        "title": "4. Availability & Disclaimer",
+        "title": "4. Data Processing & File Retention",
+        "paragraphs": [
+          "Uploaded files are retained for 24 hours by default before automatic deletion. Visa package users' files are retained for 30 days.",
+          "Temporary data generated during processing (such as face detection coordinates) exists only in memory and is not persisted."
+        ]
+      },
+      {
+        "title": "5. Availability & Disclaimer",
         "paragraphs": [
           "We do not guarantee that processing results will meet all official acceptance standards. Please verify before submission.",
           "To the extent permitted by law, Toolii shall not be liable for indirect losses or lost profits."
         ]
       },
       {
-        "title": "5. Changes to Terms",
+        "title": "6. Account Termination",
+        "paragraphs": [
+          "You may request account deletion at any time. After deletion, all associated personal information and files will be cleared within 30 days.",
+          "If a user violates these terms, we reserve the right to suspend or terminate their account access."
+        ]
+      },
+      {
+        "title": "7. Changes to Terms",
         "paragraphs": [
           "We may update these terms and mark the latest date on the page. Continued use of the service constitutes acceptance of the updated terms."
         ]

@@ -65,7 +65,8 @@
       "itemFailed": "Conversion failed",
       "retryFailed": "Retry failed",
       "clearFinished": "Clear finished",
-      "zipFailed": "Failed to build ZIP. Please retry."
+      "zipFailed": "Failed to build ZIP. Please retry.",
+      "zipDisabledGated": "Batch ZIP is not available for paid results. Please download individually."
     }
   },
   "jpgToPng": {
@@ -159,6 +160,7 @@
     "seoKeywords": "image upscale,AI upscale,super resolution,enlarge image,Real-ESRGAN",
     "description": "AI super resolution to enlarge images while preserving sharpness.",
     "scaleLabel": "Scale Factor",
+    "startUpscale": "Start Upscale",
     "processing": "AI processing\u2026",
     "output": "Output: {{filename}} \u00b7 {{size}}"
   },
@@ -196,7 +198,8 @@
     "seoKeywords": "colorize photo,black and white to color,AI colorization,DDColor,old photo color",
     "description": "AI-powered colorization for black & white photos.",
     "dropTitle": "Drop a black & white photo",
-    "dropHint": "Upload starts colorization automatically.",
+    "dropHint": "Upload a black & white photo, then click Start.",
+    "startColorize": "Start Colorize",
     "processing": "AI processing\u2026",
     "output": "Output: {{filename}} \u00b7 {{size}}"
   },
@@ -277,7 +280,7 @@
     "seoKeywords": "background removal,remove background,cutout tool,transparent background",
     "description": "AI auto-remove image background, output transparent PNG.",
     "dropTitle": "Drop an image to remove background",
-    "dropHint": "Upload starts processing automatically.",
+    "dropHint": "Upload an image, then click Start.",
     "previewTitle": "Result Preview",
     "showOriginalHold": "Hold to view original",
     "backgroundLabel": "Background",

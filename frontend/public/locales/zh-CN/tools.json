@@ -65,7 +65,8 @@
       "itemFailed": "转换失败",
       "retryFailed": "重试失败项",
       "clearFinished": "清除已完成",
-      "zipFailed": "打包 ZIP 失败，请重试。"
+      "zipFailed": "打包 ZIP 失败，请重试。",
+      "zipDisabledGated": "付费结果不支持批量打包，请逐个下载。"
     }
   },
   "jpgToPng": {
@@ -159,6 +160,7 @@
     "seoKeywords": "图片放大,AI放大,超分辨率,Real-ESRGAN,图片清晰化",
     "description": "AI 超分辨率放大图片，保持画面清晰锐利。",
     "scaleLabel": "放大倍数",
+    "startUpscale": "开始放大",
     "processing": "AI 处理中\u2026",
     "output": "输出：{{filename}} \u00b7 {{size}}"
   },
@@ -196,7 +198,8 @@
     "seoKeywords": "黑白上色,照片上色,AI上色,DDColor,老照片上色",
     "description": "AI 智能为黑白照片添加自然色彩。",
     "dropTitle": "拖拽黑白照片",
-    "dropHint": "上传后自动开始上色处理。",
+    "dropHint": "上传黑白照片后，点击开始上色。",
+    "startColorize": "开始上色",
     "processing": "AI 处理中\u2026",
     "output": "输出：{{filename}} \u00b7 {{size}}"
   },
@@ -277,7 +280,7 @@
     "seoKeywords": "AI抠图,去背景,抠图工具,透明背景",
     "description": "AI 自动移除图片背景，输出透明 PNG。",
     "dropTitle": "拖拽图片自动抠图",
-    "dropHint": "上传后会立即开始处理。",
+    "dropHint": "上传图片后，点击开始抠图。",
     "previewTitle": "结果预览",
     "showOriginalHold": "按住查看原图",
     "backgroundLabel": "背景",
