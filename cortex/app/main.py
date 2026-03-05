@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import time
@@ -8,6 +9,8 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from app import gpu
 from app.config import settings
@@ -139,8 +142,29 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # -- App factory ------------------------------------------------------------
 
 
+_AUTH_EXEMPT_PATHS = frozenset({"/health"})
+
+
+class ApiKeyMiddleware(BaseHTTPMiddleware):
+    """Reject requests without a valid X-API-Key header (except health)."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        if request.url.path in _AUTH_EXEMPT_PATHS:
+            return await call_next(request)
+        key = request.headers.get("X-API-Key", "")
+        if not hmac.compare_digest(key, settings.api_key):
+            return JSONResponse({"error": "invalid api key"}, status_code=401)
+        return await call_next(request)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Toolii Cortex", version="0.1.0", lifespan=lifespan)
+
+    if settings.api_key:
+        app.add_middleware(ApiKeyMiddleware)
+        logger.info("API key authentication enabled")
+    else:
+        logger.warning("SECURITY WARNING: CORTEX_API_KEY not set, all requests accepted")
 
     @app.get("/health")
     async def health(request: Request) -> dict:

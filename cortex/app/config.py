@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     idle_evict_minutes: int = 30
     max_image_pixels: int = 4096 * 4096  # ~16.7M pixels
     max_payload_mb: int = 20
+    api_key: str = ""
     stats_file: Path | None = None
     profile_file: Path | None = None
 

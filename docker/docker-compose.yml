@@ -11,7 +11,7 @@ services:
       ENV: prod
       DATABASE_URL: sqlite+aiosqlite:///../data/toolii.db
       FILE_STORAGE_DIR: ../data/files
-      CORS_ORIGINS: http://localhost
+      # CORS_ORIGINS: loaded from .env
     volumes:
       - ../data:/app/data
     expose:
@@ -55,11 +55,13 @@ services:
       dockerfile: docker/Dockerfile.cortex
     volumes:
       - ../data/cortex:/app/data
+    env_file:
+      - ../.env
     environment:
       - CORTEX_DATA_DIR=/app/data
       - CORTEX_LOG_LEVEL=INFO
     ports:
-      - "9100:9100"
+      - "${CORTEX_BIND_HOST:-127.0.0.1}:9100:9100"
     networks:
       - toolii-net
     deploy:

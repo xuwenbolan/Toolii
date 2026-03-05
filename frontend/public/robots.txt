@@ -2,7 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /auth/
 Disallow: /dashboard/
-Disallow: /admin/
 Disallow: /share/
 
 Sitemap: https://www.toolii.cc/sitemap.xml

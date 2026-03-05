@@ -98,7 +98,7 @@ class UpdateUserStatusRequest(BaseModel):
 
 
 class AdjustCreditsRequest(BaseModel):
-    amount: int = Field(description="Positive to add, negative to deduct")
+    amount: int = Field(ge=-100000, le=100000, description="Positive to add, negative to deduct")
     description: str = Field(max_length=255)
 
 
@@ -112,7 +112,7 @@ class AdjustCreditsResponse(BaseModel):
 
 class CardGenerateRequest(BaseModel):
     count: int = Field(ge=1, le=500)
-    credits: int = Field(ge=1)
+    credits: int = Field(ge=1, le=100000)
     card_type: str = Field(default="standard", max_length=50)
     prefix: str = Field(default="TOOL", max_length=10, pattern=r"^[A-Z0-9]+$")
     expires_days: int | None = Field(default=None, ge=1)
@@ -246,6 +246,8 @@ class AdminProcessingHistoryListItem(BaseModel):
     tool_name: str
     display_name: str
     status: str
+    ip: str | None
+    user_agent: str | None
     input_file_id: str | None
     output_file_id: str | None
     created_at: datetime
@@ -307,6 +309,51 @@ class AdminResultShareItem(BaseModel):
 
 class AdminResultShareListResponse(BaseModel):
     items: list[AdminResultShareItem]
+    total: int
+    limit: int
+    offset: int
+
+
+# ── File Browser ─────────────────────────────────────────
+
+class AdminFileItem(BaseModel):
+    file_id: str
+    original_filename: str
+    content_type: str
+    size: int
+    created_at: int
+    previewable: bool
+
+
+class AdminFileListResponse(BaseModel):
+    items: list[AdminFileItem]
+    total: int
+    directory: str
+
+
+class AdminFileDownloadResponse(BaseModel):
+    download_url: str
+
+
+# ── Audit Logs ───────────────────────────────────────────
+
+class AuditLogItem(BaseModel):
+    id: int
+    user_id: int | None
+    user_email: str | None = None
+    category: str
+    action: str
+    success: bool
+    resource_type: str | None
+    resource_id: str | None
+    ip: str | None
+    user_agent: str | None
+    detail: str | None
+    created_at: datetime
+
+
+class AuditLogListResponse(BaseModel):
+    items: list[AuditLogItem]
     total: int
     limit: int
     offset: int

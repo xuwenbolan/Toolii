@@ -25,8 +25,12 @@ _client: httpx.AsyncClient | None = None
 def _get_client() -> httpx.AsyncClient:
     global _client  # noqa: PLW0603
     if _client is None:
+        headers = {}
+        if settings.cortex_api_key:
+            headers["X-API-Key"] = settings.cortex_api_key
         _client = httpx.AsyncClient(
             base_url=settings.cortex_url,
+            headers=headers,
             timeout=httpx.Timeout(connect=5.0, read=120.0, write=30.0, pool=5.0),
         )
     return _client

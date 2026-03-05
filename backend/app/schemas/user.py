@@ -17,22 +17,22 @@ class UserPublic(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str
+    current_password: str = Field(max_length=128)
     new_password: str = Field(min_length=8, max_length=128)
 
 
 class UpdateProfileRequest(BaseModel):
     name: str | None = Field(default=None, max_length=100)
     email: EmailStr | None = None
-    current_password: str | None = None  # Required when changing email
+    current_password: str | None = Field(default=None, max_length=128)
 
 
 class DeleteAccountRequest(BaseModel):
-    password: str | None = None
+    password: str | None = Field(default=None, max_length=128)
     confirm_email: str | None = None  # Required for Google-only accounts
 
 
 class RecoverAccountRequest(BaseModel):
     email: EmailStr
-    password: str | None = None
+    password: str | None = Field(default=None, max_length=128)
     confirm_email: str | None = None  # For Google-only accounts

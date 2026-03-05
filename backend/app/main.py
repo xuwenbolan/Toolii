@@ -55,7 +55,12 @@ logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.project_name)
+    docs_enabled = settings.env == "dev"
+    app = FastAPI(
+        title=settings.project_name,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+    )
 
     app.add_middleware(
         CORSMiddleware,

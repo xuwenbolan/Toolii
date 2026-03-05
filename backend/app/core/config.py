@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import secrets
 from pathlib import Path
 from typing import Annotated
 
@@ -32,14 +33,14 @@ class Settings(BaseSettings):
     )
     db_echo: bool = Field(default=False, alias="DB_ECHO")
 
-    jwt_secret_key: str = Field(default="CHANGE_ME", alias="JWT_SECRET_KEY")
+    jwt_secret_key: str = Field(default_factory=lambda: secrets.token_hex(32), alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(default=30, alias="REFRESH_TOKEN_EXPIRE_DAYS")
 
     google_oauth_client_id: str | None = Field(default=None, alias="GOOGLE_OAUTH_CLIENT_ID")
 
-    download_signing_secret: str = Field(default="CHANGE_ME_TOO", alias="DOWNLOAD_SIGNING_SECRET")
+    download_signing_secret: str = Field(default_factory=lambda: secrets.token_hex(32), alias="DOWNLOAD_SIGNING_SECRET")
 
     rate_limit_anon: str = Field(default="10/minute", alias="RATE_LIMIT_ANON")
     rate_limit_auth: str = Field(default="20/minute", alias="RATE_LIMIT_AUTH")
@@ -72,6 +73,7 @@ class Settings(BaseSettings):
 
     # Cortex GPU inference service
     cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
+    cortex_api_key: str = Field(default="", alias="CORTEX_API_KEY")
 
     # Result share settings
     result_share_storage_dir: str = Field(

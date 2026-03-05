@@ -15,12 +15,12 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
 
 
 class GoogleAuthRequest(BaseModel):
-    access_token: str
-    link_password: str | None = None
+    access_token: str = Field(max_length=4096)
+    link_password: str | None = Field(default=None, max_length=128)
 
 
 class AccessTokenResponse(BaseModel):
@@ -35,7 +35,7 @@ class AuthResponse(BaseModel):
 
 
 class VerifyEmailRequest(BaseModel):
-    token: str
+    token: str = Field(max_length=4096)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -43,5 +43,5 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ResetPasswordRequest(BaseModel):
-    token: str
+    token: str = Field(max_length=4096)
     password: str = Field(min_length=8, max_length=128)
