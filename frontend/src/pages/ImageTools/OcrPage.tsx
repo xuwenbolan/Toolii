@@ -363,6 +363,7 @@ export function OcrPage() {
         progress={pending ? progress : hasResult ? 100 : 0}
         error={error}
         done={runState.phase === 'done'}
+        toolName="image/ocr"
       />
     </>
   )

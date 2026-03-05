@@ -4,7 +4,7 @@ import type { Accept } from 'react-dropzone'
 import JSZip from 'jszip'
 import { AlertCircle, CheckCircle2, Clock3, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -278,8 +278,10 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime, toolN
     setResultPanelOpen(false)
   }, [])
 
+  const hasGatedResults = doneItems.some((item) => item.result?.requires_credit)
+
   const downloadZip = useCallback(async () => {
-    if (doneItems.length === 0) return
+    if (doneItems.length === 0 || hasGatedResults) return
     setZipPending(true)
     setZipError(null)
 
@@ -302,7 +304,7 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime, toolN
     } finally {
       setZipPending(false)
     }
-  }, [doneItems, t])
+  }, [doneItems, hasGatedResults, t])
 
   const bannerError = useMemo(() => {
     if (zipError) return zipError
@@ -472,8 +474,8 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime, toolN
                       ) : null}
 
                       {item.status === 'done' && item.result ? (
-                        <DownloadButton
-                          url={item.result.download_url}
+                        <GatedDownloadButton
+                          result={item.result}
                           size="sm"
                           className="w-auto px-3"
                         />
@@ -494,6 +496,7 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime, toolN
         progress={zipPending ? undefined : overallProgress}
         error={hardError}
         done={runState.phase === 'done'}
+        toolName={toolName}
       />
 
       <ToolResultPanel
@@ -511,7 +514,12 @@ export function ConvertForm({ title, description, fixedFormat, acceptMime, toolN
             <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
               {t('common:actions.back')}
             </Button>
-            <Button type="button" onClick={() => void downloadZip()} disabled={zipPending || doneCount === 0}>
+            <Button
+              type="button"
+              onClick={() => void downloadZip()}
+              disabled={zipPending || doneCount === 0 || hasGatedResults}
+              title={hasGatedResults ? t('convert.batch.zipDisabledGated') : undefined}
+            >
               {zipPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

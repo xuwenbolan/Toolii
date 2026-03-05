@@ -1,4 +1,5 @@
-import { type PointerEvent, useCallback, useRef, useState } from 'react'
+import { type PointerEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '@/lib/utils'
@@ -11,6 +12,8 @@ type Props = {
   beforeMeta?: string
   afterMeta?: string
   className?: string
+  /** Prevent easy right-click save / drag on the "after" preview image. */
+  protectedPreview?: boolean
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -25,11 +28,17 @@ export function ImageCompareSlider({
   beforeMeta,
   afterMeta,
   className,
+  protectedPreview = false,
 }: Props) {
   const { t } = useTranslation('common')
   const [position, setPosition] = useState(50)
   const [dragging, setDragging] = useState(false)
+  const [afterLoaded, setAfterLoaded] = useState(false)
   const frameRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setAfterLoaded(false)
+  }, [afterUrl])
 
   const updateByClientX = useCallback((clientX: number) => {
     const frame = frameRef.current
@@ -66,14 +75,22 @@ export function ImageCompareSlider({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div className="flex min-h-[17rem] items-center justify-center p-3 sm:min-h-[22rem]">
+        <div className="relative flex min-h-[17rem] items-center justify-center p-3 sm:min-h-[22rem]">
+          {!afterLoaded && afterUrl ? (
+            <Loader2 className="absolute h-6 w-6 animate-spin text-muted-foreground" />
+          ) : null}
           {afterUrl ? (
             <img
               src={afterUrl}
               alt={afterAlt}
-              className="h-full max-h-[62vh] w-full rounded-md object-contain motion-safe:animate-fade-in"
-              loading="lazy"
+              className={cn(
+                'h-full max-h-[62vh] w-full rounded-md object-contain',
+                afterLoaded ? 'motion-safe:animate-fade-in' : 'invisible',
+                protectedPreview && 'select-none',
+              )}
               draggable={false}
+              onContextMenu={protectedPreview ? (e) => e.preventDefault() : undefined}
+              onLoad={() => setAfterLoaded(true)}
             />
           ) : null}
           {beforeUrl ? (
@@ -82,7 +99,6 @@ export function ImageCompareSlider({
               alt={beforeAlt}
               className="pointer-events-none absolute inset-3 h-[calc(100%-1.5rem)] w-[calc(100%-1.5rem)] rounded-md object-contain"
               style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
-              loading="lazy"
               draggable={false}
             />
           ) : null}

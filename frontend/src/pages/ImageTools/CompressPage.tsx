@@ -5,7 +5,7 @@ import { ImageCompareSlider } from '@/components/tools/ImageCompareSlider'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
@@ -19,7 +19,7 @@ import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { compressImage, type FileResult } from '@/services/imageApi'
+import { compressImage, getResultDisplayUrl, type FileResult } from '@/services/imageApi'
 
 const PREVIEW_MAX_DIMENSION = 2200
 
@@ -192,7 +192,7 @@ export function CompressPage() {
   })
   const canRun = runState.canRun && formValid
 
-  const compareAfterUrl = result?.download_url ?? previewUrl
+  const compareAfterUrl = (result ? getResultDisplayUrl(result) : null) ?? previewUrl
   const compareAfterSize = result?.size ?? previewSize ?? undefined
 
   const handleCompress = async () => {
@@ -260,6 +260,7 @@ export function CompressPage() {
               afterAlt={result?.filename ?? file.name}
               beforeMeta={formatBytes(file.size)}
               afterMeta={compareAfterSize ? formatBytes(compareAfterSize) : undefined}
+              protectedPreview={result?.requires_credit}
             />
           ) : null}
 
@@ -309,11 +310,13 @@ export function CompressPage() {
         progress={progress}
         error={error}
         done={runState.phase === 'done'}
+        toolName="image/compress"
         ctaLabel={t('compress.startCompress')}
         ctaDisabled={!canRun}
         onCta={() => {
           void handleCompress()
         }}
+        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
         maxWidthClassName="max-w-6xl"
       />
 
@@ -326,18 +329,19 @@ export function CompressPage() {
           <div className="space-y-4">
             <ImageCompareSlider
               beforeUrl={inputPreviewUrl}
-              afterUrl={result.download_url}
+              afterUrl={getResultDisplayUrl(result)}
               beforeAlt={file.name}
               afterAlt={result.filename}
               beforeMeta={formatBytes(file.size)}
               afterMeta={formatBytes(result.size)}
+              protectedPreview={result?.requires_credit}
             />
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="compress" className="w-auto" />
-              <DownloadButton url={result.download_url} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="compress" className="w-auto" />
+              <GatedDownloadButton result={result} className="w-auto" />
             </div>
           </div>
         ) : null}

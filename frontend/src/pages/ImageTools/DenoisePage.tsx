@@ -5,7 +5,7 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -19,7 +19,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { denoiseImage, type FileResult } from '@/services/imageApi'
+import { denoiseImage, getResultDisplayUrl, type FileResult } from '@/services/imageApi'
 
 export function DenoisePage() {
   const { t } = useTranslation(['tools', 'common'])
@@ -79,8 +79,9 @@ export function DenoisePage() {
               filename={result ? result.filename : file.name}
               sizeText={result ? formatBytes(result.size) : formatBytes(file.size)}
               mediaKind="image"
-              mediaUrl={result ? result.download_url : inputPreviewUrl}
-              action={result ? <DownloadButton url={result.download_url} size="sm" className="w-auto" /> : undefined}
+              mediaUrl={result ? getResultDisplayUrl(result) : inputPreviewUrl}
+              action={result ? <GatedDownloadButton result={result} size="sm" className="w-auto" /> : undefined}
+              protectedPreview={result?.requires_credit}
             />
           ) : null}
 
@@ -102,9 +103,11 @@ export function DenoisePage() {
         progress={progress}
         error={error}
         done={runState.phase === 'done'}
+        toolName="image/denoise"
         ctaLabel={t('denoise.startDenoise')}
         ctaDisabled={!file || pending}
         onCta={() => { void runDenoise() }}
+        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
       />
 
       <ToolResultPanel open={Boolean(result && resultPanelOpen)} title={t('common:actions.downloadResult')} onClose={() => setResultPanelOpen(false)}>
@@ -116,14 +119,15 @@ export function DenoisePage() {
               beforeUrl={inputPreviewUrl}
               afterFilename={result.filename}
               afterSizeText={formatBytes(result.size)}
-              afterUrl={result.download_url}
+              afterUrl={getResultDisplayUrl(result)}
+              protectedPreview={result?.requires_credit}
             />
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="denoise" className="w-auto" />
-              <DownloadButton url={result.download_url} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="denoise" className="w-auto" />
+              <GatedDownloadButton result={result} className="w-auto" />
             </div>
           </div>
         ) : null}

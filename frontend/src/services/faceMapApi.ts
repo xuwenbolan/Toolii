@@ -215,6 +215,8 @@ export type RegionScore = {
   region: string
   score: number
   description: string | null
+  rank?: number | null
+  badge?: string | null
 }
 
 export type FaceSimilarityResponse = {
@@ -223,6 +225,10 @@ export type FaceSimilarityResponse = {
   title: string
   summary: string
   disclaimer: string
+  narrative?: string | null
+  fun_facts?: string[] | null
+  best_region?: string | null
+  worst_region?: string | null
 }
 
 // --- Face similarity API call ---

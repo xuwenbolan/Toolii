@@ -5,7 +5,7 @@ import { Brush, Eraser, Redo2, RotateCcw, Undo2 } from 'lucide-react'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -19,7 +19,7 @@ import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
 import { cn } from '@/lib/utils'
-import { inpaintImage, type FileResult } from '@/services/imageApi'
+import { getResultDisplayUrl, inpaintImage, type FileResult } from '@/services/imageApi'
 
 type InpaintTool = 'brush' | 'eraser'
 type Point = { x: number; y: number }
@@ -460,7 +460,7 @@ export function InpaintPage() {
         </div>
       </ToolPageShell>
 
-      <ToolActionBar mode="manual" status={runState.statusText} pending={pending} progress={progress} error={error} done={runState.phase === 'done'} />
+      <ToolActionBar mode="manual" status={runState.statusText} pending={pending} progress={progress} error={error} done={runState.phase === 'done'} toolName="image/inpaint" onViewResult={result ? () => setResultPanelOpen(true) : undefined} />
 
       <ToolResultPanel
         open={Boolean(result && resultPanelOpen)}
@@ -475,14 +475,15 @@ export function InpaintPage() {
               beforeUrl={inputPreviewUrl}
               afterFilename={result.filename}
               afterSizeText={formatBytes(result.size)}
-              afterUrl={result.download_url}
+              afterUrl={getResultDisplayUrl(result)}
+              protectedPreview={result?.requires_credit}
             />
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="inpaint" className="w-auto" />
-              <DownloadButton url={result.download_url} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="inpaint" className="w-auto" />
+              <GatedDownloadButton result={result} className="w-auto" />
             </div>
           </div>
         ) : null}

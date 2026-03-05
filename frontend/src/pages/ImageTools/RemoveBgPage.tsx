@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -18,7 +18,7 @@ import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { cn } from '@/lib/utils'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { removeBackground, type FileResult } from '@/services/imageApi'
+import { getResultDisplayUrl, removeBackground, type FileResult } from '@/services/imageApi'
 
 type BgMode = 'transparent' | 'white' | 'custom'
 
@@ -39,7 +39,7 @@ export function RemoveBgPage() {
   }, [file])
   const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
   const runState = useToolRunState({
-    mode: 'auto',
+    mode: 'manual',
     hasInput: Boolean(file),
     hasResult: Boolean(result),
     pending,
@@ -50,12 +50,13 @@ export function RemoveBgPage() {
     },
   })
 
-  const runRemoveBg = async (input: File) => {
+  const runRemoveBg = async () => {
+    if (!file) return
     setResult(null)
     setResultPanelOpen(false)
 
     try {
-      const res = await run((onProgress) => removeBackground(input, onProgress))
+      const res = await run((onProgress) => removeBackground(file, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -77,9 +78,7 @@ export function RemoveBgPage() {
               setResult(null)
               setResultPanelOpen(false)
               setShowOriginalPreview(false)
-              const nextFile = files[0]
-              setFile(nextFile)
-              void runRemoveBg(nextFile)
+              setFile(files[0])
             }}
             title={t('removeBg.dropTitle', t('common:upload.dropHere'))}
             hint={t('removeBg.dropHint', t('common:upload.orSelectBelow'))}
@@ -137,7 +136,7 @@ export function RemoveBgPage() {
                     ) : null
                   ) : result ? (
                     <img
-                      src={result.download_url}
+                      src={getResultDisplayUrl(result)}
                       alt={result.filename}
                       className="max-h-[60vh] w-full rounded-md object-contain"
                     />
@@ -192,7 +191,7 @@ export function RemoveBgPage() {
                 </div>
 
                 {result ? (
-                  <DownloadButton url={result.download_url} size="sm" className="w-auto" />
+                  <GatedDownloadButton result={result} size="sm" className="w-auto" />
                 ) : null}
               </div>
             </div>
@@ -203,12 +202,17 @@ export function RemoveBgPage() {
       </ToolPageShell>
 
       <ToolActionBar
-        mode="auto"
+        mode="manual"
         status={runState.statusText}
         pending={pending}
         progress={progress}
         error={error}
         done={runState.phase === 'done'}
+        toolName="image/remove-bg"
+        ctaLabel={t('removeBg.startProcess')}
+        ctaDisabled={!file || pending}
+        onCta={() => { void runRemoveBg() }}
+        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
       />
 
       <ToolResultPanel
@@ -224,14 +228,15 @@ export function RemoveBgPage() {
               beforeUrl={inputPreviewUrl}
               afterFilename={result.filename}
               afterSizeText={formatBytes(result.size)}
-              afterUrl={result.download_url}
+              afterUrl={getResultDisplayUrl(result)}
+              protectedPreview={result?.requires_credit}
             />
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="remove_bg" className="w-auto" />
-              <DownloadButton url={result.download_url} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="remove_bg" className="w-auto" />
+              <GatedDownloadButton result={result} className="w-auto" />
             </div>
           </div>
         ) : null}

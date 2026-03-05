@@ -332,6 +332,7 @@ export function PdfToolsPage() {
         progress={progress}
         error={error}
         done={runState.phase === 'done'}
+        toolName="pdf/tools"
         secondaryCtaLabel={t('pdf.workspace.compressExport')}
         secondaryCtaDisabled={!hasPages}
         onSecondaryCta={() => {

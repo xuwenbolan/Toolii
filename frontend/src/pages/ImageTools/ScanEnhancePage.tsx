@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -17,7 +17,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { enhanceScan, type FileResult } from '@/services/imageApi'
+import { enhanceScan, getResultDisplayUrl, type FileResult } from '@/services/imageApi'
 
 type Mode = 'bw' | 'color'
 
@@ -36,7 +36,7 @@ export function ScanEnhancePage() {
   }, [file])
   const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
   const runState = useToolRunState({
-    mode: 'auto',
+    mode: 'manual',
     hasInput: Boolean(file),
     hasResult: Boolean(result),
     pending,
@@ -47,12 +47,13 @@ export function ScanEnhancePage() {
     },
   })
 
-  const runEnhance = async (input: File, nextMode = mode) => {
+  const runEnhance = async () => {
+    if (!file) return
     setResult(null)
     setResultPanelOpen(false)
 
     try {
-      const res = await run((onProgress) => enhanceScan(input, { mode: nextMode }, onProgress))
+      const res = await run((onProgress) => enhanceScan(file, { mode }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -71,9 +72,7 @@ export function ScanEnhancePage() {
             reset()
             setResult(null)
             setResultPanelOpen(false)
-            const nextFile = files[0]
-            setFile(nextFile)
-            void runEnhance(nextFile)
+            setFile(files[0])
           }}
         />
         <ToolErrorBanner
@@ -88,8 +87,9 @@ export function ScanEnhancePage() {
             filename={result ? result.filename : file.name}
             sizeText={result ? formatBytes(result.size) : formatBytes(file.size)}
             mediaKind="image"
-            mediaUrl={result ? result.download_url : inputPreviewUrl}
-            action={result ? <DownloadButton url={result.download_url} size="sm" className="w-auto" /> : undefined}
+            mediaUrl={result ? getResultDisplayUrl(result) : inputPreviewUrl}
+            action={result ? <GatedDownloadButton result={result} size="sm" className="w-auto" /> : undefined}
+            protectedPreview={result?.requires_credit}
           />
         ) : null}
 
@@ -100,12 +100,7 @@ export function ScanEnhancePage() {
               type="button"
               variant={mode === 'bw' ? 'secondary' : 'outline'}
               disabled={pending}
-              onClick={() => {
-                setMode('bw')
-                if (file && mode !== 'bw' && !pending) {
-                  void runEnhance(file, 'bw')
-                }
-              }}
+              onClick={() => setMode('bw')}
             >
               {t('scanEnhance.bw')}
             </Button>
@@ -113,12 +108,7 @@ export function ScanEnhancePage() {
               type="button"
               variant={mode === 'color' ? 'secondary' : 'outline'}
               disabled={pending}
-              onClick={() => {
-                setMode('color')
-                if (file && mode !== 'color' && !pending) {
-                  void runEnhance(file, 'color')
-                }
-              }}
+              onClick={() => setMode('color')}
             >
               {t('scanEnhance.color')}
             </Button>
@@ -128,12 +118,17 @@ export function ScanEnhancePage() {
     </ToolPageShell>
 
     <ToolActionBar
-      mode="auto"
+      mode="manual"
       status={runState.statusText}
       pending={pending}
       progress={progress}
       error={error}
       done={runState.phase === 'done'}
+      toolName="image/scan-enhance"
+      ctaLabel={t('scanEnhance.startProcess')}
+      ctaDisabled={!file || pending}
+      onCta={() => { void runEnhance() }}
+      onViewResult={result ? () => setResultPanelOpen(true) : undefined}
     />
 
     <ToolResultPanel
@@ -149,14 +144,15 @@ export function ScanEnhancePage() {
             beforeUrl={inputPreviewUrl}
             afterFilename={result.filename}
             afterSizeText={formatBytes(result.size)}
-            afterUrl={result.download_url}
+            afterUrl={getResultDisplayUrl(result)}
+            protectedPreview={result?.requires_credit}
           />
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
               {t('common:actions.back')}
             </Button>
-            <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="scan_enhance" className="w-auto" />
-            <DownloadButton url={result.download_url} className="w-auto" />
+            <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="scan_enhance" className="w-auto" />
+            <GatedDownloadButton result={result} className="w-auto" />
           </div>
         </div>
       ) : null}

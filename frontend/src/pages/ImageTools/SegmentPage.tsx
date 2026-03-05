@@ -394,7 +394,7 @@ export function SegmentPage() {
         </div>
       </ToolPageShell>
 
-      <ToolActionBar mode="manual" status={runState.statusText} pending={pending} progress={pending ? 50 : 0} error={error} done={runState.phase === 'done'} />
+      <ToolActionBar mode="manual" status={runState.statusText} pending={pending} progress={pending ? 50 : 0} error={error} done={runState.phase === 'done'} toolName="image/segment" />
     </>
   )
 }

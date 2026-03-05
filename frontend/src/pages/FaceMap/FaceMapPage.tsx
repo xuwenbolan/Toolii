@@ -195,6 +195,7 @@ export function FaceMapPage() {
         progress={actionProgress}
         error={actionError}
         done={runState.phase === 'done' && !actionPending}
+        toolName="facemap/profile"
         ctaLabel={hasResult ? t('faceMap:upload.reanalyze') : t('faceMap:upload.button')}
         ctaDisabled={!runState.canRun || actionPending}
         onCta={() => {

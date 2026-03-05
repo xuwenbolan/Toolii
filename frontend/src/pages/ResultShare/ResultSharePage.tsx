@@ -31,6 +31,8 @@ import { TagPills } from '../FaceMap/components/TagPills'
 // Face similarity components
 import { OverallScoreRing } from '../FaceSimilarity/components/OverallScoreRing'
 import { RegionBar } from '../FaceSimilarity/components/RegionBar'
+import { NarrativeCard } from '../FaceSimilarity/components/NarrativeCard'
+import { FunFactCards } from '../FaceSimilarity/components/FunFactCards'
 
 const FACEMAP_TYPES = new Set(['profile', 'report'])
 const IMAGE_TOOL_TYPES = new Set([
@@ -261,10 +263,16 @@ function SimilarityShareView({ data }: { data: ResultShareData }) {
           </h3>
           <div className="space-y-4">
             {result.regions.map((r, i) => (
-              <RegionBar key={r.region} region={r.region} label={regionLabels[r.region] ?? r.region} score={r.score} description={r.description} delay={i * 100} />
+              <RegionBar key={r.region} region={r.region} label={regionLabels[r.region] ?? r.region} score={r.score} description={r.description} badge={r.badge} delay={i * 100} />
             ))}
           </div>
         </div>
+
+        {result.narrative && <NarrativeCard narrative={result.narrative} />}
+
+        {result.fun_facts && result.fun_facts.length > 0 && (
+          <FunFactCards facts={result.fun_facts} />
+        )}
 
         <p className="text-xs text-muted-foreground/70 text-center">{result.disclaimer}</p>
       </div>
@@ -320,15 +328,28 @@ export function ResultSharePage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  // Switch locale to match share data
+  // Switch locale to match share data, restore on unmount
   useEffect(() => {
-    if (!data?.locale || data.locale === i18n.language) return
+    if (!data?.locale) return
     const prevLang = i18n.language
-    void i18n.changeLanguage(data.locale)
+    if (data.locale !== prevLang) {
+      void i18n.changeLanguage(data.locale)
+    }
     return () => {
       void i18n.changeLanguage(prevLang)
     }
-  }, [data?.locale, i18n])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.locale])
+
+  // Parse tool metadata for image tools — must be before early returns (hooks rules)
+  const toolMeta = useMemo(() => {
+    if (!data || !IMAGE_TOOL_TYPES.has(data.share_type)) return {}
+    try {
+      return JSON.parse(data.result_json) as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }, [data])
 
   if (loading) {
     return (
@@ -350,16 +371,6 @@ export function ResultSharePage() {
 
   // Atmospheric background for FaceMap/similarity
   const showAtmosphere = FACEMAP_TYPES.has(data.share_type) || data.share_type === 'similarity'
-
-  // Parse tool metadata for image tools
-  const toolMeta = useMemo(() => {
-    if (!IMAGE_TOOL_TYPES.has(data.share_type)) return {}
-    try {
-      return JSON.parse(data.result_json) as Record<string, unknown>
-    } catch {
-      return {}
-    }
-  }, [data])
 
   const ogImageUrl = `${window.location.origin}${data.image_url}`
 

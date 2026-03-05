@@ -11,6 +11,8 @@ type Props = {
   resultFileId: string
   shareType: string
   resultJson?: string
+  /** Result file size in bytes — used to build metadata for the share page */
+  resultSize?: number
   variant?: ButtonProps['variant']
   size?: ButtonProps['size']
   className?: string
@@ -20,7 +22,8 @@ export function ShareResultButton({
   originalFile,
   resultFileId,
   shareType,
-  resultJson = '{}',
+  resultJson,
+  resultSize,
   variant = 'outline',
   size,
   className,
@@ -37,9 +40,14 @@ export function ShareResultButton({
     setError(false)
     try {
       const locale = i18n.language.startsWith('zh') ? 'zh-CN' : 'en'
+      const meta = resultJson ?? JSON.stringify({
+        original_filename: originalFile.name,
+        original_size: originalFile.size,
+        ...(resultSize != null ? { result_size: resultSize } : {}),
+      })
       const result = await createResultShare(
         originalFile,
-        resultJson,
+        meta,
         shareType,
         locale,
         resultFileId,
@@ -54,7 +62,7 @@ export function ShareResultButton({
     } finally {
       setPending(false)
     }
-  }, [pending, originalFile, resultJson, shareType, resultFileId, i18n.language])
+  }, [pending, originalFile, resultJson, resultSize, shareType, resultFileId, i18n.language])
 
   const handleCopy = useCallback(async () => {
     if (!shareUrl) return

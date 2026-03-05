@@ -5,7 +5,7 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
-import { DownloadButton } from '@/components/tools/DownloadButton'
+import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
@@ -17,7 +17,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
 import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { upscaleImage, type FileResult } from '@/services/imageApi'
+import { getResultDisplayUrl, upscaleImage, type FileResult } from '@/services/imageApi'
 
 type Scale = 2 | 4
 
@@ -36,7 +36,7 @@ export function UpscalePage() {
   }, [file])
   const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
   const runState = useToolRunState({
-    mode: 'auto',
+    mode: 'manual',
     hasInput: Boolean(file),
     hasResult: Boolean(result),
     pending,
@@ -44,11 +44,12 @@ export function UpscalePage() {
     texts: { input: fileInfo ?? undefined, result: resultInfo },
   })
 
-  const runUpscale = async (input: File, nextScale: Scale = scale) => {
+  const runUpscale = async () => {
+    if (!file) return
     setResult(null)
     setResultPanelOpen(false)
     try {
-      const res = await run((onProgress) => upscaleImage(input, { scale: nextScale }, onProgress))
+      const res = await run((onProgress) => upscaleImage(file, { scale }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -67,9 +68,7 @@ export function UpscalePage() {
               reset()
               setResult(null)
               setResultPanelOpen(false)
-              const nextFile = files[0]
-              setFile(nextFile)
-              void runUpscale(nextFile)
+              setFile(files[0])
             }}
           />
           <ToolErrorBanner error={error} errorMeta={errorMeta} onRetry={file ? () => retry() : undefined} />
@@ -80,8 +79,9 @@ export function UpscalePage() {
               filename={result ? result.filename : file.name}
               sizeText={result ? formatBytes(result.size) : formatBytes(file.size)}
               mediaKind="image"
-              mediaUrl={result ? result.download_url : inputPreviewUrl}
-              action={result ? <DownloadButton url={result.download_url} size="sm" className="w-auto" /> : undefined}
+              mediaUrl={result ? getResultDisplayUrl(result) : inputPreviewUrl}
+              action={result ? <GatedDownloadButton result={result} size="sm" className="w-auto" /> : undefined}
+              protectedPreview={result?.requires_credit}
             />
           ) : null}
 
@@ -92,10 +92,7 @@ export function UpscalePage() {
                 type="button"
                 variant={scale === 2 ? 'secondary' : 'outline'}
                 disabled={pending}
-                onClick={() => {
-                  setScale(2)
-                  if (file && scale !== 2 && !pending) void runUpscale(file, 2)
-                }}
+                onClick={() => setScale(2)}
               >
                 2x
               </Button>
@@ -103,10 +100,7 @@ export function UpscalePage() {
                 type="button"
                 variant={scale === 4 ? 'secondary' : 'outline'}
                 disabled={pending}
-                onClick={() => {
-                  setScale(4)
-                  if (file && scale !== 4 && !pending) void runUpscale(file, 4)
-                }}
+                onClick={() => setScale(4)}
               >
                 4x
               </Button>
@@ -115,7 +109,19 @@ export function UpscalePage() {
         </div>
       </ToolPageShell>
 
-      <ToolActionBar mode="auto" status={runState.statusText} pending={pending} progress={progress} error={error} done={runState.phase === 'done'} />
+      <ToolActionBar
+        mode="manual"
+        status={runState.statusText}
+        pending={pending}
+        progress={progress}
+        error={error}
+        done={runState.phase === 'done'}
+        toolName="image/upscale"
+        ctaLabel={t('upscale.startUpscale')}
+        ctaDisabled={!file || pending}
+        onCta={() => { void runUpscale() }}
+        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
+      />
 
       <ToolResultPanel open={Boolean(result && resultPanelOpen)} title={t('common:actions.downloadResult')} onClose={() => setResultPanelOpen(false)}>
         {result && file ? (
@@ -126,14 +132,15 @@ export function UpscalePage() {
               beforeUrl={inputPreviewUrl}
               afterFilename={result.filename}
               afterSizeText={formatBytes(result.size)}
-              afterUrl={result.download_url}
+              afterUrl={getResultDisplayUrl(result)}
+              protectedPreview={result?.requires_credit}
             />
             <div className="flex flex-wrap justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
                 {t('common:actions.back')}
               </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} shareType="upscale" className="w-auto" />
-              <DownloadButton url={result.download_url} className="w-auto" />
+              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="upscale" className="w-auto" />
+              <GatedDownloadButton result={result} className="w-auto" />
             </div>
           </div>
         ) : null}

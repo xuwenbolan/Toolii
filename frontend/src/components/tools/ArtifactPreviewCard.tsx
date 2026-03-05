@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { FileIcon, FileText, ImageIcon } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import { FileIcon, FileText, ImageIcon, Loader2 } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -16,6 +16,8 @@ type Props = {
   className?: string
   previewClassName?: string
   imageFit?: 'contain' | 'cover'
+  /** Prevent easy right-click save / drag on the preview image. */
+  protectedPreview?: boolean
 }
 
 function EmptyState({ mediaKind }: { mediaKind: MediaKind }) {
@@ -42,6 +44,29 @@ function EmptyState({ mediaKind }: { mediaKind: MediaKind }) {
   )
 }
 
+function LoadableImage({ src, alt, fitClassName, protect }: { src: string; alt: string; fitClassName: string; protect?: boolean }) {
+  const [loaded, setLoaded] = useState(false)
+
+  return (
+    <>
+      {!loaded ? <Loader2 className="absolute h-6 w-6 animate-spin text-muted-foreground" /> : null}
+      <img
+        src={src}
+        alt={alt}
+        draggable={protect ? false : undefined}
+        onContextMenu={protect ? (e) => e.preventDefault() : undefined}
+        className={cn(
+          'max-h-[70vh] w-full rounded-md bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)]',
+          fitClassName,
+          loaded ? 'motion-safe:animate-fade-in' : 'invisible',
+          protect && 'pointer-events-none select-none',
+        )}
+        onLoad={() => setLoaded(true)}
+      />
+    </>
+  )
+}
+
 export function ArtifactPreviewCard({
   label,
   filename,
@@ -52,9 +77,11 @@ export function ArtifactPreviewCard({
   className,
   previewClassName,
   imageFit = 'contain',
+  protectedPreview = false,
 }: Props) {
   const hasPreviewMedia = Boolean(mediaUrl)
   const previewHeightClass = mediaKind === 'image' ? 'min-h-[18rem] sm:min-h-[22rem]' : 'min-h-[11rem]'
+  const fitClassName = imageFit === 'cover' ? 'h-full object-cover' : 'h-auto object-contain'
 
   return (
     <Card className={cn('overflow-hidden border-border/70 shadow-sm', className)}>
@@ -71,15 +98,7 @@ export function ArtifactPreviewCard({
         <div className={cn('overflow-hidden rounded-lg border border-border/70 bg-muted/20', previewClassName)}>
           <div className={cn('relative flex items-center justify-center p-3', previewHeightClass)}>
             {hasPreviewMedia ? (
-              <img
-                src={mediaUrl ?? undefined}
-                alt={filename}
-                className={cn(
-                  'max-h-[70vh] w-full rounded-md bg-[radial-gradient(circle,_rgba(120,120,120,0.18)_1px,_transparent_1px)] [background-size:12px_12px]',
-                  imageFit === 'cover' ? 'h-full object-cover' : 'h-auto object-contain',
-                )}
-                loading="lazy"
-              />
+              <LoadableImage key={mediaUrl} src={mediaUrl!} alt={filename} fitClassName={fitClassName} protect={protectedPreview} />
             ) : (
               <EmptyState mediaKind={mediaKind} />
             )}

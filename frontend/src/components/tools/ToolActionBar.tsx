@@ -1,7 +1,9 @@
-import { Loader2 } from 'lucide-react'
+import { Coins, Eye, Loader2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useToolStore } from '@/stores/toolStore'
 
 type Props = {
   mode?: 'manual' | 'auto'
@@ -10,12 +12,15 @@ type Props = {
   progress?: number | null
   error?: string | null
   done?: boolean
+  /** Backend tool name (e.g. "image/compress") to show credit cost badge */
+  toolName?: string
   secondaryCtaLabel?: string
   secondaryCtaDisabled?: boolean
   onSecondaryCta?: () => void
   ctaLabel?: string
   ctaDisabled?: boolean
   onCta?: () => void
+  onViewResult?: () => void
   maxWidthClassName?: string
   className?: string
 }
@@ -27,16 +32,23 @@ export function ToolActionBar({
   progress = null,
   error = null,
   done = false,
+  toolName,
   secondaryCtaLabel,
   secondaryCtaDisabled = false,
   onSecondaryCta,
   ctaLabel,
   ctaDisabled = false,
   onCta,
+  onViewResult,
   maxWidthClassName = 'max-w-6xl',
   className,
 }: Props) {
+  const { t } = useTranslation('common')
+  const { getToolCost } = useToolStore()
+  const creditCost = toolName ? getToolCost(toolName) : 0
   const clampedProgress = progress == null ? null : Math.max(0, Math.min(100, Math.round(progress)))
+  const showViewResult = done && !pending && !error && onViewResult
+  const showCost = creditCost > 0 && !pending && !done && !error
 
   return (
     <div className={cn('fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4 motion-safe:animate-fade-in', className)} style={{ bottom: 'var(--sai-bottom)' }}>
@@ -57,22 +69,36 @@ export function ToolActionBar({
                   </svg>
                 ) : null}
                 <p className={cn('truncate text-sm', error ? 'text-destructive' : 'text-muted-foreground')}>{status}</p>
+                {showCost ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                    <Coins className="h-3 w-3" />
+                    {t('actions.creditCost', { count: creditCost })}
+                  </span>
+                ) : null}
               </div>
             </div>
-            {mode === 'manual' ? (
-              <div className="flex shrink-0 items-center gap-2">
-                {onSecondaryCta && secondaryCtaLabel ? (
-                  <Button type="button" size="sm" variant="outline" onClick={onSecondaryCta} disabled={pending || secondaryCtaDisabled}>
-                    {secondaryCtaLabel}
-                  </Button>
-                ) : null}
-                {onCta && ctaLabel ? (
-                  <Button type="button" size="sm" onClick={onCta} disabled={pending || ctaDisabled}>
-                    {ctaLabel}
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="flex shrink-0 items-center gap-2">
+              {showViewResult ? (
+                <Button type="button" size="sm" variant="outline" onClick={onViewResult}>
+                  <Eye className="mr-1.5 h-4 w-4" />
+                  {t('actions.viewResult')}
+                </Button>
+              ) : null}
+              {mode === 'manual' ? (
+                <>
+                  {onSecondaryCta && secondaryCtaLabel ? (
+                    <Button type="button" size="sm" variant="outline" onClick={onSecondaryCta} disabled={pending || secondaryCtaDisabled}>
+                      {secondaryCtaLabel}
+                    </Button>
+                  ) : null}
+                  {onCta && ctaLabel ? (
+                    <Button type="button" size="sm" onClick={onCta} disabled={pending || ctaDisabled}>
+                      {ctaLabel}
+                    </Button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
           </div>
           {pending && clampedProgress != null ? (
             <div
