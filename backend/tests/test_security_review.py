@@ -56,6 +56,7 @@ async def test_rate_limiting_for_anonymous_requests(async_client, monkeypatch: p
         quality: int | None = None,
         target_kb: int | None = None,
         output_format: str | None = None,
+        credit_cost: int = 0,
     ) -> ImageFileResult:
         return ImageFileResult(
             file_id="fake",

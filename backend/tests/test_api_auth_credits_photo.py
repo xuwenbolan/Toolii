@@ -13,7 +13,7 @@ from app.utils.hash_utils import sha256_hex
 @pytest.mark.asyncio
 async def test_api_auth_register_login_refresh_me(async_client) -> None:
     email = f"api-auth-{int(time.time() * 1000)}@example.com"
-    password = "password123"
+    password = "Password123"
 
     register_res = await async_client.post("/api/auth/register", json={"email": email, "password": password})
     assert register_res.status_code == 200

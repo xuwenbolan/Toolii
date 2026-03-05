@@ -84,6 +84,11 @@ async def unlock(
             status_code=400,
         )
 
+    # Verify ownership: only the user who created the file can unlock it
+    owner_id = meta.get("owner_user_id")
+    if owner_id is not None and owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Not the file owner")
+
     # Determine the target file to serve
     target_file_id = clean_file_id or file_id
 

@@ -37,8 +37,12 @@ def _generate_token() -> str:
     return "".join(secrets.choice(_TOKEN_CHARS) for _ in range(_TOKEN_LENGTH))
 
 
+_CODE_CHARS = string.digits + string.ascii_lowercase
+_CODE_LENGTH = 6
+
+
 def _generate_extract_code() -> str:
-    return "".join(secrets.choice(string.digits) for _ in range(4))
+    return "".join(secrets.choice(_CODE_CHARS) for _ in range(_CODE_LENGTH))
 
 
 @dataclass(slots=True)

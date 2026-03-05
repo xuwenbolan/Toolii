@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
+from app.schemas.validators import StrongPassword
+
 
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -18,7 +20,7 @@ class UserPublic(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(max_length=128)
-    new_password: str = Field(min_length=8, max_length=128)
+    new_password: StrongPassword
 
 
 class UpdateProfileRequest(BaseModel):

@@ -83,3 +83,22 @@ def validate_pdf_bytes(data: bytes) -> None:
     """Raise AppError if *data* does not start with a PDF signature."""
     if len(data) < 5 or data[:5] != b"%PDF-":
         raise AppError(code="INVALID_FILE_TYPE", message="Not a valid PDF file", status_code=400)
+
+
+def check_pdf_page_count(data: bytes, *, max_pages: int | None = None) -> int:
+    """Return page count and raise AppError if it exceeds *max_pages*."""
+    from PyPDF2 import PdfReader
+
+    if max_pages is None:
+        from app.core.config import settings
+        max_pages = settings.max_pdf_pages
+
+    reader = PdfReader(io.BytesIO(data))
+    count = len(reader.pages)
+    if count > max_pages:
+        raise AppError(
+            code="PDF_TOO_MANY_PAGES",
+            message=f"PDF has {count} pages, exceeding the limit of {max_pages}",
+            status_code=400,
+        )
+    return count

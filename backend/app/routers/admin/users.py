@@ -6,6 +6,7 @@ from slowapi.util import get_remote_address
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
 from app.core.exceptions import AppError
+from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.schemas.admin import (
     AdminUserDetailResponse,
@@ -46,6 +47,7 @@ async def get_user_detail(
 
 
 @router.put("/{user_id}/status", response_model=Message)
+@limiter.limit(admin_write_rate_limit)
 async def update_user_status(
     request: Request,
     payload: UpdateUserStatusRequest,
@@ -68,6 +70,7 @@ async def update_user_status(
 
 
 @router.post("/{user_id}/credits", response_model=AdjustCreditsResponse)
+@limiter.limit(admin_write_rate_limit)
 async def adjust_credits(
     request: Request,
     payload: AdjustCreditsRequest,

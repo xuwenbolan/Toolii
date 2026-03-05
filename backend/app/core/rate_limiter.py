@@ -89,6 +89,11 @@ def dynamic_rate_limit_heavy(key: str) -> str:
     return settings.rate_limit_heavy_anon
 
 
+def admin_write_rate_limit(_key: str) -> str:
+    """Fixed rate limit for admin write operations."""
+    return settings.rate_limit_admin_write
+
+
 def register_rate_limiter(app: FastAPI) -> None:
     app.add_middleware(SlowAPIMiddleware)
 

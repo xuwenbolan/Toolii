@@ -204,6 +204,7 @@ class AuthService:
         return user
 
     async def refresh(self, *, refresh_token: str) -> User:
+        """Validate refresh token, rotate it (blacklist old JTI), return user."""
         from app.core.token_blacklist import token_blacklist
 
         token = decode_jwt_token(refresh_token)
@@ -229,6 +230,17 @@ class AuthService:
         if user.tokens_revoked_at is not None:
             if token.iat < int(user.tokens_revoked_at.timestamp()):
                 raise UnauthorizedError("Token has been revoked")
+
+        # Rotate: blacklist the old refresh token so it cannot be reused
+        if jti:
+            expires_at = datetime.fromtimestamp(token.exp, tz=timezone.utc)
+            await token_blacklist.revoke(
+                self._db,
+                jti=jti,
+                user_id=user.id,
+                token_type="refresh",
+                expires_at=expires_at,
+            )
 
         return user
 

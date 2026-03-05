@@ -5,11 +5,12 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.user import UserPublic
+from app.schemas.validators import StrongPassword
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: StrongPassword
     name: str | None = Field(default=None, max_length=100)
 
 
@@ -44,4 +45,4 @@ class ForgotPasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     token: str = Field(max_length=4096)
-    password: str = Field(min_length=8, max_length=128)
+    password: StrongPassword

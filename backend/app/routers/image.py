@@ -28,6 +28,10 @@ def _credit_cost(request: Request) -> int:
     return getattr(request.state, "tool_credit_cost", 0)
 
 
+def _owner_user_id(request: Request) -> int | None:
+    return getattr(request.state, "tool_user_id", None)
+
+
 # ── Shared dependency: read + validate + acquire task slot ────────────
 
 
@@ -66,7 +70,7 @@ async def compress(
     target_kb: int | None = Form(None),
     output_format: str | None = Form(None),
 ) -> FileResult:
-    return await ImageService().compress(
+    return await ImageService(owner_user_id=_owner_user_id(request)).compress(
         image_bytes=img.data, filename=img.filename,
         quality=quality, target_kb=target_kb, output_format=output_format,
         credit_cost=_credit_cost(request),
@@ -81,7 +85,7 @@ async def convert(
     output_format: str = Form(...),
     quality: int | None = Form(None),
 ) -> FileResult:
-    return await ImageService().convert(
+    return await ImageService(owner_user_id=_owner_user_id(request)).convert(
         image_bytes=img.data, filename=img.filename,
         output_format=output_format, quality=quality,
         credit_cost=_credit_cost(request),
@@ -102,7 +106,7 @@ async def mosaic(
             parsed = json.loads(regions)
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail="Invalid regions JSON") from exc
-    return await ImageService().mosaic(
+    return await ImageService(owner_user_id=_owner_user_id(request)).mosaic(
         image_bytes=img.data, filename=img.filename,
         regions=parsed, pixel_size=pixel_size,
         credit_cost=_credit_cost(request),
@@ -116,7 +120,7 @@ async def scan_enhance(
     img: ImageInput = Depends(validated_image),
     mode: str = Form("bw"),
 ) -> FileResult:
-    return await ImageService().scan_enhance(
+    return await ImageService(owner_user_id=_owner_user_id(request)).scan_enhance(
         image_bytes=img.data, filename=img.filename, mode=mode,
         credit_cost=_credit_cost(request),
     )
@@ -138,7 +142,7 @@ async def remove_bg(
         params["model"] = model
     if output_type is not None:
         params["output_type"] = output_type
-    return await ImageService().remove_bg(
+    return await ImageService(owner_user_id=_owner_user_id(request)).remove_bg(
         image_bytes=img.data, filename=img.filename,
         credit_cost=_credit_cost(request), **params,
     )
@@ -155,7 +159,7 @@ async def upscale(
     params: dict[str, Any] = {}
     if model is not None:
         params["model"] = model
-    return await ImageService().upscale(
+    return await ImageService(owner_user_id=_owner_user_id(request)).upscale(
         image_bytes=img.data, filename=img.filename, scale=scale,
         credit_cost=_credit_cost(request), **params,
     )
@@ -168,7 +172,7 @@ async def restore_face(
     img: ImageInput = Depends(validated_image),
     weight: float = Form(0.5),
 ) -> FileResult:
-    return await ImageService().restore_face(
+    return await ImageService(owner_user_id=_owner_user_id(request)).restore_face(
         image_bytes=img.data, filename=img.filename, weight=weight,
         credit_cost=_credit_cost(request),
     )
@@ -182,7 +186,7 @@ async def denoise(
     strength: float = Form(1.0),
     task: str = Form("denoise"),
 ) -> FileResult:
-    return await ImageService().denoise(
+    return await ImageService(owner_user_id=_owner_user_id(request)).denoise(
         image_bytes=img.data, filename=img.filename,
         strength=strength, task=task,
         credit_cost=_credit_cost(request),
@@ -199,7 +203,7 @@ async def colorize(
     params: dict[str, Any] = {}
     if model is not None:
         params["model"] = model
-    return await ImageService().colorize(
+    return await ImageService(owner_user_id=_owner_user_id(request)).colorize(
         image_bytes=img.data, filename=img.filename,
         credit_cost=_credit_cost(request), **params,
     )
@@ -227,7 +231,7 @@ async def inpaint(
         params: dict[str, Any] = {}
         if model is not None:
             params["model"] = model
-        return await ImageService().inpaint(
+        return await ImageService(owner_user_id=_owner_user_id(request)).inpaint(
             image_bytes=data, mask_bytes=mask_data,
             filename=file.filename or "image",
             credit_cost=_credit_cost(request), **params,
@@ -243,7 +247,7 @@ async def ocr(
     img: ImageInput = Depends(validated_image),
     lang: str = Form("ch_en"),
 ) -> OcrResult:
-    return await ImageService().ocr(image_bytes=img.data, lang=lang)
+    return await ImageService(owner_user_id=_owner_user_id(request)).ocr(image_bytes=img.data, lang=lang)
 
 
 @router.post("/segment", response_model=SegmentResult)
@@ -267,7 +271,7 @@ async def segment(
             parsed_boxes = json.loads(boxes)
         except json.JSONDecodeError as exc:
             raise HTTPException(status_code=400, detail="Invalid boxes JSON") from exc
-    return await ImageService().segment(
+    return await ImageService(owner_user_id=_owner_user_id(request)).segment(
         image_bytes=img.data, points=parsed_points, boxes=parsed_boxes,
         multimask=multimask,
     )

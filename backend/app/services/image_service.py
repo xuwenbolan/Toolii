@@ -44,8 +44,9 @@ def _ext_for_mime(content_type: str) -> str:
 
 
 class ImageService:
-    def __init__(self) -> None:
+    def __init__(self, *, owner_user_id: int | None = None) -> None:
         self._files = FileService()
+        self._owner_user_id = owner_user_id
 
     def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
         if credit_cost > 0:
@@ -73,7 +74,11 @@ class ImageService:
             data=wm_data,
             filename=filename,
             content_type=stored.content_type,
-            extra_meta={"clean_file_id": stored.file_id, "credit_cost": credit_cost},
+            extra_meta={
+                "clean_file_id": stored.file_id,
+                "credit_cost": credit_cost,
+                **({"owner_user_id": self._owner_user_id} if self._owner_user_id is not None else {}),
+            },
         )
         return FileResult(
             file_id=wm_stored.file_id,

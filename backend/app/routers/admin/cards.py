@@ -5,6 +5,7 @@ from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
+from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.schemas.admin import (
     AdminCardListResponse,
@@ -34,6 +35,7 @@ async def list_cards(
 
 
 @router.post("/generate", response_model=CardGenerateResponse)
+@limiter.limit(admin_write_rate_limit)
 async def generate_cards(
     request: Request,
     payload: CardGenerateRequest,
@@ -62,6 +64,7 @@ async def generate_cards(
 
 
 @router.put("/{card_id}/disable", response_model=Message)
+@limiter.limit(admin_write_rate_limit)
 async def disable_card(
     request: Request,
     card_id: int = Path(),

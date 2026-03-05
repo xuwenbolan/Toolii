@@ -8,6 +8,7 @@ from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user
+from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.services import cortex_client
 
@@ -55,6 +56,7 @@ async def cortex_model_check(
 
 
 @router.post("/cortex/unload-all")
+@limiter.limit(admin_write_rate_limit)
 async def cortex_unload_all(
     request: Request,
     admin: User = Depends(get_admin_user),

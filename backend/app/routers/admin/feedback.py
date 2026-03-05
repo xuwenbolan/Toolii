@@ -5,6 +5,7 @@ from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
+from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.schemas.feedback import (
     AdminFeedbackItem,
@@ -34,6 +35,7 @@ async def list_feedback(
 
 
 @router.put("/{feedback_id}", response_model=FeedbackItem)
+@limiter.limit(admin_write_rate_limit)
 async def update_feedback(
     request: Request,
     feedback_id: int,

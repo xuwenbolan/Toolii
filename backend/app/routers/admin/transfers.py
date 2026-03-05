@@ -5,6 +5,7 @@ from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
+from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.schemas.admin import (
     AdminFileTransferListResponse,
@@ -30,6 +31,7 @@ async def list_file_transfers(
 
 
 @router.put("/file-transfers/{transfer_id}/expire")
+@limiter.limit(admin_write_rate_limit)
 async def force_expire_transfer(
     request: Request,
     transfer_id: int,
@@ -49,6 +51,7 @@ async def force_expire_transfer(
 
 
 @router.delete("/file-transfers/{transfer_id}")
+@limiter.limit(admin_write_rate_limit)
 async def delete_transfer(
     request: Request,
     transfer_id: int,
@@ -83,6 +86,7 @@ async def list_result_shares(
 
 
 @router.delete("/result-shares/{share_id}")
+@limiter.limit(admin_write_rate_limit)
 async def delete_result_share(
     request: Request,
     share_id: int,

@@ -6,7 +6,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi import Depends
 
 from app.core.config import settings
-from app.core.file_validation import validate_image_bytes, validate_pdf_bytes
+from app.core.file_validation import check_pdf_page_count, validate_image_bytes, validate_pdf_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.task_limiter import acquire_task_slot
 from app.core.tool_recording import ToolRecordingRoute
@@ -19,6 +19,10 @@ router = APIRouter(prefix=f"{settings.api_prefix}/pdf", tags=["pdf"], route_clas
 def _credit_cost(request: Request) -> int:
     """Read tool credit_cost injected by ToolGatewayRoute."""
     return getattr(request.state, "tool_credit_cost", 0)
+
+
+def _owner_user_id(request: Request) -> int | None:
+    return getattr(request.state, "tool_user_id", None)
 
 
 def _max_pdf_bytes() -> int:
@@ -34,6 +38,7 @@ async def validate_pdf_upload(file: UploadFile = File(...)) -> tuple[UploadFile,
     if len(data) > _max_pdf_bytes():
         raise HTTPException(status_code=413, detail="File too large")
     validate_pdf_bytes(data)
+    check_pdf_page_count(data)
     return file, data
 
 
@@ -59,7 +64,7 @@ async def compress(
     sem = await acquire_task_slot(request)
     try:
         file, data = validated
-        return await PdfService().compress(
+        return await PdfService(owner_user_id=_owner_user_id(request)).compress(
             pdf_bytes=data,
             filename=file.filename or "document.pdf",
             target_kb=target_kb,
@@ -90,11 +95,12 @@ async def merge(
             if len(data) > _max_pdf_bytes():
                 raise HTTPException(status_code=413, detail="File too large")
             validate_pdf_bytes(data)
+            check_pdf_page_count(data)
             total += len(data)
             if total > max_total:
                 raise HTTPException(status_code=413, detail="Batch too large")
             payload.append((file.filename or "document.pdf", data))
-        return await PdfService().merge(pdf_files=payload, credit_cost=_credit_cost(request))
+        return await PdfService(owner_user_id=_owner_user_id(request)).merge(pdf_files=payload, credit_cost=_credit_cost(request))
     finally:
         sem.release()
 
@@ -114,7 +120,7 @@ async def pages(
         file, data = validated
         parsed_pages = _parse_int_list(pages, "pages")
         parsed_order = _parse_int_list(order, "order")
-        return await PdfService().pages(
+        return await PdfService(owner_user_id=_owner_user_id(request)).pages(
             pdf_bytes=data,
             filename=file.filename or "document.pdf",
             operation=operation,
@@ -137,7 +143,7 @@ async def split(
     sem = await acquire_task_slot(request)
     try:
         file, data = validated
-        return await PdfService().split(
+        return await PdfService(owner_user_id=_owner_user_id(request)).split(
             pdf_bytes=data,
             filename=file.filename or "document.pdf",
             ranges=ranges,
@@ -174,6 +180,6 @@ async def from_images(
                 raise HTTPException(status_code=413, detail="Batch too large")
             payload.append((file.filename or "image", data))
 
-        return await PdfService().from_images(image_files=payload, dpi=dpi, credit_cost=_credit_cost(request))
+        return await PdfService(owner_user_id=_owner_user_id(request)).from_images(image_files=payload, dpi=dpi, credit_cost=_credit_cost(request))
     finally:
         sem.release()

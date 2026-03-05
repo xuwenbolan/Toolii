@@ -37,6 +37,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     """Reject requests whose Content-Length exceeds *max_bytes*."""
 
+    # Keep in sync with nginx client_max_body_size (docker/nginx.conf)
     def __init__(self, app: object, max_bytes: int = 550 * 1024 * 1024) -> None:
         super().__init__(app)  # type: ignore[arg-type]
         self._max_bytes = max_bytes

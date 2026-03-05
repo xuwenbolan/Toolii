@@ -16,8 +16,9 @@ from app.services.file_service import FileService, StoredFile
 
 
 class PdfService:
-    def __init__(self) -> None:
+    def __init__(self, *, owner_user_id: int | None = None) -> None:
         self._files = FileService()
+        self._owner_user_id = owner_user_id
 
     def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
         if credit_cost > 0:
@@ -44,6 +45,8 @@ class PdfService:
         if meta_path.exists():
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             meta["credit_cost"] = credit_cost
+            if self._owner_user_id is not None:
+                meta["owner_user_id"] = self._owner_user_id
             meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
         return FileResult(

@@ -46,11 +46,13 @@ class Settings(BaseSettings):
     rate_limit_auth: str = Field(default="20/minute", alias="RATE_LIMIT_AUTH")
     rate_limit_heavy_anon: str = Field(default="5/minute", alias="RATE_LIMIT_HEAVY_ANON")
     rate_limit_heavy_auth: str = Field(default="12/minute", alias="RATE_LIMIT_HEAVY_AUTH")
+    rate_limit_admin_write: str = Field(default="10/minute", alias="RATE_LIMIT_ADMIN_WRITE")
 
     max_concurrent_tasks_per_key: int = Field(default=3, alias="MAX_CONCURRENT_TASKS_PER_KEY")
 
     max_upload_image_mb: int = Field(default=20, alias="MAX_UPLOAD_IMAGE_MB")
     max_upload_pdf_mb: int = Field(default=50, alias="MAX_UPLOAD_PDF_MB")
+    max_pdf_pages: int = Field(default=500, alias="MAX_PDF_PAGES")
     max_batch_files: int = Field(default=20, alias="MAX_BATCH_FILES")
     max_batch_total_mb: int = Field(default=100, alias="MAX_BATCH_TOTAL_MB")
 
