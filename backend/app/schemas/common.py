@@ -13,5 +13,8 @@ class FileResult(BaseModel):
     size: int
     content_type: str
     download_url: str
+    preview_url: str | None = None
+    requires_credit: bool = False
+    credit_cost: int = 0
     expires_in: int
 

@@ -24,11 +24,22 @@ _MAX_SHARE_IMAGE_PX = 1600
 _JPEG_QUALITY = 90
 
 
-def _compress_image(image_bytes: bytes) -> bytes:
-    """Compress image to JPEG, resized to max 1600px longest side."""
+def _compress_image(image_bytes: bytes, *, preserve_alpha: bool = False) -> tuple[bytes, str]:
+    """Compress image, resized to max 1600px longest side.
+
+    Returns (compressed_bytes, content_type).
+    When preserve_alpha is True and the image has an alpha channel,
+    output is PNG; otherwise JPEG.
+    """
     img = Image.open(io.BytesIO(image_bytes))
     img = ImageOps.exif_transpose(img)
-    img = img.convert("RGB")
+
+    has_alpha = preserve_alpha and img.mode in ("RGBA", "LA", "PA")
+
+    if has_alpha:
+        img = img.convert("RGBA")
+    else:
+        img = img.convert("RGB")
 
     w, h = img.size
     if max(w, h) > _MAX_SHARE_IMAGE_PX:
@@ -36,8 +47,12 @@ def _compress_image(image_bytes: bytes) -> bytes:
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
 
     buf = io.BytesIO()
+    if has_alpha:
+        img.save(buf, format="PNG", optimize=True)
+        return buf.getvalue(), "image/png"
+
     img.save(buf, format="JPEG", quality=_JPEG_QUALITY, optimize=True)
-    return buf.getvalue()
+    return buf.getvalue(), "image/jpeg"
 
 
 _COMPOSITE_FACE_SIZE = 400
@@ -70,9 +85,16 @@ class ResultShareService:
         self._files = FileService(storage_dir=settings.result_share_storage_dir)
 
     @staticmethod
-    def _compute_hash(share_type: str, result_json: str) -> str:
-        data = f"{share_type}:{result_json}"
-        return hashlib.sha256(data.encode()).hexdigest()
+    def _compute_hash(
+        share_type: str,
+        result_json: str,
+        image_bytes: bytes | None = None,
+    ) -> str:
+        h = hashlib.sha256()
+        h.update(f"{share_type}:{result_json}".encode())
+        if image_bytes:
+            h.update(image_bytes)
+        return h.hexdigest()
 
     async def _find_by_hash(self, content_hash: str) -> ResultShare | None:
         """Return an existing non-expired share with the same content hash."""
@@ -80,9 +102,9 @@ class ResultShareService:
             select(ResultShare).where(
                 ResultShare.content_hash == content_hash,
                 ResultShare.expires_at > utcnow(),
-            )
+            ).limit(1)
         )
-        return result.scalar_one_or_none()
+        return result.scalars().first()
 
     async def _generate_unique_token(self) -> str:
         for _ in range(8):
@@ -98,15 +120,20 @@ class ResultShareService:
             status_code=500,
         )
 
-    def _save_image(self, image_bytes: bytes) -> str:
-        """Compress and save image, return file_id."""
-        compressed = _compress_image(image_bytes)
+    def _save_image(
+        self, image_bytes: bytes, *, preserve_alpha: bool = False,
+    ) -> tuple[str, str]:
+        """Compress and save image. Returns (file_id, content_type)."""
+        compressed, content_type = _compress_image(
+            image_bytes, preserve_alpha=preserve_alpha,
+        )
+        ext = "png" if content_type == "image/png" else "jpg"
         stored = self._files.save_bytes(
             data=compressed,
-            filename="share.jpg",
-            content_type="image/jpeg",
+            filename=f"share.{ext}",
+            content_type=content_type,
         )
-        return stored.file_id
+        return stored.file_id, content_type
 
     async def create_share(
         self,
@@ -124,15 +151,17 @@ class ResultShareService:
         For image tools: image_bytes is the result image, original_image_bytes
         is the "before" image for before/after comparison.
         """
-        content_hash = self._compute_hash(share_type, result_json)
+        content_hash = self._compute_hash(share_type, result_json, image_bytes)
         existing = await self._find_by_hash(content_hash)
         if existing:
             return existing
 
-        image_file_id = self._save_image(image_bytes)
+        # Result image may have alpha (e.g. remove_bg)
+        image_file_id, _ = self._save_image(image_bytes, preserve_alpha=True)
         original_image_file_id = None
         if original_image_bytes:
-            original_image_file_id = self._save_image(original_image_bytes)
+            # Original "before" image is always opaque
+            original_image_file_id, _ = self._save_image(original_image_bytes)
 
         token = await self._generate_unique_token()
         now = utcnow()
@@ -173,7 +202,9 @@ class ResultShareService:
         user_id: int | None = None,
     ) -> ResultShare:
         """Create a share for face similarity with a side-by-side composite."""
-        content_hash = self._compute_hash("similarity", result_json)
+        content_hash = self._compute_hash(
+            "similarity", result_json, image1_bytes + image2_bytes,
+        )
         existing = await self._find_by_hash(content_hash)
         if existing:
             return existing
@@ -227,9 +258,10 @@ class ResultShareService:
             raise AppError(code="SHARE_EXPIRED", message="Share has expired", status_code=410)
         return share
 
-    def get_image_path(self, *, file_id: str) -> Path:
+    def get_image(self, *, file_id: str) -> tuple[Path, str]:
+        """Return (path, content_type) for a stored share image."""
         stored = self._files.get(file_id)
-        return stored.path
+        return stored.path, stored.content_type
 
     async def expire_shares(self, *, limit: int = 500) -> int:
         """Delete expired shares and their image files."""

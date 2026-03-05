@@ -64,6 +64,7 @@ class FileService:
         data: bytes,
         filename: str,
         content_type: str,
+        extra_meta: dict[str, Any] | None = None,
     ) -> StoredFile:
         file_id = uuid.uuid4().hex
         path = self._file_path(file_id)
@@ -78,6 +79,8 @@ class FileService:
             "original_filename": _safe_filename(filename),
             "created_at": created_at,
         }
+        if extra_meta:
+            meta.update(extra_meta)
         self._meta_path(file_id).write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
         return StoredFile(
@@ -115,6 +118,13 @@ class FileService:
             original_filename=original_filename,
             created_at=created_at,
         )
+
+    def get_meta(self, file_id: str) -> dict[str, Any]:
+        """Return the metadata dict for a stored file."""
+        meta_path = self._meta_path(file_id)
+        if not meta_path.exists():
+            raise FileNotFoundError(file_id)
+        return json.loads(meta_path.read_text(encoding="utf-8"))
 
     def delete(self, file_id: str) -> None:
         """Delete a stored file and its metadata."""

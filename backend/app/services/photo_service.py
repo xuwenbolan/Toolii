@@ -12,7 +12,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -87,31 +87,8 @@ def _load_standards() -> list[dict[str, Any]]:
 
 
 def _watermark_preview(photo_png_bytes: bytes, *, text: str = "TOOLII PREVIEW") -> bytes:
-    image = Image.open(io.BytesIO(photo_png_bytes)).convert("RGBA")
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    font = ImageFont.load_default()
-
-    step_x = max(80, image.width // 3)
-    step_y = max(70, image.height // 4)
-    for y in range(-20, image.height + step_y, step_y):
-        for x in range(-40, image.width + step_x, step_x):
-            draw.text((x, y), text, fill=(255, 255, 255, 72), font=font)
-
-    # Add a stronger center label for clarity.
-    center_text = "Preview"
-    bbox = draw.textbbox((0, 0), center_text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    cx = (image.width - tw) // 2
-    cy = (image.height - th) // 2
-    draw.rectangle((cx - 8, cy - 5, cx + tw + 8, cy + th + 5), fill=(0, 0, 0, 72))
-    draw.text((cx, cy), center_text, fill=(255, 255, 255, 220), font=font)
-
-    out = Image.alpha_composite(image, overlay)
-    buf = io.BytesIO()
-    out.save(buf, format="PNG", optimize=True)
-    return buf.getvalue()
+    from app.processing.watermark import apply_watermark
+    return apply_watermark(photo_png_bytes, "image/png", text=text)
 
 
 class PhotoService:

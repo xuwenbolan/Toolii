@@ -12,6 +12,7 @@ from app.processing.image_compress import compress_image
 from app.processing.image_convert import convert_image
 from app.processing.image_mosaic import MosaicRegion, mosaic_image
 from app.processing.scan_enhance import enhance_scan
+from app.processing.watermark import apply_watermark
 from app.schemas.image import FileResult, OcrResult, SegmentResult
 from app.services.file_service import FileService, StoredFile
 
@@ -46,13 +47,43 @@ class ImageService:
     def __init__(self) -> None:
         self._files = FileService()
 
-    def _to_result(self, stored: StoredFile, *, filename: str) -> FileResult:
+    def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
+        if credit_cost > 0:
+            return self._to_gated_result(stored, filename=filename, credit_cost=credit_cost)
         return FileResult(
             file_id=stored.file_id,
             filename=filename,
             size=stored.size,
             content_type=stored.content_type,
             download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
+            expires_in=settings.file_retention_hours * 3600,
+        )
+
+    def _to_gated_result(self, stored: StoredFile, *, filename: str, credit_cost: int) -> FileResult:
+        """Save a watermarked preview and return a gated FileResult.
+
+        The clean original is stored but its download URL is NOT exposed.
+        The ``file_id`` in the returned result refers to the *watermarked*
+        preview; the clean original's ID is recorded in the preview's
+        metadata under ``clean_file_id``.
+        """
+        clean_data = stored.path.read_bytes()
+        wm_data = apply_watermark(clean_data, stored.content_type)
+        wm_stored = self._files.save_bytes(
+            data=wm_data,
+            filename=filename,
+            content_type=stored.content_type,
+            extra_meta={"clean_file_id": stored.file_id, "credit_cost": credit_cost},
+        )
+        return FileResult(
+            file_id=wm_stored.file_id,
+            filename=filename,
+            size=stored.size,
+            content_type=stored.content_type,
+            download_url="",
+            preview_url=self._files.build_download_url(file_id=wm_stored.file_id, filename=filename),
+            requires_credit=True,
+            credit_cost=credit_cost,
             expires_in=settings.file_retention_hours * 3600,
         )
 
@@ -66,6 +97,7 @@ class ImageService:
         quality: int | None,
         target_kb: int | None,
         output_format: str | None,
+        credit_cost: int = 0,
     ) -> FileResult:
         if output_format is not None and output_format.lower() not in {"jpeg", "jpg", "png", "webp"}:
             raise AppError(
@@ -97,7 +129,7 @@ class ImageService:
 
         out_name = f"{_safe_stem(filename)}-compressed{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def convert(
         self,
@@ -106,6 +138,7 @@ class ImageService:
         filename: str,
         output_format: str,
         quality: int | None,
+        credit_cost: int = 0,
     ) -> FileResult:
         if output_format.lower() not in {"jpeg", "jpg", "png", "webp"}:
             raise AppError(
@@ -127,7 +160,7 @@ class ImageService:
 
         out_name = f"{_safe_stem(filename)}{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def mosaic(
         self,
@@ -136,6 +169,7 @@ class ImageService:
         filename: str,
         regions: Iterable[MosaicRegion] | None,
         pixel_size: int,
+        credit_cost: int = 0,
     ) -> FileResult:
         loop = asyncio.get_running_loop()
         try:
@@ -148,7 +182,7 @@ class ImageService:
 
         out_name = f"{_safe_stem(filename)}-mosaic{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def scan_enhance(
         self,
@@ -156,6 +190,7 @@ class ImageService:
         image_bytes: bytes,
         filename: str,
         mode: str,
+        credit_cost: int = 0,
     ) -> FileResult:
         if mode not in {"bw", "color"}:
             raise AppError(code="INVALID_MODE", message="mode only supports bw/color", status_code=400)
@@ -168,7 +203,7 @@ class ImageService:
 
         out_name = f"{_safe_stem(filename)}-scan{_ext_for_mime(mime)}"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     # ── GPU operations (via Cortex) ───────────────────────────────────
 
@@ -178,6 +213,7 @@ class ImageService:
         *,
         image_bytes: bytes,
         filename: str,
+        credit_cost: int = 0,
         **params: Any,
     ) -> FileResult:
         """Generic GPU processing via Cortex.  Extra params forwarded transparently."""
@@ -205,30 +241,30 @@ class ImageService:
         out_bytes = base64.b64decode(data["image_b64"])
         out_name = f"{_safe_stem(filename)}{suffix}"
         stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
-    async def remove_bg(self, *, image_bytes: bytes, filename: str, **params: Any) -> FileResult:
-        return await self._gpu_process("remove_bg", image_bytes=image_bytes, filename=filename, **params)
+    async def remove_bg(self, *, image_bytes: bytes, filename: str, credit_cost: int = 0, **params: Any) -> FileResult:
+        return await self._gpu_process("remove_bg", image_bytes=image_bytes, filename=filename, credit_cost=credit_cost, **params)
 
-    async def upscale(self, *, image_bytes: bytes, filename: str, scale: int = 4, **params: Any) -> FileResult:
+    async def upscale(self, *, image_bytes: bytes, filename: str, scale: int = 4, credit_cost: int = 0, **params: Any) -> FileResult:
         if scale not in (2, 4):
             raise AppError(code="INVALID_SCALE", message="scale must be 2 or 4", status_code=400)
-        return await self._gpu_process("upscale", image_bytes=image_bytes, filename=filename, scale=scale, **params)
+        return await self._gpu_process("upscale", image_bytes=image_bytes, filename=filename, scale=scale, credit_cost=credit_cost, **params)
 
-    async def restore_face(self, *, image_bytes: bytes, filename: str, weight: float = 0.5, **params: Any) -> FileResult:
+    async def restore_face(self, *, image_bytes: bytes, filename: str, weight: float = 0.5, credit_cost: int = 0, **params: Any) -> FileResult:
         if not (0.0 <= weight <= 1.0):
             raise AppError(code="INVALID_WEIGHT", message="weight must be between 0 and 1", status_code=400)
-        return await self._gpu_process("restore_face", image_bytes=image_bytes, filename=filename, weight=weight, **params)
+        return await self._gpu_process("restore_face", image_bytes=image_bytes, filename=filename, weight=weight, credit_cost=credit_cost, **params)
 
-    async def denoise(self, *, image_bytes: bytes, filename: str, strength: float = 1.0, **params: Any) -> FileResult:
+    async def denoise(self, *, image_bytes: bytes, filename: str, strength: float = 1.0, credit_cost: int = 0, **params: Any) -> FileResult:
         if not (0.0 <= strength <= 1.0):
             raise AppError(code="INVALID_STRENGTH", message="strength must be between 0 and 1", status_code=400)
-        return await self._gpu_process("denoise", image_bytes=image_bytes, filename=filename, strength=strength, **params)
+        return await self._gpu_process("denoise", image_bytes=image_bytes, filename=filename, strength=strength, credit_cost=credit_cost, **params)
 
-    async def colorize(self, *, image_bytes: bytes, filename: str, **params: Any) -> FileResult:
-        return await self._gpu_process("colorize", image_bytes=image_bytes, filename=filename, **params)
+    async def colorize(self, *, image_bytes: bytes, filename: str, credit_cost: int = 0, **params: Any) -> FileResult:
+        return await self._gpu_process("colorize", image_bytes=image_bytes, filename=filename, credit_cost=credit_cost, **params)
 
-    async def inpaint(self, *, image_bytes: bytes, mask_bytes: bytes, filename: str, **params: Any) -> FileResult:
+    async def inpaint(self, *, image_bytes: bytes, mask_bytes: bytes, filename: str, credit_cost: int = 0, **params: Any) -> FileResult:
         from app.services.cortex_client import _b64, call as cortex_call
 
         try:
@@ -246,7 +282,7 @@ class ImageService:
         out_bytes = base64.b64decode(data["image_b64"])
         out_name = f"{_safe_stem(filename)}-inpainted.png"
         stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def ocr(self, *, image_bytes: bytes, lang: str = "ch_en", **params: Any) -> OcrResult:
         if lang not in ("ch", "en", "ch_en"):

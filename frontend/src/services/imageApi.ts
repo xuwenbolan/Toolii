@@ -7,7 +7,23 @@ export type FileResult = {
   size: number
   content_type: string
   download_url: string
+  preview_url?: string | null
+  requires_credit?: boolean
+  credit_cost?: number
   expires_in: number
+}
+
+/** Get the URL to use for previewing a result (watermarked when gated, clean when free). */
+export function getResultDisplayUrl(result: FileResult): string {
+  if (result.requires_credit && result.preview_url) {
+    return result.preview_url
+  }
+  return result.download_url
+}
+
+export async function unlockDownload(fileId: string): Promise<{ download_url: string }> {
+  const res = await api.post<{ download_url: string }>(`/api/download/${fileId}/unlock`)
+  return res.data
 }
 
 function getProgressHandler(

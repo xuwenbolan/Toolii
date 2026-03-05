@@ -202,10 +202,10 @@ async def get_result_share_image(
     """Serve the stored result image. Public, no auth required."""
     svc = ResultShareService(db)
     share = await svc.get_share(token=token)
-    path = svc.get_image_path(file_id=share.image_file_id)
+    path, content_type = svc.get_image(file_id=share.image_file_id)
     return FileResponse(
         path,
-        media_type="image/jpeg",
+        media_type=content_type,
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
@@ -222,10 +222,10 @@ async def get_result_share_original(
     share = await svc.get_share(token=token)
     if not share.original_image_file_id:
         raise HTTPException(status_code=404, detail="No original image")
-    path = svc.get_image_path(file_id=share.original_image_file_id)
+    path, content_type = svc.get_image(file_id=share.original_image_file_id)
     return FileResponse(
         path,
-        media_type="image/jpeg",
+        media_type=content_type,
         headers={"Cache-Control": "public, max-age=86400"},
     )
 

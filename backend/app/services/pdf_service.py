@@ -19,7 +19,9 @@ class PdfService:
     def __init__(self) -> None:
         self._files = FileService()
 
-    def _to_result(self, stored: StoredFile, *, filename: str) -> FileResult:
+    def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
+        if credit_cost > 0:
+            return self._to_gated_result(stored, filename=filename, credit_cost=credit_cost)
         return FileResult(
             file_id=stored.file_id,
             filename=filename,
@@ -29,13 +31,39 @@ class PdfService:
             expires_in=settings.file_retention_hours * 3600,
         )
 
+    def _to_gated_result(self, stored: StoredFile, *, filename: str, credit_cost: int) -> FileResult:
+        """Return a gated result (no download URL, pay to unlock).
+
+        Unlike image tools there is no watermarked preview for PDFs.
+        We store credit_cost in the file metadata so the unlock endpoint
+        can charge credits and return a signed download URL.
+        """
+        import json
+
+        meta_path = self._files._meta_path(stored.file_id)
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["credit_cost"] = credit_cost
+            meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+
+        return FileResult(
+            file_id=stored.file_id,
+            filename=filename,
+            size=stored.size,
+            content_type=stored.content_type,
+            download_url="",
+            requires_credit=True,
+            credit_cost=credit_cost,
+            expires_in=settings.file_retention_hours * 3600,
+        )
+
     @staticmethod
     def _safe_stem(filename: str, fallback: str) -> str:
         base = os.path.basename(filename or fallback)
         stem = os.path.splitext(base)[0].strip()
         return stem or fallback
 
-    async def compress(self, *, pdf_bytes: bytes, filename: str, target_kb: int | None) -> FileResult:
+    async def compress(self, *, pdf_bytes: bytes, filename: str, target_kb: int | None, credit_cost: int = 0) -> FileResult:
         if target_kb is not None and target_kb <= 0:
             raise AppError(code="INVALID_TARGET_KB", message="target_kb must be greater than 0", status_code=400)
 
@@ -50,9 +78,9 @@ class PdfService:
 
         out_name = f"{self._safe_stem(filename, 'document')}-compressed.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
-    async def merge(self, *, pdf_files: list[tuple[str, bytes]]) -> FileResult:
+    async def merge(self, *, pdf_files: list[tuple[str, bytes]], credit_cost: int = 0) -> FileResult:
         if len(pdf_files) < 2:
             raise AppError(code="INVALID_FILES", message="At least 2 PDF files required", status_code=400)
 
@@ -64,7 +92,7 @@ class PdfService:
 
         out_name = "toolii-merged.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def pages(
         self,
@@ -75,6 +103,7 @@ class PdfService:
         pages: list[int] | None,
         order: list[int] | None,
         rotation: int,
+        credit_cost: int = 0,
     ) -> FileResult:
         op_value = operation.value if isinstance(operation, PdfPagesOperation) else str(operation)
 
@@ -96,9 +125,9 @@ class PdfService:
 
         out_name = f"{self._safe_stem(filename, 'document')}-{op_value}.pdf"
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
-    async def split(self, *, pdf_bytes: bytes, filename: str, ranges: str) -> FileResult:
+    async def split(self, *, pdf_bytes: bytes, filename: str, ranges: str, credit_cost: int = 0) -> FileResult:
         ranges = ranges.strip()
         if not ranges:
             raise AppError(code="MISSING_RANGES", message="ranges cannot be empty", status_code=400)
@@ -114,13 +143,14 @@ class PdfService:
 
         out_name = f"{self._safe_stem(filename, 'document')}-split.zip"
         stored = self._files.save_bytes(data=zip_bytes, filename=out_name, content_type="application/zip")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 
     async def from_images(
         self,
         *,
         image_files: list[tuple[str, bytes]],
         dpi: int = 150,
+        credit_cost: int = 0,
     ) -> FileResult:
         if not image_files:
             raise AppError(code="INVALID_FILES", message="At least 1 image required", status_code=400)
@@ -142,5 +172,5 @@ class PdfService:
             out_name = "toolii-images.pdf"
 
         stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name)
+        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
 

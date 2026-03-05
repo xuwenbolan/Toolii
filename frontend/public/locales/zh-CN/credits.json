@@ -60,6 +60,12 @@
     "quickRedeem": "快速兑换",
     "goRedeem": "去兑换 / 分享"
   },
+  "confirm": {
+    "title": "需要消耗积分",
+    "description": "此操作将消耗 {{count}} 积分，是否继续？",
+    "cancel": "取消",
+    "pay": "支付 {{count}} 积分"
+  },
   "share": {
     "title": "分享 Credits",
     "statusPending": "待领取",

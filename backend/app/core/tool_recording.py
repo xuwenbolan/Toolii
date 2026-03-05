@@ -1,4 +1,4 @@
-"""Tool gateway: availability checks, access control, credit charging, and usage recording."""
+"""Tool gateway: availability checks, access control, credit pre-check, and usage recording."""
 
 from __future__ import annotations
 
@@ -83,44 +83,30 @@ async def _record_usage(tool_name: str, user_id: int | None) -> None:
         logger.warning("Failed to record tool usage for %s", tool_name, exc_info=True)
 
 
-async def _charge_credits(user_id: int, amount: int, tool_name: str) -> None:
-    """Charge credits in an independent session. Raises AppError on failure."""
+async def _check_balance(user_id: int, amount: int) -> None:
+    """Verify user has sufficient credits. Raises AppError(402) if not."""
     from app.services.credit_service import CreditService
 
     async with _db.SessionLocal() as db:
         svc = CreditService(db)
-        await svc.consume(
-            user_id=user_id,
-            amount=amount,
-            tx_type="tool_use",
-            description=f"Tool: {tool_name}",
-        )
-
-
-async def _refund_credits(user_id: int, amount: int, tool_name: str) -> None:
-    """Refund credits in an independent session. Logs errors but never raises."""
-    from app.services.credit_service import CreditService
-
-    try:
-        async with _db.SessionLocal() as db:
-            svc = CreditService(db)
-            await svc.add(
-                user_id=user_id,
-                amount=amount,
-                tx_type="tool_refund",
-                description=f"Refund: {tool_name} (processing failed)",
+        balance = await svc.get_balance(user_id)
+        if balance < amount:
+            raise AppError(
+                code="INSUFFICIENT_CREDITS",
+                message="Insufficient credits",
+                status_code=402,
             )
-    except Exception:
-        logger.error(
-            "Failed to refund %d credits for user %d (tool %s)",
-            amount, user_id, tool_name,
-            exc_info=True,
-        )
 
 
 class ToolGatewayRoute(APIRoute):
     """APIRoute subclass that enforces tool availability, access control,
-    credit charging, and records successful tool usage."""
+    credit pre-checks, and records successful tool usage.
+
+    When credit_cost > 0, credits are NOT charged here.  Instead the
+    tool's credit_cost is stored on ``request.state`` so that the
+    service layer can generate a gated (watermarked) result.  Actual
+    charging happens at the unlock/download endpoint.
+    """
 
     def get_route_handler(self):
         original = super().get_route_handler()
@@ -175,8 +161,7 @@ class ToolGatewayRoute(APIRoute):
                         status_code=429,
                     )
 
-            # 4. Credit charging (fail-fast)
-            charged = False
+            # 4. Credit pre-check (balance verification only, no charge)
             if tool.credit_cost > 0:
                 if user_id is None:
                     raise AppError(
@@ -184,21 +169,16 @@ class ToolGatewayRoute(APIRoute):
                         message="Authentication required for paid tools",
                         status_code=401,
                     )
-                await _charge_credits(user_id, tool.credit_cost, tool_name)
-                charged = True
+                await _check_balance(user_id, tool.credit_cost)
+
+            # Store credit info on request.state for downstream service use
+            request.state.tool_credit_cost = tool.credit_cost
 
             # 5. Execute the actual handler
-            try:
-                response = await original(request)
-            except Exception:
-                if charged:
-                    await _refund_credits(user_id, tool.credit_cost, tool_name)  # type: ignore[arg-type]
-                raise
+            response = await original(request)
 
-            # 6. Post-processing
-            if response.status_code >= 400 and charged:
-                await _refund_credits(user_id, tool.credit_cost, tool_name)  # type: ignore[arg-type]
-            elif response.status_code < 400:
+            # 6. Record usage on success
+            if response.status_code < 400:
                 await _record_usage(tool_name, user_id)
 
             return response

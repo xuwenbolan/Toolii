@@ -60,6 +60,12 @@
     "quickRedeem": "Quick Redeem",
     "goRedeem": "Redeem / Share"
   },
+  "confirm": {
+    "title": "Credit Payment Required",
+    "description": "This action will cost {{count}} credit(s). Do you want to continue?",
+    "cancel": "Cancel",
+    "pay": "Pay {{count}} Credit(s)"
+  },
   "share": {
     "title": "Share Credits",
     "statusPending": "Pending",

@@ -16,6 +16,11 @@ from app.services.pdf_service import PdfService
 router = APIRouter(prefix=f"{settings.api_prefix}/pdf", tags=["pdf"], route_class=ToolRecordingRoute)
 
 
+def _credit_cost(request: Request) -> int:
+    """Read tool credit_cost injected by ToolGatewayRoute."""
+    return getattr(request.state, "tool_credit_cost", 0)
+
+
 def _max_pdf_bytes() -> int:
     return settings.max_upload_pdf_mb * 1024 * 1024
 
@@ -58,6 +63,7 @@ async def compress(
             pdf_bytes=data,
             filename=file.filename or "document.pdf",
             target_kb=target_kb,
+            credit_cost=_credit_cost(request),
         )
     finally:
         sem.release()
@@ -88,7 +94,7 @@ async def merge(
             if total > max_total:
                 raise HTTPException(status_code=413, detail="Batch too large")
             payload.append((file.filename or "document.pdf", data))
-        return await PdfService().merge(pdf_files=payload)
+        return await PdfService().merge(pdf_files=payload, credit_cost=_credit_cost(request))
     finally:
         sem.release()
 
@@ -115,6 +121,7 @@ async def pages(
             pages=parsed_pages,
             order=parsed_order,
             rotation=rotation,
+            credit_cost=_credit_cost(request),
         )
     finally:
         sem.release()
@@ -134,6 +141,7 @@ async def split(
             pdf_bytes=data,
             filename=file.filename or "document.pdf",
             ranges=ranges,
+            credit_cost=_credit_cost(request),
         )
     finally:
         sem.release()
@@ -166,6 +174,6 @@ async def from_images(
                 raise HTTPException(status_code=413, detail="Batch too large")
             payload.append((file.filename or "image", data))
 
-        return await PdfService().from_images(image_files=payload, dpi=dpi)
+        return await PdfService().from_images(image_files=payload, dpi=dpi, credit_cost=_credit_cost(request))
     finally:
         sem.release()

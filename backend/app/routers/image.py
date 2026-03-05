@@ -23,6 +23,11 @@ def _max_image_bytes() -> int:
     return settings.max_upload_image_mb * 1024 * 1024
 
 
+def _credit_cost(request: Request) -> int:
+    """Read tool credit_cost injected by ToolGatewayRoute."""
+    return getattr(request.state, "tool_credit_cost", 0)
+
+
 # ── Shared dependency: read + validate + acquire task slot ────────────
 
 
@@ -64,6 +69,7 @@ async def compress(
     return await ImageService().compress(
         image_bytes=img.data, filename=img.filename,
         quality=quality, target_kb=target_kb, output_format=output_format,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -78,6 +84,7 @@ async def convert(
     return await ImageService().convert(
         image_bytes=img.data, filename=img.filename,
         output_format=output_format, quality=quality,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -98,6 +105,7 @@ async def mosaic(
     return await ImageService().mosaic(
         image_bytes=img.data, filename=img.filename,
         regions=parsed, pixel_size=pixel_size,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -110,6 +118,7 @@ async def scan_enhance(
 ) -> FileResult:
     return await ImageService().scan_enhance(
         image_bytes=img.data, filename=img.filename, mode=mode,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -130,7 +139,8 @@ async def remove_bg(
     if output_type is not None:
         params["output_type"] = output_type
     return await ImageService().remove_bg(
-        image_bytes=img.data, filename=img.filename, **params,
+        image_bytes=img.data, filename=img.filename,
+        credit_cost=_credit_cost(request), **params,
     )
 
 
@@ -146,7 +156,8 @@ async def upscale(
     if model is not None:
         params["model"] = model
     return await ImageService().upscale(
-        image_bytes=img.data, filename=img.filename, scale=scale, **params,
+        image_bytes=img.data, filename=img.filename, scale=scale,
+        credit_cost=_credit_cost(request), **params,
     )
 
 
@@ -159,6 +170,7 @@ async def restore_face(
 ) -> FileResult:
     return await ImageService().restore_face(
         image_bytes=img.data, filename=img.filename, weight=weight,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -173,6 +185,7 @@ async def denoise(
     return await ImageService().denoise(
         image_bytes=img.data, filename=img.filename,
         strength=strength, task=task,
+        credit_cost=_credit_cost(request),
     )
 
 
@@ -187,7 +200,8 @@ async def colorize(
     if model is not None:
         params["model"] = model
     return await ImageService().colorize(
-        image_bytes=img.data, filename=img.filename, **params,
+        image_bytes=img.data, filename=img.filename,
+        credit_cost=_credit_cost(request), **params,
     )
 
 
@@ -215,7 +229,8 @@ async def inpaint(
             params["model"] = model
         return await ImageService().inpaint(
             image_bytes=data, mask_bytes=mask_data,
-            filename=file.filename or "image", **params,
+            filename=file.filename or "image",
+            credit_cost=_credit_cost(request), **params,
         )
     finally:
         sem.release()
