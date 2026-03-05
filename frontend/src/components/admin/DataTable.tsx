@@ -84,11 +84,11 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="relative rounded-xl border bg-card">
+    <div className="relative rounded-xl bg-card shadow-sm">
       <div ref={scrollRef} className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/50">
+            <tr className="border-b border-border/60 bg-muted/50">
               {columns.map((col) => (
                 <th
                   key={col.key}
@@ -175,7 +175,7 @@ function DataTableRow<T>({
     <>
       <tr
         className={cn(
-          'border-b last:border-b-0',
+          'border-b border-border/40 last:border-b-0',
           index % 2 !== 0 && 'bg-muted/30',
           onRowClick && 'cursor-pointer hover:bg-muted/50 transition-colors',
         )}
@@ -209,7 +209,7 @@ function DataTableRow<T>({
       </tr>
       {expandedContent && (
         <tr>
-          <td colSpan={columns.length} className="border-t bg-muted/20 px-4 py-4">
+          <td colSpan={columns.length} className="border-t border-border/40 bg-muted/20 px-4 py-4">
             {expandedContent}
           </td>
         </tr>

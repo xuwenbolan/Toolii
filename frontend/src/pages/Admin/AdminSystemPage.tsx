@@ -613,7 +613,7 @@ export function AdminSystemPage() {
 
       {/* Shared memory warning */}
       {online && sharedMemoryWarning && (
-        <div className="rounded-md border border-warning/30 bg-warning-light px-4 py-3 text-sm text-warning">
+        <div className="rounded-xl border border-warning/30 bg-warning-light px-4 py-3 text-sm text-warning">
           {t('system.sharedMemoryWarning')}
         </div>
       )}

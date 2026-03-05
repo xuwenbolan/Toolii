@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { AdminErrorState, AdminFilter, DataTable, Pagination, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
   SelectContent,
@@ -172,13 +173,13 @@ export function AdminFeedbackPage() {
           <label className="text-xs font-medium text-muted-foreground">
             {t('feedback.adminNote')}
           </label>
-          <textarea
+          <Textarea
             value={editNote}
             onChange={(e) => setEditNote(e.target.value)}
             maxLength={1000}
             rows={2}
             aria-label={t('feedback.adminNote')}
-            className="mt-1 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="mt-1 resize-none"
           />
         </div>
       </div>

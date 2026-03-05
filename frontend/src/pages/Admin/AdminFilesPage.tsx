@@ -243,14 +243,14 @@ export function AdminFilesPage() {
             <img
               src={previewUrl}
               alt={previewItem?.original_filename}
-              className="w-full rounded-lg object-contain max-h-[70vh]"
+              className="w-full rounded-xl object-contain max-h-[70vh]"
             />
           )}
           {previewUrl && isPdf && (
             <iframe
               src={previewUrl}
               title={previewItem?.original_filename}
-              className="w-full h-[70vh] rounded-lg border"
+              className="w-full h-[70vh] rounded-xl border"
             />
           )}
           <div className="flex items-center justify-between text-sm text-muted-foreground mt-2">

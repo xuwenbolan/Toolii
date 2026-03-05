@@ -6,13 +6,13 @@
     "imageTools": "Image Tools",
     "pdfTools": "PDF Tools",
     "textTools": "Text Tools",
-    "dashboard": "Dashboard",
+    "dashboard": "My Account",
     "redeemCredits": "Redeem Credits",
     "login": "Log in",
     "register": "Sign up",
     "logout": "Log out",
     "logoutFull": "Log out",
-    "console": "Console"
+    "console": "Admin"
   },
   "footer": {
     "privacy": "Privacy Policy",

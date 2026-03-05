@@ -8,6 +8,7 @@ import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 import {
@@ -341,9 +342,9 @@ export function AdminCardsPage() {
                 <p className="text-sm font-medium">
                   {t('cards.generatedCodes')} ({generatedCodes.length})
                 </p>
-                <textarea
+                <Textarea
                   readOnly
-                  className="h-40 w-full rounded-md border border-input bg-muted p-3 font-mono text-sm"
+                  className="h-40 bg-muted p-3 font-mono"
                   value={generatedCodes.join('\n')}
                 />
                 <div className="flex gap-2">

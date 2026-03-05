@@ -6,13 +6,13 @@
     "imageTools": "图片工具",
     "pdfTools": "PDF 工具",
     "textTools": "文本工具",
-    "dashboard": "控制台",
+    "dashboard": "个人中心",
     "redeemCredits": "兑换卡密",
     "login": "登录",
     "register": "注册",
     "logout": "退出",
     "logoutFull": "\u9000\u51fa\u767b\u5f55",
-    "console": "\u63a7\u5236\u53f0"
+    "console": "管理后台"
   },
   "footer": {
     "privacy": "隐私政策",

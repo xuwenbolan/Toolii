@@ -105,13 +105,13 @@ export function ConsoleLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-card transition-all duration-200 lg:static',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/50 bg-card transition-all duration-200 lg:static',
           collapsed ? 'lg:w-16' : 'lg:w-56',
           mobileOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
       >
         {/* Sidebar header */}
-        <div className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/50 px-3">
           <Link to="/console" className={cn(collapsed && 'lg:hidden')}>
             <Logo size={20} />
           </Link>
@@ -171,7 +171,7 @@ export function ConsoleLayout() {
         </nav>
 
         {/* Sidebar footer */}
-        <div className={cn('border-t p-3', collapsed && 'lg:p-2')}>
+        <div className={cn('border-t border-border/50 p-3', collapsed && 'lg:p-2')}>
           <Link
             to="/"
             className={cn(
@@ -195,7 +195,7 @@ export function ConsoleLayout() {
       {/* Main area */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="flex h-12 shrink-0 items-center gap-3 border-b px-4">
+        <header className="flex h-12 shrink-0 items-center gap-3 border-b border-border/50 px-4">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}

@@ -123,8 +123,8 @@
     "register": "注册"
   },
   "overview": {
-    "seoTitle": "控制台",
-    "title": "控制台",
+    "seoTitle": "我的账户",
+    "title": "我的账户",
     "greeting": "你好，{{name}}",
     "quickRedeem": "快速兑换",
     "redeemPage": "兑换页",

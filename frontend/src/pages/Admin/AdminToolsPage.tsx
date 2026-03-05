@@ -284,7 +284,7 @@ export function AdminToolsPage() {
           </div>
         </div>
         {/* Access summary */}
-        <div className="mt-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <div className="mt-3 rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           {getAccessSummary(tool, t)}
         </div>
       </ExpandedSection>
