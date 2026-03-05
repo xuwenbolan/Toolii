@@ -22,7 +22,13 @@
     "mouth": "Mouth",
     "jawline": "Jawline",
     "overall_face": "Overall Face",
-    "vs": "VS"
+    "vs": "VS",
+    "narrative": "AI Commentary",
+    "funFacts": "Fun Facts",
+    "bestMatch": "Best",
+    "leastMatch": "Least",
+    "recentHistory": "Recent Comparisons",
+    "clearHistory": "Clear"
   },
   "errors": {
     "compareFailed": "Comparison failed. Please try again.",

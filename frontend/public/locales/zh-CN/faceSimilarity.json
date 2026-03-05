@@ -22,7 +22,13 @@
     "mouth": "嘴巴",
     "jawline": "脸型轮廓",
     "overall_face": "整体面部",
-    "vs": "VS"
+    "vs": "VS",
+    "narrative": "AI 点评",
+    "funFacts": "趣味发现",
+    "bestMatch": "最像",
+    "leastMatch": "最不像",
+    "recentHistory": "最近对比",
+    "clearHistory": "清空"
   },
   "errors": {
     "compareFailed": "对比失败，请重试",

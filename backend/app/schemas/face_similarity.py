@@ -9,6 +9,8 @@ class RegionScore(BaseModel):
     region: str
     score: int
     description: str | None = None
+    rank: int | None = None
+    badge: str | None = None  # "best_match" | "least_match"
 
 
 class FaceSimilarityResponse(BaseModel):
@@ -17,3 +19,7 @@ class FaceSimilarityResponse(BaseModel):
     title: str
     summary: str
     disclaimer: str
+    narrative: str | None = None
+    fun_facts: list[str] | None = None
+    best_region: str | None = None
+    worst_region: str | None = None

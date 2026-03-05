@@ -13,6 +13,9 @@ import { cn } from '@/lib/utils'
 import { useFaceSimilarityState } from './useFaceSimilarityState'
 import { OverallScoreRing } from './components/OverallScoreRing'
 import { RegionBar } from './components/RegionBar'
+import { NarrativeCard } from './components/NarrativeCard'
+import { FunFactCards } from './components/FunFactCards'
+import { ComparisonHistory } from './components/ComparisonHistory'
 
 // ---------------------------------------------------------------------------
 // Single dropzone for one face image
@@ -148,6 +151,9 @@ function SimilarityResults({
         </div>
       )}
 
+      {/* Narrative */}
+      {result.narrative && <NarrativeCard narrative={result.narrative} />}
+
       {/* Region comparison bars */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -161,11 +167,17 @@ function SimilarityResults({
               label={regionLabels[r.region] ?? r.region}
               score={r.score}
               description={r.description}
+              badge={r.badge}
               delay={i * 100}
             />
           ))}
         </div>
       </div>
+
+      {/* Fun facts */}
+      {result.fun_facts && result.fun_facts.length > 0 && (
+        <FunFactCards facts={result.fun_facts} />
+      )}
 
       {/* Disclaimer */}
       <p className="text-xs text-muted-foreground/70 text-center pt-2">
@@ -279,6 +291,12 @@ export function FaceSimilarityPage() {
             <p className="text-xs text-muted-foreground/60 text-center">
               {t('faceSimilarity:disclaimer')}
             </p>
+
+            {/* Comparison history */}
+            <ComparisonHistory
+              entries={state.historyEntries}
+              onClear={state.clearHistory}
+            />
           </div>
         )}
       </ToolPageShell>

@@ -7,6 +7,7 @@ import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { precompressImage } from '@/lib/imageCompressor'
 import { compareFaces, type FaceSimilarityResponse } from '@/services/faceMapApi'
 import { createSimilarityShare } from '@/services/resultShareApi'
+import { useComparisonHistory } from './useComparisonHistory'
 
 export function useFaceSimilarityState() {
   const { t, i18n } = useTranslation('faceSimilarity')
@@ -15,6 +16,7 @@ export function useFaceSimilarityState() {
   const [result, setResult] = useState<FaceSimilarityResponse | null>(null)
 
   const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
+  const history = useComparisonHistory()
 
   const previewUrl1 = useObjectUrl(file1)
   const previewUrl2 = useObjectUrl(file2)
@@ -56,10 +58,11 @@ export function useFaceSimilarityState() {
       ])
       const res = await run((onProgress) => compareFaces(c1, c2, onProgress))
       setResult(res)
+      void history.addEntry(res.overall_score, res.title, file1, file2)
     } catch {
       // handled by useFileUpload
     }
-  }, [file1, file2, run])
+  }, [file1, file2, run, history])
 
   const handleShare = useCallback(async () => {
     if (!result || !file1 || !file2) return
@@ -122,5 +125,8 @@ export function useFaceSimilarityState() {
     setShareDialogOpen,
     shareUrl,
     handleShare,
+    // History
+    historyEntries: history.entries,
+    clearHistory: history.clearHistory,
   }
 }
