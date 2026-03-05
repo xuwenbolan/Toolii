@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.feedback import (
@@ -33,9 +35,10 @@ async def list_feedback(
 
 @router.put("/{feedback_id}", response_model=FeedbackItem)
 async def update_feedback(
+    request: Request,
     feedback_id: int,
     body: AdminUpdateFeedbackRequest,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> FeedbackItem:
     svc = FeedbackService(db)
@@ -43,6 +46,15 @@ async def update_feedback(
         feedback_id,
         status=body.status.value if body.status else None,
         admin_note=body.admin_note,
+    )
+    await audit(
+        category="admin",
+        action="update_feedback",
+        user_id=admin.id,
+        resource_type="feedback",
+        resource_id=feedback_id,
+        ip=get_remote_address(request),
+        detail={"status": body.status.value if body.status else None},
     )
     return FeedbackItem(
         id=fb.id,

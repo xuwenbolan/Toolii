@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 
+from slowapi.util import get_remote_address
+
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.rate_limiter import limiter
@@ -57,13 +60,20 @@ def _to_item(link: ShareLink) -> ShareLinkItem:
 @router.post("/create", response_model=ShareCreateResponse)
 @limiter.limit(settings.rate_limit_auth)
 async def create_share(
-    request: Request,  # noqa: ARG001
+    request: Request,
     payload: ShareCreateRequest,
     user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> ShareCreateResponse:
     service = ShareService(db)
     result = await service.create_share_link(user_id=user.id, amount=payload.amount)
+    await audit(
+        category="share",
+        action="create",
+        user_id=user.id,
+        ip=get_remote_address(request),
+        detail={"amount": payload.amount, "token": result.link.token},
+    )
     return ShareCreateResponse(
         link=_to_item(result.link),
         share_path=service.get_share_path(result.link.token),
@@ -75,11 +85,18 @@ async def create_share(
 @limiter.limit(settings.rate_limit_auth)
 async def claim_share(
     token: str,
-    request: Request,  # noqa: ARG001
+    request: Request,
     user: User = Depends(get_current_user),
     db=Depends(get_db),
 ) -> ShareClaimResponse:
     result = await ShareService(db).claim(token=token, user_id=user.id)
+    await audit(
+        category="share",
+        action="claim",
+        user_id=user.id,
+        ip=get_remote_address(request),
+        detail={"token": token, "amount": result.amount},
+    )
     return ShareClaimResponse(
         code="SHARE_CLAIMED",
         message="Claimed successfully",
@@ -126,9 +143,17 @@ async def my_share_links(
 @limiter.limit(settings.rate_limit_auth)
 async def cancel_share(
     link_id: int,
-    request: Request,  # noqa: ARG001
+    request: Request,
     user: User = Depends(get_current_user),
     db=Depends(get_db),
 ) -> ShareCancelResponse:
     result = await ShareService(db).cancel(link_id=link_id, user_id=user.id)
+    await audit(
+        category="share",
+        action="cancel",
+        user_id=user.id,
+        resource_type="share_link",
+        resource_id=link_id,
+        ip=get_remote_address(request),
+    )
     return ShareCancelResponse(code=result.code, message=result.message, balance=result.balance_after)

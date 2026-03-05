@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 
+from slowapi.util import get_remote_address
+
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.rate_limiter import limiter
@@ -21,12 +24,23 @@ router = APIRouter(prefix=f"{settings.api_prefix}/credits", tags=["credits"])
 @router.post("/redeem", response_model=RedeemResponse)
 @limiter.limit(settings.rate_limit_auth)
 async def redeem(
-    request: Request,  # noqa: ARG001
+    request: Request,
     payload: RedeemRequest,
     user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> RedeemResponse:
     result = await CreditService(db).redeem_code(user_id=user.id, plain_code=payload.code)
+    await audit(
+        category="credit",
+        action="redeem",
+        user_id=user.id,
+        ip=get_remote_address(request),
+        detail={
+            "added_credits": result.added_credits,
+            "balance_after": result.balance_after,
+            "card_type": result.card_type,
+        },
+    )
     return RedeemResponse(
         added_credits=result.added_credits,
         balance=result.balance_after,

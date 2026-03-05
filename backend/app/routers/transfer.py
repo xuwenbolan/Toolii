@@ -5,6 +5,9 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
+from slowapi.util import get_remote_address
+
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db, get_verified_user
 from app.core.rate_limiter import dynamic_rate_limit, limiter
@@ -25,12 +28,12 @@ router = APIRouter(prefix=f"{settings.api_prefix}/transfer", tags=["transfer"])
 @router.post("/create", response_model=TransferCreateResponse)
 @limiter.limit(dynamic_rate_limit)
 async def create_transfer(
-    request: Request,  # noqa: ARG001
+    request: Request,
     files: list[UploadFile] = File(...),
     retention: str = Form("24h"),
     use_extract_code: bool = Form(False),
     max_downloads: int | None = Form(None),
-    message: str | None = Form(None),
+    message: str | None = Form(None, max_length=500),
     burn_after_read: bool = Form(False),
     user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
@@ -60,6 +63,17 @@ async def create_transfer(
         message=message,
         burn_after_read=burn_after_read,
     )
+    await audit(
+        category="transfer",
+        action="create",
+        user_id=user.id,
+        ip=get_remote_address(request),
+        detail={
+            "token": result.transfer.token,
+            "file_count": result.transfer.file_count,
+            "total_size": result.transfer.total_size,
+        },
+    )
     return TransferCreateResponse(
         token=result.transfer.token,
         transfer_path=result.transfer_path,
@@ -74,7 +88,7 @@ async def create_transfer(
 @router.post("/create-from-result", response_model=TransferCreateResponse)
 @limiter.limit(dynamic_rate_limit)
 async def create_from_result(
-    request: Request,  # noqa: ARG001
+    request: Request,
     file_id: str = Form(...),
     retention: str = Form("24h"),
     burn_after_read: bool = Form(False),
@@ -88,6 +102,17 @@ async def create_from_result(
         file_id=file_id,
         retention=retention,
         burn_after_read=burn_after_read,
+    )
+    await audit(
+        category="transfer",
+        action="create_from_result",
+        user_id=user.id,
+        ip=get_remote_address(request),
+        detail={
+            "token": result.transfer.token,
+            "source_file_id": file_id,
+            "total_size": result.transfer.total_size,
+        },
     )
     return TransferCreateResponse(
         token=result.transfer.token,
@@ -228,11 +253,19 @@ async def my_transfers(
 @limiter.limit(dynamic_rate_limit)
 async def delete_transfer(
     transfer_id: int,
-    request: Request,  # noqa: ARG001
+    request: Request,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     await TransferService(db).delete_transfer(
         transfer_id=transfer_id, user_id=user.id
+    )
+    await audit(
+        category="transfer",
+        action="delete",
+        user_id=user.id,
+        resource_type="transfer",
+        resource_id=transfer_id,
+        ip=get_remote_address(request),
     )
     return {"code": "TRANSFER_DELETED", "message": "Transfer deleted"}

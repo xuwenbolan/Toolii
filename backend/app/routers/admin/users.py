@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
+from app.core.exceptions import AppError
 from app.models.user import User
 from app.schemas.admin import (
     AdminUserDetailResponse,
@@ -44,24 +47,51 @@ async def get_user_detail(
 
 @router.put("/{user_id}/status", response_model=Message)
 async def update_user_status(
+    request: Request,
     payload: UpdateUserStatusRequest,
     user_id: int = Path(),
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> Message:
     await AdminService(db).toggle_user_status(user_id, is_active=payload.is_active)
     status = "enabled" if payload.is_active else "disabled"
+    await audit(
+        category="admin",
+        action="toggle_user_status",
+        user_id=admin.id,
+        resource_type="user",
+        resource_id=user_id,
+        ip=get_remote_address(request),
+        detail={"is_active": payload.is_active},
+    )
     return Message(message=f"User {status}")
 
 
 @router.post("/{user_id}/credits", response_model=AdjustCreditsResponse)
 async def adjust_credits(
+    request: Request,
     payload: AdjustCreditsRequest,
     user_id: int = Path(),
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> AdjustCreditsResponse:
+    if user_id == admin.id:
+        raise AppError(code="SELF_OPERATION_FORBIDDEN", message="Cannot adjust own credits", status_code=403)
     data = await AdminService(db).adjust_credits(
         user_id, amount=payload.amount, description=payload.description,
+    )
+    await audit(
+        category="admin",
+        action="adjust_credits",
+        user_id=admin.id,
+        resource_type="user",
+        resource_id=user_id,
+        ip=get_remote_address(request),
+        detail={
+            "amount": payload.amount,
+            "description": payload.description,
+            "balance_before": data["balance_before"],
+            "balance_after": data["balance_after"],
+        },
     )
     return AdjustCreditsResponse(**data)

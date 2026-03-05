@@ -3,9 +3,11 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.core.config import settings
+from app.routers.admin.audit import router as audit_router
 from app.routers.admin.cards import router as cards_router
 from app.routers.admin.dashboard import router as dashboard_router
 from app.routers.admin.feedback import router as feedback_router
+from app.routers.admin.files import router as files_router
 from app.routers.admin.operations import router as operations_router
 from app.routers.admin.storage import router as storage_router
 from app.routers.admin.system import router as system_router
@@ -24,3 +26,5 @@ router.include_router(tools_router)
 router.include_router(system_router)
 router.include_router(storage_router)
 router.include_router(transfers_router)
+router.include_router(files_router)
+router.include_router(audit_router)

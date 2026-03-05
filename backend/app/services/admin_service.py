@@ -11,6 +11,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import settings
 from app.core.exceptions import AppError, NotFoundError
 from app.utils.time_utils import utcnow
+from app.models.audit_log import AuditLog
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
 from app.models.result_share import ResultShare
@@ -648,6 +649,8 @@ class AdminService:
                 ProcessingHistory.tool_name,
                 func.coalesce(Tool.display_name_zh, ProcessingHistory.tool_name).label("display_name"),
                 ProcessingHistory.status,
+                ProcessingHistory.ip,
+                ProcessingHistory.user_agent,
                 ProcessingHistory.input_file_id,
                 ProcessingHistory.output_file_id,
                 ProcessingHistory.created_at,
@@ -677,6 +680,8 @@ class AdminService:
                 "tool_name": r.tool_name,
                 "display_name": r.display_name,
                 "status": r.status,
+                "ip": r.ip,
+                "user_agent": r.user_agent,
                 "input_file_id": r.input_file_id,
                 "output_file_id": r.output_file_id,
                 "created_at": r.created_at,
@@ -820,6 +825,67 @@ class AdminService:
                 "created_at": s.created_at,
             }
             for s in shares
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    # ── Audit Logs ─────────────────────────────────────────
+
+    async def list_audit_logs(
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        category: str | None = None,
+        action: str | None = None,
+        user_id: int | None = None,
+        success: bool | None = None,
+    ) -> dict:
+        base = select(AuditLog)
+        count_base = select(func.count()).select_from(AuditLog)
+
+        if category:
+            base = base.where(AuditLog.category == category)
+            count_base = count_base.where(AuditLog.category == category)
+        if action:
+            base = base.where(AuditLog.action == action)
+            count_base = count_base.where(AuditLog.action == action)
+        if user_id is not None:
+            base = base.where(AuditLog.user_id == user_id)
+            count_base = count_base.where(AuditLog.user_id == user_id)
+        if success is not None:
+            base = base.where(AuditLog.success == success)
+            count_base = count_base.where(AuditLog.success == success)
+
+        total = int((await self._db.execute(count_base)).scalar_one())
+        logs = (await self._db.execute(
+            base.order_by(AuditLog.id.desc()).limit(limit).offset(offset)
+        )).scalars().all()
+
+        # Batch-load user emails
+        uid_set = {log.user_id for log in logs if log.user_id is not None}
+        emails: dict[int, str] = {}
+        if uid_set:
+            rows = (await self._db.execute(
+                select(User.id, User.email).where(User.id.in_(uid_set))
+            )).all()
+            emails = {r[0]: r[1] for r in rows}
+
+        items = [
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "user_email": emails.get(log.user_id) if log.user_id else None,
+                "category": log.category,
+                "action": log.action,
+                "success": log.success,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "ip": log.ip,
+                "user_agent": log.user_agent,
+                "detail": log.detail,
+                "created_at": log.created_at,
+            }
+            for log in logs
         ]
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 

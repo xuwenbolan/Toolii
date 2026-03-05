@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.admin import (
+    AdminProcessingHistoryListResponse,
     AdminShareLinkListResponse,
     GlobalTransactionListResponse,
     RevenueResponse,
@@ -63,3 +64,18 @@ async def get_revenue(
 ) -> RevenueResponse:
     data = await AdminService(db).get_revenue(granularity=granularity, days=days)
     return RevenueResponse(**data)
+
+
+@router.get("/usage-log", response_model=AdminProcessingHistoryListResponse)
+async def list_usage_log(
+    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    db=Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    tool_name: str | None = Query(default=None),
+    status: str | None = Query(default=None),
+) -> AdminProcessingHistoryListResponse:
+    data = await AdminService(db).list_processing_history(
+        limit=limit, offset=offset, tool_name=tool_name, status=status,
+    )
+    return AdminProcessingHistoryListResponse(**data)

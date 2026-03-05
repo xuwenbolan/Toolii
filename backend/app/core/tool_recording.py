@@ -69,14 +69,23 @@ async def _check_is_admin(user_id: int) -> bool:
         return False
 
 
-async def _record_usage(tool_name: str, user_id: int | None) -> None:
+async def _record_usage(
+    tool_name: str,
+    user_id: int | None,
+    request: Request,
+) -> None:
     """Record a single tool usage entry in its own db session."""
     try:
+        xff = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        ip = xff or (request.client.host if request.client else None)
+        ua = (request.headers.get("user-agent") or "")[:256] or None
         async with _db.SessionLocal() as session:
             session.add(ProcessingHistory(
                 user_id=user_id,
                 tool_name=tool_name,
                 status="done",
+                ip=ip,
+                user_agent=ua,
             ))
             await session.commit()
     except Exception:
@@ -179,7 +188,7 @@ class ToolGatewayRoute(APIRoute):
 
             # 6. Record usage on success
             if response.status_code < 400:
-                await _record_usage(tool_name, user_id)
+                await _record_usage(tool_name, user_id, request)
 
             return response
 

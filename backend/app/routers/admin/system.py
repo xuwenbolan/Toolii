@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user
 from app.models.user import User
 from app.services import cortex_client
@@ -54,11 +56,19 @@ async def cortex_model_check(
 
 @router.post("/cortex/unload-all")
 async def cortex_unload_all(
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    request: Request,
+    admin: User = Depends(get_admin_user),
 ) -> dict[str, Any]:
     """Unload all Cortex models to free VRAM."""
     try:
-        return await cortex_client.unload_all()
+        result = await cortex_client.unload_all()
+        await audit(
+            category="admin",
+            action="cortex_unload_all",
+            user_id=admin.id,
+            ip=get_remote_address(request),
+        )
+        return result
     except Exception:
         logger.warning("Cortex unavailable for unload-all", exc_info=True)
         return {"status": "error", "error": "cortex_unavailable"}

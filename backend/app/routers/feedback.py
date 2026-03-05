@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.models.user import User
@@ -17,12 +19,22 @@ router = APIRouter(prefix=f"{settings.api_prefix}/feedback", tags=["feedback"])
 
 @router.post("/", response_model=FeedbackItem)
 async def submit_feedback(
+    request: Request,
     body: FeedbackCreateRequest,
     user: User = Depends(get_current_user),
     db=Depends(get_db),
 ) -> FeedbackItem:
     svc = FeedbackService(db)
     fb = await svc.create(user.id, body.category.value, body.content)
+    await audit(
+        category="user",
+        action="submit_feedback",
+        user_id=user.id,
+        resource_type="feedback",
+        resource_id=fb.id,
+        ip=get_remote_address(request),
+        detail={"feedback_category": body.category.value},
+    )
     return FeedbackItem(
         id=fb.id,
         category=fb.category,

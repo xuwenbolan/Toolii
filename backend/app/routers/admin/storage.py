@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.admin import (
-    AdminProcessingHistoryListResponse,
     StorageCleanupRequest,
     StorageCleanupResponse,
     StorageOverviewResponse,
 )
-from app.services.admin_service import AdminService
 from app.services.storage_admin_service import StorageAdminService
 
 router = APIRouter(prefix="/storage", tags=["admin-storage"])
@@ -25,26 +25,19 @@ async def get_storage_overview(
     return StorageOverviewResponse(**data)
 
 
-@router.get("/processing-history", response_model=AdminProcessingHistoryListResponse)
-async def list_processing_history(
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
-    limit: int = Query(default=20, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
-    tool_name: str | None = Query(default=None),
-    status: str | None = Query(default=None),
-) -> AdminProcessingHistoryListResponse:
-    data = await AdminService(db).list_processing_history(
-        limit=limit, offset=offset, tool_name=tool_name, status=status,
-    )
-    return AdminProcessingHistoryListResponse(**data)
-
-
 @router.post("/cleanup", response_model=StorageCleanupResponse)
 async def run_cleanup(
+    request: Request,
     body: StorageCleanupRequest,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> StorageCleanupResponse:
     data = await StorageAdminService(db).run_cleanup(body.target)
+    await audit(
+        category="admin",
+        action="storage_cleanup",
+        user_id=admin.id,
+        ip=get_remote_address(request),
+        detail={"target": body.target, **data},
+    )
     return StorageCleanupResponse(**data)

@@ -5,6 +5,8 @@ from typing import Literal
 import cv2
 import numpy as np
 
+from app.core.file_validation import check_cv2_image_size
+
 
 def _order_points(pts: np.ndarray) -> np.ndarray:
     rect = np.zeros((4, 2), dtype="float32")
@@ -49,6 +51,7 @@ def enhance_scan(image_bytes: bytes, *, mode: Literal["bw", "color"] = "bw") -> 
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError("Invalid image")
+    check_cv2_image_size(img)
 
     orig = img.copy()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

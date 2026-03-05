@@ -309,10 +309,13 @@ class FaceBox(TypedDict, total=False):
 
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
+    from app.core.file_validation import check_cv2_image_size
+
     arr = np.frombuffer(image_bytes, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     if img is None:
         raise ValueError("Invalid image")
+    check_cv2_image_size(img)
     return img
 
 

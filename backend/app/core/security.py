@@ -16,17 +16,18 @@ from app.core.exceptions import UnauthorizedError
 from app.utils.time_utils import utcnow
 
 
+def _prehash(password: str) -> bytes:
+    """SHA-256 pre-hash with base64 encoding to avoid bcrypt 72-byte limit and null-byte truncation."""
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
+
+
 def hash_password(password: str) -> str:
-    # bcrypt only uses the first 72 bytes of the input on many backends; newer
-    # versions may raise on >72 bytes. Pre-hash to a fixed 32 bytes.
-    digest = hashlib.sha256(password.encode("utf-8")).digest()
     salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(digest, salt).decode("utf-8")
+    return bcrypt.hashpw(_prehash(password), salt).decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    digest = hashlib.sha256(plain_password.encode("utf-8")).digest()
-    return bcrypt.checkpw(digest, hashed_password.encode("utf-8"))
+    return bcrypt.checkpw(_prehash(plain_password), hashed_password.encode("utf-8"))
 
 
 TokenType = Literal["access", "refresh"]

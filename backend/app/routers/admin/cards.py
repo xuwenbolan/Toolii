@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, Path, Query, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.admin import (
@@ -33,8 +35,9 @@ async def list_cards(
 
 @router.post("/generate", response_model=CardGenerateResponse)
 async def generate_cards(
+    request: Request,
     payload: CardGenerateRequest,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> CardGenerateResponse:
     codes = await AdminService(db).generate_cards(
@@ -44,16 +47,36 @@ async def generate_cards(
         prefix=payload.prefix,
         expires_days=payload.expires_days,
     )
+    await audit(
+        category="admin",
+        action="generate_cards",
+        user_id=admin.id,
+        ip=get_remote_address(request),
+        detail={
+            "count": payload.count,
+            "credits": payload.credits,
+            "card_type": payload.card_type,
+        },
+    )
     return CardGenerateResponse(codes=codes, count=len(codes))
 
 
 @router.put("/{card_id}/disable", response_model=Message)
 async def disable_card(
+    request: Request,
     card_id: int = Path(),
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> Message:
     await AdminService(db).disable_card(card_id)
+    await audit(
+        category="admin",
+        action="disable_card",
+        user_id=admin.id,
+        resource_type="card",
+        resource_id=card_id,
+        ip=get_remote_address(request),
+    )
     return Message(message="Card disabled")
 
 

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user
 from app.models.user import User
 from app.schemas.tool import AdminToolItem, AdminToolListResponse, AdminToolUpdateRequest
@@ -43,13 +45,23 @@ async def list_tools(
 
 @router.put("/{tool_name:path}", response_model=AdminToolItem)
 async def update_tool(
+    request: Request,
     tool_name: str,
     body: AdminToolUpdateRequest,
-    _admin: User = Depends(get_admin_user),
+    admin: User = Depends(get_admin_user),
 ) -> AdminToolItem:
     """Update a tool's configuration. Only provided fields are updated."""
     fields = body.model_dump(exclude_unset=True)
     tool = await tool_service.update_tool(tool_name, **fields)
+    await audit(
+        category="admin",
+        action="update_tool",
+        user_id=admin.id,
+        resource_type="tool",
+        resource_id=tool_name,
+        ip=get_remote_address(request),
+        detail=fields,
+    )
     return AdminToolItem(
         tool_name=tool.tool_name,
         category=tool.category,

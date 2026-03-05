@@ -96,7 +96,9 @@ async def register(
         log_auth_event("register_failed", email=payload.email, ip=ip, success=False)
         raise
     log_auth_event("register_success", email=payload.email, user_id=user.id, ip=ip)
-    extra = {"_dev_verification_token": dev_token} if dev_token is not None else None
+    extra = None
+    if dev_token is not None:
+        logger.info("Dev verification token for %s: %s", payload.email, dev_token)
     response, token_info = _build_auth_response(user, extra_body=extra)
     await _record_login(
         db, user_id=user.id, ip=ip,
@@ -261,10 +263,9 @@ async def resend_verification(
     lang = parse_lang(request.headers.get("accept-language"))
     dev_token = await AuthService(db).resend_verification(user_id=user.id, lang=lang)
     log_auth_event("resend_verification", email=user.email, user_id=user.id, ip=ip)
-    body: dict = {"code": "VERIFICATION_EMAIL_SENT", "message": "Verification email sent"}
     if dev_token is not None:
-        body["_dev_verification_token"] = dev_token
-    return JSONResponse(content=body)
+        logger.info("Dev verification token for %s: %s", user.email, dev_token)
+    return JSONResponse(content={"code": "VERIFICATION_EMAIL_SENT", "message": "Verification email sent"})
 
 
 @router.post("/forgot-password")
@@ -279,10 +280,9 @@ async def forgot_password(
     dev_token = await AuthService(db).forgot_password(email=payload.email, lang=lang)
     log_auth_event("forgot_password", email=payload.email, ip=ip)
     # Always return success to prevent email enumeration
-    body: dict = {"code": "RESET_EMAIL_SENT", "message": "If this email is registered, you will receive a password reset email"}
     if dev_token is not None:
-        body["_dev_reset_token"] = dev_token
-    return JSONResponse(content=body)
+        logger.info("Dev reset token for %s: %s", payload.email, dev_token)
+    return JSONResponse(content={"code": "RESET_EMAIL_SENT", "message": "If this email is registered, you will receive a password reset email"})
 
 
 @router.post("/reset-password")

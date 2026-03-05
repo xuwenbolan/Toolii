@@ -168,6 +168,8 @@ def _check_blur(
     img = cv2.imdecode(arr, cv2.IMREAD_GRAYSCALE)
     if img is None:
         return
+    from app.core.file_validation import check_cv2_image_size
+    check_cv2_image_size(img)
 
     face_roi = img[y_min:y_max, x_min:x_max]
     if face_roi.size == 0:

@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from slowapi.util import get_remote_address
+
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_db, get_optional_user
 from app.core.file_validation import validate_image_bytes
@@ -111,6 +114,13 @@ async def create_result_share(
             user_id=user.id if user else None,
         )
 
+    await audit(
+        category="share",
+        action="create_result_share",
+        user_id=user.id if user else None,
+        ip=get_remote_address(request),
+        detail={"share_type": share_type, "token": share.token},
+    )
     share_url = f"{settings.frontend_base_url}/s/{share.token}"
     return ResultShareCreateResponse(
         token=share.token,
@@ -157,6 +167,13 @@ async def create_similarity_share(
         result_json=clean_json,
         locale=locale,
         user_id=user.id if user else None,
+    )
+    await audit(
+        category="share",
+        action="create_similarity_share",
+        user_id=user.id if user else None,
+        ip=get_remote_address(request),
+        detail={"token": share.token},
     )
     share_url = f"{settings.frontend_base_url}/s/{share.token}"
     return ResultShareCreateResponse(

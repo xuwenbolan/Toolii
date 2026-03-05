@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
+from slowapi.util import get_remote_address
 
+from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.admin import (
@@ -29,21 +31,39 @@ async def list_file_transfers(
 
 @router.put("/file-transfers/{transfer_id}/expire")
 async def force_expire_transfer(
+    request: Request,
     transfer_id: int,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> dict:
     await AdminService(db).force_expire_transfer(transfer_id)
+    await audit(
+        category="admin",
+        action="force_expire_transfer",
+        user_id=admin.id,
+        resource_type="transfer",
+        resource_id=transfer_id,
+        ip=get_remote_address(request),
+    )
     return {"status": "ok"}
 
 
 @router.delete("/file-transfers/{transfer_id}")
 async def delete_transfer(
+    request: Request,
     transfer_id: int,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> dict:
     await AdminService(db).delete_transfer(transfer_id)
+    await audit(
+        category="admin",
+        action="delete_transfer",
+        user_id=admin.id,
+        resource_type="transfer",
+        resource_id=transfer_id,
+        ip=get_remote_address(request),
+    )
     return {"status": "ok"}
 
 
@@ -64,9 +84,18 @@ async def list_result_shares(
 
 @router.delete("/result-shares/{share_id}")
 async def delete_result_share(
+    request: Request,
     share_id: int,
-    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> dict:
     await AdminService(db).delete_result_share(share_id)
+    await audit(
+        category="admin",
+        action="delete_result_share",
+        user_id=admin.id,
+        resource_type="result_share",
+        resource_id=share_id,
+        ip=get_remote_address(request),
+    )
     return {"status": "ok"}

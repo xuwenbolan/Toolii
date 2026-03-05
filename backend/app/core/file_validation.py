@@ -7,6 +7,28 @@ from app.core.exceptions import AppError
 
 _MIN_FILE_SIZE = 12
 _MAX_DIMENSION = 10_000  # Max width/height in pixels
+_MAX_PIXELS = 30_000_000  # ~30MP, prevents OOM from decompression bombs
+
+
+def check_cv2_image_size(img) -> None:  # type: ignore[no-untyped-def]
+    """Check decoded cv2 image dimensions. Raises AppError if too large."""
+    h, w = img.shape[:2]
+    if w > _MAX_DIMENSION or h > _MAX_DIMENSION or w * h > _MAX_PIXELS:
+        raise AppError(code="IMAGE_TOO_LARGE", message="Image dimensions exceed limit", status_code=400)
+
+
+def _check_pillow_dimensions(data: bytes) -> None:
+    """Generic dimension check using Pillow for any supported format."""
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as img:
+            w, h = img.size
+        if w > _MAX_DIMENSION or h > _MAX_DIMENSION:
+            raise AppError(code="IMAGE_TOO_LARGE", message="Image dimensions exceed limit", status_code=400)
+    except AppError:
+        raise
+    except Exception:
+        pass
 
 
 def _check_png_dimensions(data: bytes) -> None:
@@ -18,21 +40,6 @@ def _check_png_dimensions(data: bytes) -> None:
         raise AppError(code="IMAGE_TOO_LARGE", message="Image dimensions exceed limit", status_code=400)
 
 
-def _check_jpeg_dimensions(data: bytes) -> None:
-    """Scan JPEG markers for SOF to read dimensions without full decode."""
-    try:
-        from PIL import Image, UnidentifiedImageError
-        with Image.open(io.BytesIO(data)) as img:
-            w, h = img.size
-        if w > _MAX_DIMENSION or h > _MAX_DIMENSION:
-            raise AppError(code="IMAGE_TOO_LARGE", message="Image dimensions exceed limit", status_code=400)
-    except AppError:
-        raise
-    except (OSError, UnidentifiedImageError, SyntaxError):
-        # Corrupt or truncated JPEG — skip dimension check, let processing catch it
-        pass
-
-
 def validate_image_bytes(data: bytes) -> None:
     """Raise AppError if *data* does not look like a supported image."""
     if len(data) < _MIN_FILE_SIZE:
@@ -40,7 +47,7 @@ def validate_image_bytes(data: bytes) -> None:
 
     # JPEG: FF D8 FF
     if data[:3] == b"\xff\xd8\xff":
-        _check_jpeg_dimensions(data)
+        _check_pillow_dimensions(data)
         return
     # PNG: 89 50 4E 47 0D 0A 1A 0A
     if data[:8] == b"\x89PNG\r\n\x1a\n":
@@ -48,20 +55,25 @@ def validate_image_bytes(data: bytes) -> None:
         return
     # WebP: RIFF....WEBP
     if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        _check_pillow_dimensions(data)
         return
     # GIF: GIF87a / GIF89a
     if data[:6] in (b"GIF87a", b"GIF89a"):
+        _check_pillow_dimensions(data)
         return
     # BMP: BM
     if data[:2] == b"BM":
+        _check_pillow_dimensions(data)
         return
     # TIFF: II (little-endian) or MM (big-endian)
     if data[:4] in (b"II\x2a\x00", b"MM\x00\x2a"):
+        _check_pillow_dimensions(data)
         return
     # HEIF / HEIC: ftyp box with known brands
     if data[4:8] == b"ftyp":
         brand = data[8:12].lower()
         if brand in (b"heic", b"mif1", b"msf1", b"heix", b"hevc"):
+            _check_pillow_dimensions(data)
             return
 
     raise AppError(code="INVALID_FILE_TYPE", message="Unsupported image format", status_code=400)

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -52,6 +54,7 @@ class UnlockResult(BaseModel):
 
 @router.post("/{file_id}/unlock", response_model=UnlockResult)
 async def unlock(
+    request: Request,
     file_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -95,6 +98,7 @@ async def unlock(
     # Charge credits (idempotent via reference_id)
     ref_id = f"unlock:{target_file_id}"
     credit_svc = CreditService(db)
+    charged = False
     if not await credit_svc.has_transaction(user_id=user.id, reference_id=ref_id):
         await credit_svc.consume(
             user_id=user.id,
@@ -102,6 +106,18 @@ async def unlock(
             tx_type="tool_use",
             description=f"Unlock file {target_file_id[:8]}",
             reference_id=ref_id,
+        )
+        charged = True
+
+    if charged:
+        await audit(
+            category="credit",
+            action="unlock",
+            user_id=user.id,
+            resource_type="file",
+            resource_id=target_file_id,
+            ip=get_remote_address(request),
+            detail={"credit_cost": credit_cost},
         )
 
     download_url = files.build_download_url(
