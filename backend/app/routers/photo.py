@@ -8,6 +8,7 @@ from app.core.dependencies import get_db, get_verified_user
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, dynamic_rate_limit_heavy, limiter
 from app.core.task_limiter import acquire_task_slot
+from app.core.tool_recording import ToolGatewayRoute
 from app.models.user import User
 from app.schemas.image import FileResult
 from app.schemas.photo import (
@@ -18,17 +19,24 @@ from app.schemas.photo import (
     PhotoStandard,
     PhotoUploadResponse,
 )
-from app.services.history_service import HistoryService
 from app.services.photo_service import PhotoService
 
-router = APIRouter(prefix=f"{settings.api_prefix}/photo", tags=["photo"])
+# Gateway router for final-output endpoints (export/layout)
+router = APIRouter(
+    prefix=f"{settings.api_prefix}/photo",
+    tags=["photo"],
+    route_class=ToolGatewayRoute,
+)
+
+# Plain router for preparatory and read-only endpoints
+router_public = APIRouter(prefix=f"{settings.api_prefix}/photo", tags=["photo"])
 
 
 def _max_image_bytes() -> int:
     return settings.max_upload_image_mb * 1024 * 1024
 
 
-@router.post("/upload", response_model=PhotoUploadResponse)
+@router_public.post("/upload", response_model=PhotoUploadResponse)
 @limiter.limit(dynamic_rate_limit_heavy)
 async def upload(
     request: Request,
@@ -49,7 +57,7 @@ async def upload(
         sem.release()
 
 
-@router.post("/preview", response_model=PhotoPreviewResponse)
+@router_public.post("/preview", response_model=PhotoPreviewResponse)
 @limiter.limit(dynamic_rate_limit)
 async def preview(
     request: Request,
@@ -77,9 +85,7 @@ async def export(
 ) -> FileResult:
     sem = await acquire_task_slot(request)
     try:
-        result = await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
-        await HistoryService(db).record(user_id=user.id, tool_name="photo/export")
-        return result
+        return await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
     finally:
         sem.release()
 
@@ -94,18 +100,16 @@ async def layout(
 ) -> FileResult:
     sem = await acquire_task_slot(request)
     try:
-        result = await PhotoService().layout(
+        return await PhotoService().layout(
             processed_id=payload.processed_id,
             copies=payload.copies,
             user_id=user.id,
             db=db,
         )
-        await HistoryService(db).record(user_id=user.id, tool_name="photo/layout")
-        return result
     finally:
         sem.release()
 
 
-@router.get("/standards", response_model=list[PhotoStandard])
+@router_public.get("/standards", response_model=list[PhotoStandard])
 async def standards() -> list[PhotoStandard]:
     return PhotoService().get_standards()

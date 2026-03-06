@@ -155,10 +155,16 @@ async def upscale(
     img: ImageInput = Depends(validated_image),
     scale: int = Form(4),
     model: str | None = Form(None),
+    denoise_strength: float | None = Form(None),
+    face_enhance: bool = Form(False),
 ) -> FileResult:
     params: dict[str, Any] = {}
     if model is not None:
         params["model"] = model
+    if denoise_strength is not None:
+        params["denoise_strength"] = denoise_strength
+    if face_enhance:
+        params["face_enhance"] = True
     return await ImageService(owner_user_id=_owner_user_id(request)).upscale(
         image_bytes=img.data, filename=img.filename, scale=scale,
         credit_cost=_credit_cost(request), **params,
@@ -171,10 +177,14 @@ async def restore_face(
     request: Request,
     img: ImageInput = Depends(validated_image),
     weight: float = Form(0.5),
+    upscale: int | None = Form(None),
 ) -> FileResult:
+    params: dict[str, Any] = {}
+    if upscale is not None:
+        params["upscale"] = upscale
     return await ImageService(owner_user_id=_owner_user_id(request)).restore_face(
         image_bytes=img.data, filename=img.filename, weight=weight,
-        credit_cost=_credit_cost(request),
+        credit_cost=_credit_cost(request), **params,
     )
 
 
@@ -185,11 +195,15 @@ async def denoise(
     img: ImageInput = Depends(validated_image),
     strength: float = Form(1.0),
     task: str = Form("denoise"),
+    model_width: int | None = Form(None),
 ) -> FileResult:
+    params: dict[str, Any] = {}
+    if model_width is not None:
+        params["model_width"] = model_width
     return await ImageService(owner_user_id=_owner_user_id(request)).denoise(
         image_bytes=img.data, filename=img.filename,
         strength=strength, task=task,
-        credit_cost=_credit_cost(request),
+        credit_cost=_credit_cost(request), **params,
     )
 
 

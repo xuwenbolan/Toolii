@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 # Categories where all endpoints share a single tool identity
 _CATEGORY_TOOL_OVERRIDES = {
     "pdf": "pdf/tools",
+    "photo": "photo/idphoto",
 }
 
 
