@@ -100,11 +100,18 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
-        # Local fallback models (kept warm in case Cortex is unavailable)
-        with _suppress_native_stderr():
-            prewarm_background_models(["silueta"])
-            prewarm_face_landmarker()
-            prewarm_facenet()
+        # Pre-warm ML models in a background thread so startup is not blocked
+        import threading
+
+        def _prewarm_models() -> None:
+            with _suppress_native_stderr():
+                prewarm_background_models(["silueta"])
+                prewarm_face_landmarker()
+                prewarm_facenet()
+            logger.info("Local fallback models loaded")
+
+        threading.Thread(target=_prewarm_models, name="model-prewarm", daemon=True).start()
+
         # Cortex GPU service connectivity check
         try:
             health = await cortex_client.health_check()
