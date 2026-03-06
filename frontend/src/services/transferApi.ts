@@ -51,6 +51,7 @@ export type TransferMyItem = {
   download_count: number
   max_downloads: number | null
   burn_after_read: boolean
+  extract_code: string | null
   expires_at: string
   created_at: string
 }

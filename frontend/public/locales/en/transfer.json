@@ -80,6 +80,7 @@
     "loadFailed": "Failed to load transfers",
     "files": "{{count}} files",
     "downloads": "{{count}} downloads",
+    "extractCode": "Code: {{code}}",
     "statusActive": "Active",
     "statusExpired": "Expired",
     "statusBurned": "Burned",

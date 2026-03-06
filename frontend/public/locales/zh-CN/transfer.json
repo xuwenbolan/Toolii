@@ -80,6 +80,7 @@
     "loadFailed": "加载传输记录失败",
     "files": "{{count}} 个文件",
     "downloads": "{{count}} 次下载",
+    "extractCode": "提取码：{{code}}",
     "statusActive": "有效",
     "statusExpired": "已过期",
     "statusBurned": "已销毁",

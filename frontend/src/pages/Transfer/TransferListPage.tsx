@@ -125,6 +125,11 @@ export function TransferListPage() {
                       <span className="text-xs text-muted-foreground">
                         {t('list.downloads', { count: item.download_count })}
                       </span>
+                      {item.extract_code ? (
+                        <span className="text-xs text-muted-foreground">
+                          {t('list.extractCode', { code: item.extract_code })}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {t('list.expires', { date: formatTime(item.expires_at, i18n.language) })}
