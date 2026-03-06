@@ -81,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(credits.router)
     app.include_router(share.router)
     app.include_router(photo.router)
+    app.include_router(photo.router_public)
     app.include_router(image.router)
     app.include_router(pdf.router)
     app.include_router(download.router)
