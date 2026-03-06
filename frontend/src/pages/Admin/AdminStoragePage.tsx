@@ -20,9 +20,7 @@ function formatBytes(bytes: number): string {
 }
 
 const DIR_LABELS: Record<string, { zh: string; en: string }> = {
-  files: { zh: '处理文件', en: 'Processed Files' },
-  transfers: { zh: '文件传输', en: 'File Transfers' },
-  result_shares: { zh: '结果分享', en: 'Result Shares' },
+  hub: { zh: '文件中心', en: 'File Hub' },
 }
 
 export function AdminStoragePage() {
@@ -43,8 +41,7 @@ export function AdminStoragePage() {
     mutationFn: () => triggerStorageCleanup('all'),
     onSuccess: (result) => {
       const parts: string[] = []
-      if (result.files_removed > 0) parts.push(`${result.files_removed} files`)
-      if (result.transfers_expired > 0) parts.push(`${result.transfers_expired} transfers`)
+      if (result.hub_expired > 0) parts.push(`${result.hub_expired} hub files`)
       if (result.shares_expired > 0) parts.push(`${result.shares_expired} shares`)
       toast.success(parts.length > 0 ? `Cleaned: ${parts.join(', ')}` : t('storage.cleanupEmpty'))
       queryClient.invalidateQueries({ queryKey: ['admin', 'storage-overview'] })

@@ -8,13 +8,14 @@ import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  fetchFileTransfers,
-  forceExpireTransfer,
-  deleteTransfer,
+  fetchHubFiles,
+  deleteHubFile,
+  fetchShareGroups,
+  deleteShareGroup,
   fetchResultShares,
   deleteResultShare,
 } from '@/services/adminApi'
-import type { AdminFileTransferItem, AdminResultShareItem } from '@/services/adminApi'
+import type { AdminHubFileItem, AdminShareGroupItem, AdminResultShareItem } from '@/services/adminApi'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 
 const PAGE_SIZE = 20
@@ -27,74 +28,67 @@ function formatBytes(bytes: number): string {
   return `${val < 10 ? val.toFixed(1) : Math.round(val)} ${units[i]}`
 }
 
-// -- Tab 1: File Transfers ---------------------------------------------------
+// -- Tab 1: Hub Files --------------------------------------------------------
 
-const TRANSFER_STATUSES = ['active', 'expired', 'burned', 'deleted']
+const SOURCE_FILTERS = ['all', 'upload', 'tool_result']
 
-function FileTransfersTab() {
+function HubFilesTab() {
   const { t } = useTranslation('console')
   const queryClient = useQueryClient()
-  const [status, setStatus] = useState('all')
+  const [source, setSource] = useState('all')
   const [offset, setOffset] = useState(0)
-  const [confirmAction, setConfirmAction] = useState<{ id: number; action: 'expire' | 'delete' } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'file-transfers', { status, offset }],
+    queryKey: ['admin', 'hub-files', { source, offset }],
     queryFn: () => {
-      const params: { limit: number; offset: number; status?: string } = { limit: PAGE_SIZE, offset }
-      if (status !== 'all') params.status = status
-      return fetchFileTransfers(params)
+      const params: { limit: number; offset: number; source?: string } = { limit: PAGE_SIZE, offset }
+      if (source !== 'all') params.source = source
+      return fetchHubFiles(params)
     },
   })
 
   const items = data?.items ?? []
   const total = data?.total ?? 0
 
-  const expireMutation = useMutation({
-    mutationFn: forceExpireTransfer,
-    onSuccess: () => {
-      toast.success(t('common.success'))
-      queryClient.invalidateQueries({ queryKey: ['admin', 'file-transfers'] })
-      setConfirmAction(null)
-    },
-    onError: (err) => toast.error(getTranslatedApiError(err, t('common.error'))),
-  })
-
   const deleteMutation = useMutation({
-    mutationFn: deleteTransfer,
+    mutationFn: deleteHubFile,
     onSuccess: () => {
       toast.success(t('common.success'))
-      queryClient.invalidateQueries({ queryKey: ['admin', 'file-transfers'] })
-      setConfirmAction(null)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'hub-files'] })
+      setConfirmDelete(null)
     },
     onError: (err) => toast.error(getTranslatedApiError(err, t('common.error'))),
   })
 
   const filterOptions = useMemo(
-    () => [
-      { value: 'all', label: t('transfers.allStatus') },
-      ...TRANSFER_STATUSES.map((s) => ({ value: s, label: s })),
-    ],
+    () => SOURCE_FILTERS.map((s) => ({
+      value: s,
+      label: s === 'all' ? t('transfers.allStatus') : s === 'upload' ? t('transfers.sourceUpload') : t('transfers.sourceTool'),
+    })),
     [t],
   )
 
-  const columns: Column<AdminFileTransferItem>[] = useMemo(
+  const columns: Column<AdminHubFileItem>[] = useMemo(
     () => [
       { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
-      { key: 'token', header: t('transfers.token'), render: (i) => <code className="text-xs">{i.token}</code> },
+      {
+        key: 'filename',
+        header: t('transfers.fileName'),
+        render: (i) => <span className="max-w-[180px] truncate block" title={i.file_name}>{i.file_name}</span>,
+      },
       { key: 'user', header: t('transfers.user'), hiddenOnMobile: true, render: (i) => i.user_email ?? '-' },
       {
-        key: 'files',
-        header: t('transfers.files'),
+        key: 'size',
+        header: t('transfers.size'),
         align: 'right' as const,
-        render: (i) => `${i.file_count} / ${formatBytes(i.total_size)}`,
+        render: (i) => formatBytes(i.size),
       },
       {
-        key: 'downloads',
-        header: t('transfers.downloads'),
-        align: 'right' as const,
+        key: 'source',
+        header: t('transfers.source'),
         hiddenOnMobile: true,
-        render: (i) => `${i.download_count}${i.max_downloads != null ? ` / ${i.max_downloads}` : ''}`,
+        render: (i) => <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{i.source}</span>,
       },
       {
         key: 'status',
@@ -112,27 +106,147 @@ function FileTransfersTab() {
         key: 'actions',
         header: '',
         align: 'right' as const,
-        render: (i) =>
-          i.status === 'active' ? (
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setConfirmAction({ id: i.id, action: 'expire' })}>
-                {t('transfers.expire')}
-              </Button>
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setConfirmAction({ id: i.id, action: 'delete' })}>
-                {t('transfers.delete')}
-              </Button>
-            </div>
-          ) : (
-            <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setConfirmAction({ id: i.id, action: 'delete' })}>
-              {t('transfers.delete')}
-            </Button>
-          ),
+        render: (i) => (
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setConfirmDelete(i.id)}>
+            {t('transfers.delete')}
+          </Button>
+        ),
       },
     ],
     [t],
   )
 
-  const isPending = expireMutation.isPending || deleteMutation.isPending
+  return (
+    <div className="space-y-4">
+      <AdminFilter
+        value={source}
+        options={filterOptions}
+        onChange={(v) => { setSource(v); setOffset(0) }}
+      />
+
+      <DataTable
+        columns={columns}
+        data={items}
+        rowKey={(i) => i.id}
+        loading={isLoading}
+        renderMobileCard={(i) => (
+          <div className="rounded-xl border bg-card px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium truncate max-w-[60%]">{i.file_name}</span>
+              <StatusBadge status={i.status} />
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{i.user_email ?? '-'}</span>
+              <span>{formatBytes(i.size)}</span>
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>{new Date(i.created_at).toLocaleString()}</span>
+              <button className="text-destructive hover:underline text-xs" onClick={() => setConfirmDelete(i.id)}>
+                {t('transfers.delete')}
+              </button>
+            </div>
+          </div>
+        )}
+      />
+      <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        title={t('transfers.deleteConfirmTitle')}
+        description={t('transfers.deleteConfirmDesc')}
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmDelete !== null && deleteMutation.mutate(confirmDelete)}
+      />
+    </div>
+  )
+}
+
+// -- Tab 2: Share Groups -----------------------------------------------------
+
+const GROUP_STATUSES = ['all', 'active', 'expired', 'deleted']
+
+function ShareGroupsTab() {
+  const { t } = useTranslation('console')
+  const queryClient = useQueryClient()
+  const [status, setStatus] = useState('all')
+  const [offset, setOffset] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'share-groups', { status, offset }],
+    queryFn: () => {
+      const params: { limit: number; offset: number; status?: string } = { limit: PAGE_SIZE, offset }
+      if (status !== 'all') params.status = status
+      return fetchShareGroups(params)
+    },
+  })
+
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteShareGroup,
+    onSuccess: () => {
+      toast.success(t('common.success'))
+      queryClient.invalidateQueries({ queryKey: ['admin', 'share-groups'] })
+      setConfirmDelete(null)
+    },
+    onError: (err) => toast.error(getTranslatedApiError(err, t('common.error'))),
+  })
+
+  const filterOptions = useMemo(
+    () => GROUP_STATUSES.map((s) => ({
+      value: s,
+      label: s === 'all' ? t('transfers.allStatus') : s,
+    })),
+    [t],
+  )
+
+  const columns: Column<AdminShareGroupItem>[] = useMemo(
+    () => [
+      { key: 'id', header: 'ID', hiddenOnMobile: true, render: (i) => i.id },
+      { key: 'token', header: t('transfers.token'), render: (i) => <code className="text-xs">{i.token}</code> },
+      { key: 'user', header: t('transfers.user'), hiddenOnMobile: true, render: (i) => i.user_email ?? '-' },
+      {
+        key: 'files',
+        header: t('transfers.files'),
+        align: 'right' as const,
+        render: (i) => `${i.file_count} / ${formatBytes(i.total_size)}`,
+      },
+      {
+        key: 'downloads',
+        header: t('transfers.downloads'),
+        align: 'right' as const,
+        hiddenOnMobile: true,
+        render: (i) => i.download_count,
+      },
+      {
+        key: 'status',
+        header: t('transfers.status'),
+        render: (i) => <StatusBadge status={i.status} />,
+      },
+      {
+        key: 'expires',
+        header: t('transfers.expiresAt'),
+        className: 'whitespace-nowrap',
+        hiddenOnMobile: true,
+        render: (i) => i.expires_at ? new Date(i.expires_at).toLocaleString() : '-',
+      },
+      {
+        key: 'actions',
+        header: '',
+        align: 'right' as const,
+        render: (i) => (
+          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setConfirmDelete(i.id)}>
+            {t('transfers.delete')}
+          </Button>
+        ),
+      },
+    ],
+    [t],
+  )
 
   return (
     <div className="space-y-4">
@@ -159,12 +273,9 @@ function FileTransfersTab() {
             </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>{new Date(i.created_at).toLocaleString()}</span>
-              {i.status === 'active' && (
-                <div className="flex gap-1">
-                  <button className="text-foreground hover:underline" onClick={() => setConfirmAction({ id: i.id, action: 'expire' })}>{t('transfers.expire')}</button>
-                  <button className="text-destructive hover:underline" onClick={() => setConfirmAction({ id: i.id, action: 'delete' })}>{t('transfers.delete')}</button>
-                </div>
-              )}
+              <button className="text-destructive hover:underline text-xs" onClick={() => setConfirmDelete(i.id)}>
+                {t('transfers.delete')}
+              </button>
             </div>
           </div>
         )}
@@ -172,23 +283,19 @@ function FileTransfersTab() {
       <Pagination offset={offset} limit={PAGE_SIZE} total={total} onOffsetChange={setOffset} />
 
       <ConfirmDialog
-        open={confirmAction !== null}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-        title={confirmAction?.action === 'expire' ? t('transfers.expireConfirmTitle') : t('transfers.deleteConfirmTitle')}
-        description={confirmAction?.action === 'expire' ? t('transfers.expireConfirmDesc') : t('transfers.deleteConfirmDesc')}
-        variant={confirmAction?.action === 'delete' ? 'destructive' : undefined}
-        loading={isPending}
-        onConfirm={() => {
-          if (!confirmAction) return
-          if (confirmAction.action === 'expire') expireMutation.mutate(confirmAction.id)
-          else deleteMutation.mutate(confirmAction.id)
-        }}
+        open={confirmDelete !== null}
+        onOpenChange={(open) => !open && setConfirmDelete(null)}
+        title={t('transfers.deleteConfirmTitle')}
+        description={t('transfers.deleteConfirmDesc')}
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => confirmDelete !== null && deleteMutation.mutate(confirmDelete)}
       />
     </div>
   )
 }
 
-// -- Tab 2: Result Shares ----------------------------------------------------
+// -- Tab 3: Result Shares ----------------------------------------------------
 
 const SHARE_TYPES = [
   'profile', 'report', 'similarity',
@@ -353,15 +460,17 @@ export function AdminTransfersPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold">{t('transfers.title')}</h1>
 
-      <Tabs defaultValue="fileTransfers">
+      <Tabs defaultValue="hubFiles">
         <div className="overflow-x-auto no-scrollbar">
           <TabsList>
-            <TabsTrigger value="fileTransfers">{t('transfers.tabs.fileTransfers')}</TabsTrigger>
+            <TabsTrigger value="hubFiles">{t('transfers.tabs.hubFiles')}</TabsTrigger>
+            <TabsTrigger value="shareGroups">{t('transfers.tabs.shareGroups')}</TabsTrigger>
             <TabsTrigger value="resultShares">{t('transfers.tabs.resultShares')}</TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="fileTransfers"><FileTransfersTab /></TabsContent>
+        <TabsContent value="hubFiles"><HubFilesTab /></TabsContent>
+        <TabsContent value="shareGroups"><ShareGroupsTab /></TabsContent>
         <TabsContent value="resultShares"><ResultSharesTab /></TabsContent>
       </Tabs>
     </div>

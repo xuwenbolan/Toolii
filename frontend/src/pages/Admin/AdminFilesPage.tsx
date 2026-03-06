@@ -33,22 +33,18 @@ function formatTimestamp(ts: number): string {
 }
 
 const DIR_OPTIONS_ZH: Record<string, string> = {
-  files: '处理文件',
-  transfers: '文件传输',
-  result_shares: '结果分享',
+  hub: '文件中心',
 }
 
 const DIR_OPTIONS_EN: Record<string, string> = {
-  files: 'Processed Files',
-  transfers: 'File Transfers',
-  result_shares: 'Result Shares',
+  hub: 'File Hub',
 }
 
 export function AdminFilesPage() {
   const { t, i18n } = useTranslation('console')
   const isZh = i18n.language.startsWith('zh')
 
-  const [directory, setDirectory] = useState('files')
+  const [directory, setDirectory] = useState('hub')
   const [offset, setOffset] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')

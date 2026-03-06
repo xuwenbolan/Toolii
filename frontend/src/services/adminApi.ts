@@ -215,32 +215,49 @@ export type AdminProcessingHistoryListResponse = {
 }
 
 export type StorageCleanupResponse = {
-  files_removed: number
-  transfers_expired: number
+  hub_expired: number
   shares_expired: number
 }
 
-// ── Transfers & Shares types ──────────────────────────────
+// ── Hub Files & Share Groups types ────────────────────────
 
-export type AdminFileTransferItem = {
+export type AdminHubFileItem = {
   id: number
-  token: string
-  user_id: number
+  user_id: number | null
   user_email: string | null
-  file_count: number
-  total_size: number
-  download_count: number
-  max_downloads: number | null
+  file_name: string
+  size: number
+  content_type: string
+  source: string
   status: string
-  burn_after_read: boolean
-  has_extract_code: boolean
-  message: string | null
   expires_at: string
   created_at: string
 }
 
-export type AdminFileTransferListResponse = {
-  items: AdminFileTransferItem[]
+export type AdminHubFileListResponse = {
+  items: AdminHubFileItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export type AdminShareGroupItem = {
+  id: number
+  user_id: number
+  user_email: string | null
+  token: string
+  file_count: number
+  total_size: number
+  download_count: number
+  has_extract_code: boolean
+  message: string | null
+  status: string
+  expires_at: string | null
+  created_at: string
+}
+
+export type AdminShareGroupListResponse = {
+  items: AdminShareGroupItem[]
   total: number
   limit: number
   offset: number
@@ -570,27 +587,39 @@ export async function fetchUsageLog(params?: {
   return res.data
 }
 
-// ── Transfers & Shares ───────────────────────────────────
+// ── Hub Files & Share Groups ─────────────────────────────
 
-export async function fetchFileTransfers(params?: {
+export async function fetchHubFiles(params?: {
   limit?: number
   offset?: number
-  status?: string
+  source?: string
 }) {
-  const res = await api.get<AdminFileTransferListResponse>(
-    '/api/admin/transfers/file-transfers',
+  const res = await api.get<AdminHubFileListResponse>(
+    '/api/admin/transfers/hub-files',
     { params },
   )
   return res.data
 }
 
-export async function forceExpireTransfer(transferId: number) {
-  const res = await api.put(`/api/admin/transfers/file-transfers/${transferId}/expire`)
+export async function deleteHubFile(fileId: number) {
+  const res = await api.delete(`/api/admin/transfers/hub-files/${fileId}`)
   return res.data
 }
 
-export async function deleteTransfer(transferId: number) {
-  const res = await api.delete(`/api/admin/transfers/file-transfers/${transferId}`)
+export async function fetchShareGroups(params?: {
+  limit?: number
+  offset?: number
+  status?: string
+}) {
+  const res = await api.get<AdminShareGroupListResponse>(
+    '/api/admin/transfers/share-groups',
+    { params },
+  )
+  return res.data
+}
+
+export async function deleteShareGroup(groupId: number) {
+  const res = await api.delete(`/api/admin/transfers/share-groups/${groupId}`)
   return res.data
 }
 
