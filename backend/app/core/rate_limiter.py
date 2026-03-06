@@ -76,20 +76,20 @@ def rate_limit_key(request: Request) -> str:
 limiter = Limiter(key_func=rate_limit_key)
 
 
-def dynamic_rate_limit(key: str) -> str:
+def dynamic_rate_limit(key: str = "") -> str:
     if key.startswith("user:"):
         return settings.rate_limit_auth
     return settings.rate_limit_anon
 
 
-def dynamic_rate_limit_heavy(key: str) -> str:
+def dynamic_rate_limit_heavy(key: str = "") -> str:
     """Stricter rate limit for compute-heavy endpoints (e.g. background removal)."""
     if key.startswith("user:"):
         return settings.rate_limit_heavy_auth
     return settings.rate_limit_heavy_anon
 
 
-def admin_write_rate_limit(_key: str) -> str:
+def admin_write_rate_limit(_key: str = "") -> str:
     """Fixed rate limit for admin write operations."""
     return settings.rate_limit_admin_write
 
