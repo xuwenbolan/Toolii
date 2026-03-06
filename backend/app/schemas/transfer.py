@@ -46,6 +46,7 @@ class TransferMyItem(BaseModel):
     download_count: int
     max_downloads: int | None = None
     burn_after_read: bool = False
+    extract_code: str | None = None
     expires_at: datetime
     created_at: datetime
 

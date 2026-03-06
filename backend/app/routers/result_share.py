@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from slowapi.util import get_remote_address
@@ -11,6 +11,7 @@ from slowapi.util import get_remote_address
 from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_db, get_optional_user
+from app.core.file_response import file_response
 from app.core.file_validation import validate_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.models.user import User
@@ -215,12 +216,12 @@ async def get_result_share_image(
     token: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """Serve the stored result image. Public, no auth required."""
     svc = ResultShareService(db)
     share = await svc.get_share(token=token)
     path, content_type = svc.get_image(file_id=share.image_file_id)
-    return FileResponse(
+    return file_response(
         path,
         media_type=content_type,
         headers={"Cache-Control": "public, max-age=86400"},
@@ -233,14 +234,14 @@ async def get_result_share_original(
     token: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     """Serve the original (before) image. Public, no auth required."""
     svc = ResultShareService(db)
     share = await svc.get_share(token=token)
     if not share.original_image_file_id:
         raise HTTPException(status_code=404, detail="No original image")
     path, content_type = svc.get_image(file_id=share.original_image_file_id)
-    return FileResponse(
+    return file_response(
         path,
         media_type=content_type,
         headers={"Cache-Control": "public, max-age=86400"},

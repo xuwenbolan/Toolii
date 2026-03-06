@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import hmac
-import io
 import logging
 import secrets
 import string
+import tempfile
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import SQLAlchemyError
@@ -62,7 +63,7 @@ class SingleDownloadResult:
 
 @dataclass(slots=True)
 class ZipDownloadResult:
-    data: bytes
+    path: str
     filename: str
     burn_after_read: bool
     transfer_id: int
@@ -400,27 +401,35 @@ class TransferService:
                 status_code=400,
             )
 
-        buf = io.BytesIO()
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            seen_names: dict[str, int] = {}
-            for f in transfer.files:
-                stored = self._files.get(f.file_id)
-                name = f.original_filename
-                if name in seen_names:
-                    seen_names[name] += 1
-                    stem, dot, ext = name.rpartition(".")
-                    if dot:
-                        name = f"{stem}_{seen_names[name]}.{ext}"
+        tmp_dir = Path(settings.data_dir).resolve() / "tmp"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp = tempfile.NamedTemporaryFile(
+            dir=tmp_dir, suffix=".zip", delete=False,
+        )
+        try:
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+                seen_names: dict[str, int] = {}
+                for f in transfer.files:
+                    stored = self._files.get(f.file_id)
+                    name = f.original_filename
+                    if name in seen_names:
+                        seen_names[name] += 1
+                        stem, dot, ext = name.rpartition(".")
+                        if dot:
+                            name = f"{stem}_{seen_names[name]}.{ext}"
+                        else:
+                            name = f"{name}_{seen_names[name]}"
                     else:
-                        name = f"{name}_{seen_names[name]}"
-                else:
-                    seen_names[name] = 0
-                zf.writestr(name, stored.path.read_bytes())
+                        seen_names[name] = 0
+                    zf.writestr(name, stored.path.read_bytes())
+        except BaseException:
+            Path(tmp.name).unlink(missing_ok=True)
+            raise
 
         await self._atomic_increment_download(transfer.id)
 
         return ZipDownloadResult(
-            data=buf.getvalue(),
+            path=tmp.name,
             filename=f"transfer-{token}.zip",
             burn_after_read=transfer.burn_after_read,
             transfer_id=transfer.id,

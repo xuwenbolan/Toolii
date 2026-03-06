@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 from slowapi.util import get_remote_address
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.exceptions import AppError
+from app.core.file_response import file_response
 from app.core.security import verify_download_signature
 from app.models.user import User
 from app.services.credit_service import CreditService
@@ -27,7 +28,7 @@ async def download(
     fn: str = Query(..., alias="fn"),
     exp: int = Query(..., alias="exp"),
     sig: str = Query(..., alias="sig"),
-) -> FileResponse:
+) -> Response:
     now = int(time.time())
     if exp < now:
         raise HTTPException(status_code=410, detail="Expired")
@@ -40,7 +41,7 @@ async def download(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Not found") from exc
 
-    return FileResponse(
+    return file_response(
         stored.path,
         media_type=stored.content_type,
         filename=fn,

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
@@ -10,6 +12,7 @@ from slowapi.util import get_remote_address
 from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db, get_verified_user
+from app.core.file_response import file_response
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.transfer_validation import validate_transfer_file
 from app.models.user import User
@@ -177,7 +180,7 @@ async def download_single_file(
     request: Request,  # noqa: ARG001
     code: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-) -> FileResponse:
+) -> Response:
     service = TransferService(db)
     result = await service.download_single(
         token=token,
@@ -185,7 +188,7 @@ async def download_single_file(
         extract_code=code,
     )
     bg = BackgroundTask(TransferService.burn_transfer_bg, result.transfer_id) if result.burn_after_read else None
-    return FileResponse(
+    return file_response(
         result.path,
         media_type=result.content_type,
         filename=result.filename,
@@ -204,15 +207,19 @@ async def download_zip(
 ) -> Response:
     service = TransferService(db)
     result = await service.download_zip(token=token, extract_code=code)
-    bg = BackgroundTask(TransferService.burn_transfer_bg, result.transfer_id) if result.burn_after_read else None
-    return Response(
-        content=result.data,
+
+    async def _cleanup() -> None:
+        os.unlink(result.path)
+        if result.burn_after_read:
+            await TransferService.burn_transfer_bg(result.transfer_id)
+
+    bg = BackgroundTask(_cleanup)
+    return file_response(
+        result.path,
         media_type="application/zip",
+        filename=result.filename,
         background=bg,
-        headers={
-            "Content-Disposition": f'attachment; filename="{result.filename}"',
-            "Cache-Control": "private, max-age=0",
-        },
+        headers={"Cache-Control": "private, max-age=0"},
     )
 
 
@@ -240,6 +247,7 @@ async def my_transfers(
                 download_count=t.download_count,
                 max_downloads=t.max_downloads,
                 burn_after_read=t.burn_after_read,
+                extract_code=t.extract_code,
                 expires_at=t.expires_at,
                 created_at=t.created_at,
             )

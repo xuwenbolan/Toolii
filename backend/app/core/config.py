@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     )
     result_share_ttl_days: int = Field(default=7, alias="RESULT_SHARE_TTL_DAYS")
 
+    # Nginx X-Accel-Redirect for Range request support (production only)
+    use_x_accel_redirect: bool = Field(default=False, alias="USE_X_ACCEL_REDIRECT")
+    data_dir: str = Field(default="../data", alias="DATA_DIR")
+    x_accel_prefix: str = Field(default="/internal-data", alias="X_ACCEL_PREFIX")
+
     # LLM settings (for physiognomy detailed analysis)
     llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
     llm_api_key: str = Field(default="", alias="LLM_API_KEY")
