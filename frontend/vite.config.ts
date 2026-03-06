@@ -137,6 +137,18 @@ function injectMeta(html: string, meta: SeoMeta, route: string): string {
   return html.replace('</head>', `    ${tags.join('\n    ')}\n  </head>`)
 }
 
+// Inject nonce placeholder into <script> tags so nginx can replace it
+// with a per-request value via sub_filter for CSP strict-dynamic support.
+function cspNoncePlugin(): Plugin {
+  return {
+    name: 'csp-nonce',
+    enforce: 'post',
+    transformIndexHtml(html) {
+      return html.replace(/<script /g, '<script nonce="__CSP_NONCE__" ')
+    },
+  }
+}
+
 function seoPlugin(): Plugin {
   return {
     name: 'seo-meta-and-sitemap',
@@ -198,7 +210,7 @@ function seoPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), seoPlugin()],
+  plugins: [react(), tailwindcss(), cspNoncePlugin(), seoPlugin()],
   build: {
     sourcemap: false,
     rollupOptions: {
