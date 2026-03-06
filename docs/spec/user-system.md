@@ -1,6 +1,63 @@
 # Module 4: User System
 
-Status: draft | Updated: 2026-03-03
+Status: draft | Updated: 2026-03-06
+
+---
+
+## Role & Permission Model
+
+Single `role` field on User model, three values with hierarchy: `superadmin > admin > user`.
+
+| Role | `role` value | Description |
+|------|-------------|-------------|
+| User | `user` (default) | Normal registered user |
+| Admin | `admin` | Operations staff, permissions controlled by superadmin |
+| Superadmin | `superadmin` | Site owner / root, full control, bypasses all permission checks |
+
+Replaces the old `is_admin` boolean field.
+
+### Superadmin
+
+- Bypasses all permission checks unconditionally
+- Can grant/revoke admin role for any user
+- Can configure which permissions each admin has
+- Cannot be disabled or demoted through the admin UI
+- Not created via UI — set directly in database or via CLI command
+
+### Admin Permissions
+
+Admins have an `admin_permissions` JSON field storing a list of permission keys.
+Superadmin assigns permissions when granting admin role.
+
+| Permission Key | Scope |
+|----------------|-------|
+| `dashboard` | View dashboard statistics |
+| `users` | View, disable/enable users, adjust credits |
+| `cards` | Generate and disable card codes |
+| `operations` | View tool usage, transactions, revenue, audit logs |
+| `storage` | Browse files, delete transfers/shares, storage cleanup |
+
+Expansion: add a new key, add `require_permission("key")` to routes. Existing admins without the new key are denied by default (secure default).
+
+### Permission Enforcement
+
+- `require_admin` — requires `role in (admin, superadmin)`
+- `require_superadmin` — requires `role == superadmin`
+- `require_permission(key)` — superadmin: pass; admin: check `key in admin_permissions`
+
+### Role Capability Matrix
+
+| Action | User | Admin | Superadmin |
+|--------|------|-------|------------|
+| Use tools | Yes | Yes | Yes |
+| Access admin panel | No | Yes | Yes |
+| Manage users (disable, adjust credits) | No | Needs `users` | Yes |
+| Generate card codes | No | Needs `cards` | Yes |
+| Delete data (transfers, shares) | No | Needs `storage` | Yes |
+| Storage cleanup | No | Needs `storage` | Yes |
+| Grant/revoke admin | No | No | Yes |
+| Modify admin permissions | No | No | Yes |
+| Disable another admin | No | No | Yes |
 
 ---
 
