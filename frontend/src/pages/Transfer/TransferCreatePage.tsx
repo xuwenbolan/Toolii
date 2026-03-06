@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, ClipboardCopy, Copy, FileIcon, Flame, Link2, Lock, Trash2 } from 'lucide-react'
+import { Check, ClipboardCopy, Copy, FileIcon, Link2, Lock, Trash2 } from 'lucide-react'
 import { Navigate, useLocation } from 'react-router-dom'
 
 import { SEOHead } from '@/components/common/SEOHead'
@@ -16,9 +16,9 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { createTransfer, type TransferCreateResponse } from '@/services/transferApi'
+import { quickShare, type QuickShareResponse } from '@/services/hubApi'
 
-const RETENTION_OPTIONS = ['1h', '24h', '7d'] as const
+const RETENTION_OPTIONS = [1, 3, 7] as const
 
 export function TransferCreatePage() {
   const { t, i18n } = useTranslation(['transfer', 'common'])
@@ -26,12 +26,10 @@ export function TransferCreatePage() {
   const location = useLocation()
 
   const [files, setFiles] = useState<File[]>([])
-  const [retention, setRetention] = useState<string>('24h')
+  const [retentionDays, setRetentionDays] = useState<number>(3)
   const [useExtractCode, setUseExtractCode] = useState(false)
-  const [maxDownloads, setMaxDownloads] = useState('')
   const [message, setMessage] = useState('')
-  const [burnAfterRead, setBurnAfterRead] = useState(false)
-  const [result, setResult] = useState<TransferCreateResponse | null>(null)
+  const [result, setResult] = useState<QuickShareResponse | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
@@ -42,33 +40,16 @@ export function TransferCreatePage() {
 
   const addFiles = useCallback(
     (newFiles: File[]) => {
-      if (burnAfterRead) {
-        // Burn mode: only keep the last selected file
-        setFiles(newFiles.slice(0, 1))
-      } else {
-        setFiles((prev) => [...prev, ...newFiles].slice(0, 20))
-      }
+      setFiles((prev) => [...prev, ...newFiles].slice(0, 20))
     },
-    [burnAfterRead],
+    [],
   )
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }, [])
 
-  const handleBurnToggle = useCallback(() => {
-    setBurnAfterRead((prev) => {
-      const next = !prev
-      if (next) {
-        setFiles((f) => f.slice(0, 1))
-        setMaxDownloads('')
-      }
-      return next
-    })
-  }, [])
-
-  const maxDownloadsValid = maxDownloads === '' || (Number(maxDownloads) >= 1 && Number.isInteger(Number(maxDownloads)))
-  const formValid = files.length > 0 && maxDownloadsValid
+  const formValid = files.length > 0
 
   const runState = useToolRunState({
     mode: 'manual',
@@ -84,7 +65,6 @@ export function TransferCreatePage() {
     },
   })
 
-  // Require login
   if (!user) {
     const redirect = encodeURIComponent(location.pathname)
     return <Navigate to={`/auth/login?redirect=${redirect}`} replace />
@@ -97,12 +77,10 @@ export function TransferCreatePage() {
 
     try {
       const res = await run((onProgress) =>
-        createTransfer(files, {
-          retention,
+        quickShare(files, {
+          retentionDays,
           useExtractCode: useExtractCode || undefined,
-          maxDownloads: burnAfterRead ? undefined : (maxDownloads ? Number(maxDownloads) : undefined),
           message: message || undefined,
-          burnAfterRead: burnAfterRead || undefined,
         }, onProgress),
       )
       setResult(res)
@@ -112,7 +90,7 @@ export function TransferCreatePage() {
     }
   }
 
-  const shareUrl = result ? `${window.location.origin}${result.transfer_path}` : ''
+  const shareUrl = result ? `${window.location.origin}${result.share.share_url}` : ''
 
   const handleCopy = async () => {
     if (!shareUrl) return
@@ -126,9 +104,9 @@ export function TransferCreatePage() {
   }
 
   const handleCopyCode = async () => {
-    if (!result?.extract_code) return
+    if (!result?.share.extract_code) return
     try {
-      await navigator.clipboard.writeText(result.extract_code)
+      await navigator.clipboard.writeText(result.share.extract_code)
       setCopiedCode(true)
       setTimeout(() => setCopiedCode(false), 2000)
     } catch {
@@ -138,11 +116,9 @@ export function TransferCreatePage() {
 
   const handleCreateAnother = () => {
     setFiles([])
-    setRetention('24h')
+    setRetentionDays(3)
     setUseExtractCode(false)
-    setMaxDownloads('')
     setMessage('')
-    setBurnAfterRead(false)
     setResult(null)
     setResultPanelOpen(false)
     setCopied(false)
@@ -165,11 +141,11 @@ export function TransferCreatePage() {
       >
         <div className="space-y-5">
           <ToolWorkspaceDropzone
-            multiple={!burnAfterRead}
-            maxFiles={burnAfterRead ? 1 : 20}
+            multiple
+            maxFiles={20}
             onFiles={addFiles}
             title={t('create.dropTitle')}
-            hint={burnAfterRead ? t('create.burnSingleFileHint') : t('create.dropHint')}
+            hint={t('create.dropHint')}
             browseLabel={t('create.browseLabel')}
           />
 
@@ -227,56 +203,25 @@ export function TransferCreatePage() {
                     <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${useExtractCode ? 'translate-x-4' : 'translate-x-0'}`} />
                   </div>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={handleBurnToggle}
-                  className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition ${burnAfterRead ? 'border-warning/50 bg-warning/10' : 'border-border/70 hover:bg-muted/40'}`}
-                >
-                  <Flame className={`h-5 w-5 shrink-0 ${burnAfterRead ? 'text-warning' : 'text-muted-foreground'}`} />
-                  <div className="min-w-0 flex-1">
-                    <p className={`text-sm font-medium ${burnAfterRead ? 'text-warning' : ''}`}>
-                      {t('create.burnAfterReadLabel')}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{t('create.burnAfterReadHint')}</p>
-                  </div>
-                  <div className={`h-5 w-9 shrink-0 rounded-full transition ${burnAfterRead ? 'bg-warning' : 'bg-muted'}`}>
-                    <div className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${burnAfterRead ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </div>
-                </button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>{t('create.retentionLabel')}</Label>
                   <div className="flex gap-2">
-                    {RETENTION_OPTIONS.map((opt) => (
+                    {RETENTION_OPTIONS.map((days) => (
                       <Button
-                        key={opt}
+                        key={days}
                         type="button"
                         size="sm"
-                        variant={retention === opt ? 'default' : 'outline'}
-                        onClick={() => setRetention(opt)}
+                        variant={retentionDays === days ? 'default' : 'outline'}
+                        onClick={() => setRetentionDays(days)}
                       >
-                        {t(`create.retention${opt}`)}
+                        {t(`create.retention${days}d`)}
                       </Button>
                     ))}
                   </div>
                 </div>
-
-                {!burnAfterRead ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="max-downloads">{t('create.maxDownloadsLabel')}</Label>
-                    <Input
-                      id="max-downloads"
-                      type="number"
-                      min={1}
-                      placeholder={t('create.maxDownloadsPlaceholder')}
-                      value={maxDownloads}
-                      onChange={(e) => setMaxDownloads(e.target.value)}
-                    />
-                  </div>
-                ) : null}
 
                 <div className="space-y-2">
                   <Label htmlFor="message">{t('create.messageLabel')}</Label>
@@ -343,17 +288,10 @@ export function TransferCreatePage() {
               </div>
             </div>
 
-            {result.burn_after_read ? (
-              <p className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm font-medium text-warning">
-                <Flame className="h-4 w-4 shrink-0" />
-                {t('result.burnReminder')}
-              </p>
-            ) : null}
-
-            {result.extract_code ? (
+            {result.share.extract_code ? (
               <div className="flex items-center justify-between rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
                 <span className="text-sm font-medium">
-                  {t('result.extractCodeReminder', { code: result.extract_code })}
+                  {t('result.extractCodeReminder', { code: result.share.extract_code })}
                 </span>
                 <Button
                   type="button"
@@ -374,7 +312,7 @@ export function TransferCreatePage() {
 
             <p className="text-xs text-muted-foreground">
               {t('result.expiresAt', {
-                date: new Date(result.expires_at).toLocaleString(i18n.language, {
+                date: new Date(result.share.expires_at).toLocaleString(i18n.language, {
                   month: '2-digit',
                   day: '2-digit',
                   hour: '2-digit',

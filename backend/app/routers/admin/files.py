@@ -17,7 +17,7 @@ router = APIRouter(prefix="/files", tags=["admin-files"])
 
 @router.get("", response_model=AdminFileListResponse)
 async def list_files(
-    directory: str = Query(pattern=r"^(files|transfers|result_shares)$"),
+    directory: str = Query(pattern=r"^(hub)$"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     search: str | None = Query(default=None, max_length=100),
@@ -33,7 +33,7 @@ async def list_files(
 async def get_download_url(
     request: Request,
     file_id: str = Path(pattern=r"^[a-f0-9]{32}$"),
-    directory: str = Query(pattern=r"^(files|transfers|result_shares)$"),
+    directory: str = Query(pattern=r"^(hub)$"),
     admin: User = Depends(get_admin_user),
 ) -> AdminFileDownloadResponse:
     try:

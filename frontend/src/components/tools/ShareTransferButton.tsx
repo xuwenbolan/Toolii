@@ -5,7 +5,12 @@ import { Check, Copy, Link2, Loader2 } from 'lucide-react'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
-import { createTransferFromResult } from '@/services/transferApi'
+import { api } from '@/services/api'
+
+type ShareFileResponse = {
+  token: string
+  share_url: string
+}
 
 type Props = {
   fileId: string
@@ -27,8 +32,8 @@ export function ShareTransferButton({ fileId, variant = 'outline', size, classNa
     setPending(true)
     setError(false)
     try {
-      const result = await createTransferFromResult(fileId)
-      const url = `${window.location.origin}${result.transfer_path}`
+      const res = await api.post<ShareFileResponse>(`/api/hub/share-file/${fileId}`)
+      const url = `${window.location.origin}${res.data.share_url}`
       setShareUrl(url)
       await navigator.clipboard.writeText(url)
       setCopied(true)
@@ -55,7 +60,6 @@ export function ShareTransferButton({ fileId, variant = 'outline', size, classNa
     return null
   }
 
-  // Already created - show copy button
   if (shareUrl) {
     return (
       <Button

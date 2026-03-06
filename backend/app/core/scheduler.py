@@ -5,32 +5,33 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.core import database as _db
 from app.core.login_guard import login_guard
 from app.core.token_blacklist import token_blacklist
+from app.services.hub_service import HubService
 from app.services.result_share_service import ResultShareService
-from app.services.file_service import FileService
 from app.services.photo_service import cleanup_expired_sessions
 from app.services.share_service import ShareService
-from app.services.transfer_service import TransferService
 
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 
 
 def setup_scheduler(_: AsyncIOScheduler) -> None:
-    def _cleanup_files() -> None:
-        FileService().cleanup_expired_files()
+    async def _expire_hub_files() -> None:
+        async with _db.SessionLocal() as db:
+            await HubService(db).expire_files()
+
+    scheduler.add_job(
+        _expire_hub_files,
+        "interval",
+        minutes=15,
+        id="expire_hub_files",
+        replace_existing=True,
+        misfire_grace_time=60,
+    )
 
     async def _expire_share_links() -> None:
         async with _db.SessionLocal() as db:
             await ShareService(db).expire_pending_links()
 
-    scheduler.add_job(
-        _cleanup_files,
-        "interval",
-        hours=1,
-        id="cleanup_files",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
     scheduler.add_job(
         _expire_share_links,
         "interval",
@@ -68,19 +69,6 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         misfire_grace_time=60,
     )
 
-    async def _expire_transfers() -> None:
-        async with _db.SessionLocal() as db:
-            await TransferService(db).expire_transfers()
-
-    scheduler.add_job(
-        _expire_transfers,
-        "interval",
-        minutes=15,
-        id="expire_transfers",
-        replace_existing=True,
-        misfire_grace_time=60,
-    )
-
     async def _expire_result_shares() -> None:
         async with _db.SessionLocal() as db:
             await ResultShareService(db).expire_shares()
@@ -99,7 +87,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         import uuid
         from datetime import datetime, timedelta, timezone
 
-        from sqlalchemy import select, update
+        from sqlalchemy import select
 
         from app.models.user import User
 
@@ -137,14 +125,12 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         import logging
         from datetime import datetime, timedelta, timezone
 
-        from sqlalchemy import delete, select
-
-        from sqlalchemy import update
+        from sqlalchemy import delete, select, update
 
         from app.models.credit_transaction import CreditTransaction
         from app.models.email_verification import EmailVerificationToken
         from app.models.result_share import ResultShare
-        from app.models.file_transfer import FileTransfer
+        from app.models.user_file import ShareGroup, UserFile
         from app.models.login_history import LoginHistory
         from app.models.password_reset import PasswordResetToken
         from app.models.processing_history import ProcessingHistory
@@ -191,9 +177,14 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
                 .where(ResultShare.user_id.in_(user_ids))
                 .values(user_id=None)
             )
-            # CASCADE on transfer_files handles child rows
             await db.execute(
-                delete(FileTransfer).where(FileTransfer.user_id.in_(user_ids))
+                update(UserFile)
+                .where(UserFile.user_id.in_(user_ids))
+                .values(user_id=None)
+            )
+            # CASCADE handles share_group_files
+            await db.execute(
+                delete(ShareGroup).where(ShareGroup.user_id.in_(user_ids))
             )
             await db.execute(
                 delete(ShareLink).where(ShareLink.from_user_id.in_(user_ids))

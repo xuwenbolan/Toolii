@@ -8,63 +8,78 @@ from app.core.dependencies import get_admin_user, get_db
 from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.schemas.admin import (
-    AdminFileTransferListResponse,
+    AdminHubFileListResponse,
     AdminResultShareListResponse,
+    AdminShareGroupListResponse,
 )
 from app.services.admin_service import AdminService
 
 router = APIRouter(prefix="/transfers", tags=["admin-transfers"])
 
 
-@router.get("/file-transfers", response_model=AdminFileTransferListResponse)
-async def list_file_transfers(
+@router.get("/hub-files", response_model=AdminHubFileListResponse)
+async def list_hub_files(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
     db=Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    status: str | None = Query(default=None),
-) -> AdminFileTransferListResponse:
-    data = await AdminService(db).list_file_transfers(
-        limit=limit, offset=offset, status=status,
+    source: str | None = Query(default=None),
+) -> AdminHubFileListResponse:
+    data = await AdminService(db).list_hub_files(
+        limit=limit, offset=offset, source=source,
     )
-    return AdminFileTransferListResponse(**data)
+    return AdminHubFileListResponse(**data)
 
 
-@router.put("/file-transfers/{transfer_id}/expire")
+@router.delete("/hub-files/{file_id}")
 @limiter.limit(admin_write_rate_limit)
-async def force_expire_transfer(
+async def delete_hub_file(
     request: Request,
-    transfer_id: int,
+    file_id: int,
     admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> dict:
-    await AdminService(db).force_expire_transfer(transfer_id)
+    await AdminService(db).delete_hub_file(file_id)
     await audit(
         category="admin",
-        action="force_expire_transfer",
+        action="delete_hub_file",
         user_id=admin.id,
-        resource_type="transfer",
-        resource_id=transfer_id,
+        resource_type="hub_file",
+        resource_id=file_id,
         ip=get_remote_address(request),
     )
     return {"status": "ok"}
 
 
-@router.delete("/file-transfers/{transfer_id}")
+@router.get("/share-groups", response_model=AdminShareGroupListResponse)
+async def list_share_groups(
+    admin: User = Depends(get_admin_user),  # noqa: ARG001
+    db=Depends(get_db),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: str | None = Query(default=None),
+) -> AdminShareGroupListResponse:
+    data = await AdminService(db).list_share_groups(
+        limit=limit, offset=offset, status=status,
+    )
+    return AdminShareGroupListResponse(**data)
+
+
+@router.delete("/share-groups/{group_id}")
 @limiter.limit(admin_write_rate_limit)
-async def delete_transfer(
+async def delete_share_group(
     request: Request,
-    transfer_id: int,
+    group_id: int,
     admin: User = Depends(get_admin_user),
     db=Depends(get_db),
 ) -> dict:
-    await AdminService(db).delete_transfer(transfer_id)
+    await AdminService(db).delete_share_group(group_id)
     await audit(
         category="admin",
-        action="delete_transfer",
+        action="delete_share_group",
         user_id=admin.id,
-        resource_type="transfer",
-        resource_id=transfer_id,
+        resource_type="share_group",
+        resource_id=group_id,
         ip=get_remote_address(request),
     )
     return {"status": "ok"}

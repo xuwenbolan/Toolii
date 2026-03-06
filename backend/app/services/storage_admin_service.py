@@ -9,9 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.processing_history import ProcessingHistory
-from app.services.file_service import FileService
+from app.services.hub_service import HubService
 from app.services.result_share_service import ResultShareService
-from app.services.transfer_service import TransferService
 from app.utils.time_utils import utcnow
 
 logger = logging.getLogger(__name__)
@@ -23,7 +22,7 @@ def _scan_directory(dir_path: Path) -> dict:
     total_size = 0
     if dir_path.exists():
         for p in dir_path.rglob("*"):
-            if not p.is_file() or p.suffix == ".json":
+            if not p.is_file():
                 continue
             count += 1
             try:
@@ -38,12 +37,7 @@ class StorageAdminService:
         self._db = db
 
     async def get_overview(self) -> dict:
-        dirs = [
-            Path(settings.file_storage_dir),
-            Path(settings.transfer_storage_dir),
-            Path(settings.result_share_storage_dir),
-        ]
-        # Run filesystem scan in thread pool to avoid blocking event loop
+        dirs = [Path(settings.hub_storage_dir)]
         loop = asyncio.get_running_loop()
         dir_stats = await asyncio.gather(
             *(loop.run_in_executor(None, _scan_directory, d) for d in dirs)
@@ -68,26 +62,18 @@ class StorageAdminService:
         }
 
     async def run_cleanup(self, target: str) -> dict:
-        files_removed = 0
-        transfers_expired = 0
+        hub_expired = 0
         shares_expired = 0
 
-        if target in ("files", "all"):
-            fs = FileService()
-            files_removed = await asyncio.get_running_loop().run_in_executor(
-                None, fs.cleanup_expired_files
-            )
-
-        if target in ("transfers", "all"):
-            svc = TransferService(self._db)
-            transfers_expired = await svc.expire_transfers()
+        if target in ("hub", "all"):
+            hub = HubService(self._db)
+            hub_expired = await hub.expire_files()
 
         if target in ("result_shares", "all"):
             svc = ResultShareService(self._db)
             shares_expired = await svc.expire_shares()
 
         return {
-            "files_removed": files_removed,
-            "transfers_expired": transfers_expired,
+            "hub_expired": hub_expired,
             "shares_expired": shares_expired,
         }

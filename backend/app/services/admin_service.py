@@ -15,7 +15,7 @@ from app.models.audit_log import AuditLog
 from app.models.card_code import CardCode
 from app.models.credit_transaction import CreditTransaction
 from app.models.result_share import ResultShare
-from app.models.file_transfer import FileTransfer, TransferStatus
+from app.models.user_file import FileStatus, ShareGroup, ShareGroupFile, ShareGroupStatus, UserFile
 from app.models.login_history import LoginHistory
 from app.models.processing_history import ProcessingHistory
 from app.models.share_link import ShareLink
@@ -690,29 +690,32 @@ class AdminService:
         ]
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
-    # ── Transfers ───────────────────────────────────────────
+    # ── Hub Files ─────────────────────────────────────────
 
-    async def list_file_transfers(
+    async def list_hub_files(
         self,
         *,
         limit: int = 20,
         offset: int = 0,
         status: str | None = None,
+        source: str | None = None,
     ) -> dict:
-        base = select(FileTransfer)
-        count_base = select(func.count()).select_from(FileTransfer)
+        base = select(UserFile)
+        count_base = select(func.count()).select_from(UserFile)
 
         if status:
-            base = base.where(FileTransfer.status == status)
-            count_base = count_base.where(FileTransfer.status == status)
+            base = base.where(UserFile.status == status)
+            count_base = count_base.where(UserFile.status == status)
+        if source:
+            base = base.where(UserFile.source == source)
+            count_base = count_base.where(UserFile.source == source)
 
         total = int((await self._db.execute(count_base)).scalar_one())
-        transfers = (await self._db.execute(
-            base.order_by(FileTransfer.id.desc()).limit(limit).offset(offset)
+        files = (await self._db.execute(
+            base.order_by(UserFile.id.desc()).limit(limit).offset(offset)
         )).scalars().all()
 
-        # Batch-load user emails
-        user_ids = list({t.user_id for t in transfers})
+        user_ids = list({f.user_id for f in files if f.user_id})
         emails: dict[int, str] = {}
         if user_ids:
             rows = (await self._db.execute(
@@ -722,57 +725,110 @@ class AdminService:
 
         items = [
             {
-                "id": t.id,
-                "token": t.token,
-                "user_id": t.user_id,
-                "user_email": emails.get(t.user_id),
-                "file_count": t.file_count,
-                "total_size": t.total_size,
-                "download_count": t.download_count,
-                "max_downloads": t.max_downloads,
-                "status": t.status,
-                "burn_after_read": t.burn_after_read,
-                "has_extract_code": t.extract_code is not None,
-                "message": t.message,
-                "expires_at": t.expires_at,
-                "created_at": t.created_at,
+                "id": f.id,
+                "user_id": f.user_id,
+                "user_email": emails.get(f.user_id) if f.user_id else None,
+                "file_name": f.original_filename,
+                "size": f.size,
+                "content_type": f.content_type,
+                "source": f.source,
+                "status": f.status,
+                "expires_at": f.expires_at,
+                "created_at": f.created_at,
             }
-            for t in transfers
+            for f in files
         ]
         return {"items": items, "total": total, "limit": limit, "offset": offset}
 
-    async def force_expire_transfer(self, transfer_id: int) -> None:
+    async def delete_hub_file(self, file_id: int) -> None:
         result = await self._db.execute(
-            select(FileTransfer)
-            .options(selectinload(FileTransfer.files))
-            .where(FileTransfer.id == transfer_id)
+            select(UserFile).where(UserFile.id == file_id)
         )
-        transfer = result.scalar_one_or_none()
-        if transfer is None:
-            raise NotFoundError("Transfer not found")
+        uf = result.scalar_one_or_none()
+        if uf is None:
+            raise NotFoundError("File not found")
 
-        fs = FileService(storage_dir=settings.transfer_storage_dir)
-        for f in transfer.files:
-            fs.delete(f.file_id)
-
-        transfer.status = TransferStatus.EXPIRED
+        fs = FileService()
+        fs.delete(uf.file_id)
+        uf.status = FileStatus.DELETED
+        await self._db.execute(
+            delete(ShareGroupFile).where(ShareGroupFile.user_file_id == uf.id)
+        )
         await self._db.commit()
 
-    async def delete_transfer(self, transfer_id: int) -> None:
+    async def list_share_groups(
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        status: str | None = None,
+    ) -> dict:
+        base = select(ShareGroup)
+        count_base = select(func.count()).select_from(ShareGroup)
+
+        if status:
+            base = base.where(ShareGroup.status == status)
+            count_base = count_base.where(ShareGroup.status == status)
+
+        total = int((await self._db.execute(count_base)).scalar_one())
+        groups = (await self._db.execute(
+            base.order_by(ShareGroup.id.desc()).limit(limit).offset(offset)
+        )).scalars().all()
+
+        user_ids = list({sg.user_id for sg in groups})
+        emails: dict[int, str] = {}
+        if user_ids:
+            rows = (await self._db.execute(
+                select(User.id, User.email).where(User.id.in_(user_ids))
+            )).all()
+            emails = {r[0]: r[1] for r in rows}
+
+        # Compute file_count and total_size per group
+        group_ids = [sg.id for sg in groups]
+        stats: dict[int, tuple[int, int]] = {}
+        if group_ids:
+            stats_rows = (await self._db.execute(
+                select(
+                    ShareGroupFile.share_group_id,
+                    func.count().label("fc"),
+                    func.coalesce(func.sum(UserFile.size), 0).label("ts"),
+                )
+                .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
+                .where(ShareGroupFile.share_group_id.in_(group_ids))
+                .group_by(ShareGroupFile.share_group_id)
+            )).all()
+            stats = {r[0]: (r[1], int(r[2])) for r in stats_rows}
+
+        items = [
+            {
+                "id": sg.id,
+                "token": sg.token,
+                "user_id": sg.user_id,
+                "user_email": emails.get(sg.user_id),
+                "file_count": stats.get(sg.id, (0, 0))[0],
+                "total_size": stats.get(sg.id, (0, 0))[1],
+                "download_count": sg.download_count,
+                "has_extract_code": sg.extract_code is not None,
+                "message": sg.message,
+                "status": sg.status,
+                "expires_at": sg.expires_at,
+                "created_at": sg.created_at,
+            }
+            for sg in groups
+        ]
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    async def delete_share_group(self, group_id: int) -> None:
         result = await self._db.execute(
-            select(FileTransfer)
-            .options(selectinload(FileTransfer.files))
-            .where(FileTransfer.id == transfer_id)
+            select(ShareGroup).where(ShareGroup.id == group_id)
         )
-        transfer = result.scalar_one_or_none()
-        if transfer is None:
-            raise NotFoundError("Transfer not found")
-
-        fs = FileService(storage_dir=settings.transfer_storage_dir)
-        for f in transfer.files:
-            fs.delete(f.file_id)
-
-        await self._db.delete(transfer)
+        sg = result.scalar_one_or_none()
+        if sg is None:
+            raise NotFoundError("Share group not found")
+        sg.status = ShareGroupStatus.DELETED
+        await self._db.execute(
+            delete(ShareGroupFile).where(ShareGroupFile.share_group_id == sg.id)
+        )
         await self._db.commit()
 
     # ── Result Shares ──────────────────────────────────────
@@ -897,7 +953,7 @@ class AdminService:
         if share is None:
             raise NotFoundError("Share not found")
 
-        fs = FileService(storage_dir=settings.result_share_storage_dir)
+        fs = FileService()
         for fid in (share.image_file_id, share.original_image_file_id):
             if not fid:
                 continue

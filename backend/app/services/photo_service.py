@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import io
 import json
 import threading
 import time
@@ -15,7 +14,6 @@ from typing import Any
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.exceptions import AppError
 from app.processing.compliance_checker import check_photo_compliance
 from app.processing.face_detection import select_primary_face
@@ -24,7 +22,7 @@ from app.processing.photo_layout import create_print_layout
 from app.schemas.image import FileResult
 from app.schemas.photo import ComplianceResult, CropBox, FaceBox, PhotoAdjust, PhotoPreviewResponse, PhotoStandard, PhotoUploadResponse, UploadWarning
 from app.services.credit_service import CreditService
-from app.services.file_service import FileService, StoredFile
+from app.services.file_service import FileService, build_download_url
 
 
 @dataclass
@@ -60,6 +58,8 @@ _session_lock = threading.Lock()
 
 # Sessions older than this (seconds) will be purged by the scheduler.
 _SESSION_TTL = 2 * 3600  # 2 hours
+
+_DEFAULT_EXPIRES_IN = 24 * 3600
 
 
 def cleanup_expired_sessions() -> int:
@@ -106,14 +106,14 @@ class PhotoService:
             raise AppError(code="STANDARD_NOT_FOUND", message="Photo standard not found", status_code=404)
         return item
 
-    def _to_file_result(self, stored: StoredFile, *, filename: str) -> FileResult:
+    def _to_file_result(self, file_id: str, size: int, *, filename: str, content_type: str = "image/png") -> FileResult:
         return FileResult(
-            file_id=stored.file_id,
+            file_id=file_id,
             filename=filename,
-            size=stored.size,
-            content_type=stored.content_type,
-            download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
-            expires_in=settings.file_retention_hours * 3600,
+            size=size,
+            content_type=content_type,
+            download_url=build_download_url(file_id=file_id, filename=filename),
+            expires_in=_DEFAULT_EXPIRES_IN,
         )
 
     async def _store_upload_session(self, session: UploadSession) -> None:
@@ -229,8 +229,8 @@ class PhotoService:
             raise AppError(code="PHOTO_COMPLIANCE_FAILED", message="Compliance check failed", status_code=400) from exc
 
         # Save original image and cutout PNG to disk
-        stored_original = self._files.save_bytes(data=image_bytes, filename=filename, content_type=content_type)
-        stored_cutout = self._files.save_bytes(data=cutout_png, filename=f"cutout-{filename}.png", content_type="image/png")
+        stored_original = self._files.save_bytes(image_bytes)
+        stored_cutout = self._files.save_bytes(cutout_png)
 
         upload_id = uuid.uuid4().hex
         model_used = str(bg_meta.get("model") or bg_meta.get("engine") or "fallback")
@@ -274,10 +274,10 @@ class PhotoService:
         upload = await self._get_upload_session(upload_id)
         standard = self._get_standard(standard_code)
 
-        original = self._files.get(upload.file_id)
-        image_bytes = original.path.read_bytes()
-        cutout_stored = self._files.get(upload.cutout_file_id)
-        cutout_png = cutout_stored.path.read_bytes()
+        original_path = self._files.get_path(upload.file_id)
+        image_bytes = original_path.read_bytes()
+        cutout_path = self._files.get_path(upload.cutout_file_id)
+        cutout_png = cutout_path.read_bytes()
         face = select_primary_face(upload.faces)
 
         loop = asyncio.get_running_loop()
@@ -301,7 +301,7 @@ class PhotoService:
             raise AppError(code="PHOTO_PREVIEW_FAILED", message="ID photo preview generation failed", status_code=400) from exc
 
         out_name = f"{standard_code}-id-photo.png"
-        stored = self._files.save_bytes(data=processed_png, filename=out_name, content_type="image/png")
+        stored = self._files.save_bytes(processed_png)
         processed_id = uuid.uuid4().hex
         await self._store_processed_session(
             ProcessedSession(
@@ -331,7 +331,8 @@ class PhotoService:
 
     async def export(self, *, processed_id: str, user_id: int, db: AsyncSession) -> FileResult:
         processed = await self._get_processed_session(processed_id)
-        stored = self._files.get(processed.file_id)
+        path = self._files.get_path(processed.file_id)
+        size = path.stat().st_size
         filename = f"{processed.standard_code}-id-photo.png"
 
         ref_id = f"photo:{processed_id}"
@@ -344,7 +345,7 @@ class PhotoService:
                 description=f"ID photo ({processed.standard_code})",
                 reference_id=ref_id,
             )
-        return self._to_file_result(stored, filename=filename)
+        return self._to_file_result(processed.file_id, size, filename=filename)
 
     async def layout(
         self,
@@ -368,8 +369,8 @@ class PhotoService:
                 description=f"ID photo ({processed.standard_code})",
                 reference_id=ref_id,
             )
-        stored_photo = self._files.get(processed.file_id)
-        photo_bytes = stored_photo.path.read_bytes()
+        photo_path = self._files.get_path(processed.file_id)
+        photo_bytes = photo_path.read_bytes()
 
         count = int(copies or standard.get("layout_default_copies", 8))
         if count < 1 or count > 20:
@@ -385,10 +386,6 @@ class PhotoService:
             raise AppError(code="PHOTO_LAYOUT_FAILED", message="Print layout export failed", status_code=400) from exc
 
         filename = f"{processed.standard_code}-layout-6x4.jpg"
-        layout_stored = self._files.save_bytes(
-            data=layout_bytes,
-            filename=filename,
-            content_type="image/jpeg",
-        )
+        layout_stored = self._files.save_bytes(layout_bytes)
 
-        return self._to_file_result(layout_stored, filename=filename)
+        return self._to_file_result(layout_stored.file_id, layout_stored.size, filename=filename, content_type="image/jpeg")

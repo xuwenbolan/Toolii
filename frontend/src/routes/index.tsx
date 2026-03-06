@@ -43,6 +43,7 @@ const WordCounterPage = lazy(() => import('@/pages/TextTools/WordCounterPage').t
 const TransferCreatePage = lazy(() => import('@/pages/Transfer/TransferCreatePage').then((m) => ({ default: m.TransferCreatePage })))
 const TransferReceivePage = lazy(() => import('@/pages/Transfer/TransferReceivePage').then((m) => ({ default: m.TransferReceivePage })))
 const TransferListPage = lazy(() => import('@/pages/Transfer/TransferListPage').then((m) => ({ default: m.TransferListPage })))
+const HubFilesPage = lazy(() => import('@/pages/Dashboard/HubFilesPage').then((m) => ({ default: m.HubFilesPage })))
 
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage').then((m) => ({ default: m.RegisterPage })))
@@ -152,6 +153,7 @@ export const router = createBrowserRouter([
           { path: 'redeem', element: <RedeemPage /> },
           { path: 'settings', element: <SettingsPage /> },
           { path: 'feedback', element: <FeedbackPage /> },
+          { path: 'hub', element: <HubFilesPage /> },
           { path: 'transfers', element: <TransferListPage /> },
         ],
       },

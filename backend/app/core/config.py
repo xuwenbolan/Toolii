@@ -56,14 +56,12 @@ class Settings(BaseSettings):
     max_batch_files: int = Field(default=20, alias="MAX_BATCH_FILES")
     max_batch_total_mb: int = Field(default=100, alias="MAX_BATCH_TOTAL_MB")
 
-    file_storage_dir: str = Field(default="../data/files", alias="FILE_STORAGE_DIR")
-    file_retention_hours: int = Field(default=24, alias="FILE_RETENTION_HOURS")
-
-    # File transfer settings
-    transfer_storage_dir: str = Field(default="../data/transfers", alias="TRANSFER_STORAGE_DIR")
-    max_transfer_files: int = Field(default=20, alias="MAX_TRANSFER_FILES")
-    max_transfer_file_mb: int = Field(default=100, alias="MAX_TRANSFER_FILE_MB")
-    max_transfer_total_mb: int = Field(default=500, alias="MAX_TRANSFER_TOTAL_MB")
+    # File Hub settings
+    hub_storage_dir: str = Field(default="../data/hub", alias="HUB_STORAGE_DIR")
+    max_hub_file_mb: int = Field(default=100, alias="MAX_HUB_FILE_MB")
+    max_hub_total_mb: int = Field(default=500, alias="MAX_HUB_TOTAL_MB")
+    max_hub_files: int = Field(default=50, alias="MAX_HUB_FILES")
+    max_hub_share_files: int = Field(default=20, alias="MAX_HUB_SHARE_FILES")
 
     # Email settings
     email_provider: str = Field(default="dev", alias="EMAIL_PROVIDER")
@@ -77,10 +75,6 @@ class Settings(BaseSettings):
     cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
     cortex_api_key: str = Field(default="", alias="CORTEX_API_KEY")
 
-    # Result share settings
-    result_share_storage_dir: str = Field(
-        default="../data/result_shares", alias="RESULT_SHARE_STORAGE_DIR"
-    )
     result_share_ttl_days: int = Field(default=7, alias="RESULT_SHARE_TTL_DAYS")
 
     # Nginx X-Accel-Redirect for Range request support (production only)

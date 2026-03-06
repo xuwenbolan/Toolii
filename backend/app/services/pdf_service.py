@@ -4,7 +4,6 @@ import asyncio
 import os
 from functools import partial
 
-from app.core.config import settings
 from app.core.exceptions import AppError
 from app.processing.pdf_compress import compress_pdf
 from app.processing.pdf_from_images import images_to_pdf
@@ -12,7 +11,9 @@ from app.processing.pdf_merge import merge_pdfs
 from app.processing.pdf_pages import edit_pdf_pages
 from app.processing.pdf_split import split_pdf
 from app.schemas.pdf import FileResult, PdfPagesOperation
-from app.services.file_service import FileService, StoredFile
+from app.services.file_service import FileService, build_download_url
+
+_DEFAULT_EXPIRES_IN = 24 * 3600
 
 
 class PdfService:
@@ -20,44 +21,58 @@ class PdfService:
         self._files = FileService()
         self._owner_user_id = owner_user_id
 
-    def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
+    def _to_result(
+        self,
+        stored_file_id: str,
+        stored_size: int,
+        *,
+        filename: str,
+        content_type: str = "application/pdf",
+        credit_cost: int = 0,
+    ) -> FileResult:
         if credit_cost > 0:
-            return self._to_gated_result(stored, filename=filename, credit_cost=credit_cost)
+            return self._to_gated_result(
+                stored_file_id, stored_size,
+                filename=filename, content_type=content_type, credit_cost=credit_cost,
+            )
         return FileResult(
-            file_id=stored.file_id,
+            file_id=stored_file_id,
             filename=filename,
-            size=stored.size,
-            content_type=stored.content_type,
-            download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
-            expires_in=settings.file_retention_hours * 3600,
+            size=stored_size,
+            content_type=content_type,
+            download_url=build_download_url(file_id=stored_file_id, filename=filename),
+            expires_in=_DEFAULT_EXPIRES_IN,
         )
 
-    def _to_gated_result(self, stored: StoredFile, *, filename: str, credit_cost: int) -> FileResult:
+    def _to_gated_result(
+        self,
+        file_id: str,
+        size: int,
+        *,
+        filename: str,
+        content_type: str,
+        credit_cost: int,
+    ) -> FileResult:
         """Return a gated result (no download URL, pay to unlock).
 
         Unlike image tools there is no watermarked preview for PDFs.
-        We store credit_cost in the file metadata so the unlock endpoint
-        can charge credits and return a signed download URL.
+        Credit gating metadata is stored in FileResult.meta for the router
+        to persist in user_files.meta.
         """
-        import json
-
-        meta_path = self._files._meta_path(stored.file_id)
-        if meta_path.exists():
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            meta["credit_cost"] = credit_cost
-            if self._owner_user_id is not None:
-                meta["owner_user_id"] = self._owner_user_id
-            meta_path.write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        meta = {"credit_cost": credit_cost}
+        if self._owner_user_id is not None:
+            meta["owner_user_id"] = self._owner_user_id
 
         return FileResult(
-            file_id=stored.file_id,
+            file_id=file_id,
             filename=filename,
-            size=stored.size,
-            content_type=stored.content_type,
+            size=size,
+            content_type=content_type,
             download_url="",
             requires_credit=True,
             credit_cost=credit_cost,
-            expires_in=settings.file_retention_hours * 3600,
+            expires_in=_DEFAULT_EXPIRES_IN,
+            meta=meta,
         )
 
     @staticmethod
@@ -80,8 +95,8 @@ class PdfService:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF compression failed", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-compressed.pdf"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, credit_cost=credit_cost)
 
     async def merge(self, *, pdf_files: list[tuple[str, bytes]], credit_cost: int = 0) -> FileResult:
         if len(pdf_files) < 2:
@@ -94,8 +109,8 @@ class PdfService:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF merge failed", status_code=400) from exc
 
         out_name = "toolii-merged.pdf"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, credit_cost=credit_cost)
 
     async def pages(
         self,
@@ -127,8 +142,8 @@ class PdfService:
             raise AppError(code="PDF_PROCESS_FAILED", message="PDF page processing failed", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-{op_value}.pdf"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, credit_cost=credit_cost)
 
     async def split(self, *, pdf_bytes: bytes, filename: str, ranges: str, credit_cost: int = 0) -> FileResult:
         ranges = ranges.strip()
@@ -145,8 +160,8 @@ class PdfService:
             raise AppError(code="PDF_PROCESS_FAILED", message=f"PDF split failed: {exc}", status_code=400) from exc
 
         out_name = f"{self._safe_stem(filename, 'document')}-split.zip"
-        stored = self._files.save_bytes(data=zip_bytes, filename=out_name, content_type="application/zip")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(zip_bytes)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type="application/zip", credit_cost=credit_cost)
 
     async def from_images(
         self,
@@ -174,6 +189,5 @@ class PdfService:
         else:
             out_name = "toolii-images.pdf"
 
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type="application/pdf")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
-
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, credit_cost=credit_cost)

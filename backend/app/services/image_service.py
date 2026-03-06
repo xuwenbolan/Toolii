@@ -14,7 +14,7 @@ from app.processing.image_mosaic import MosaicRegion, mosaic_image
 from app.processing.scan_enhance import enhance_scan
 from app.processing.watermark import apply_watermark
 from app.schemas.image import FileResult, OcrResult, SegmentResult
-from app.services.file_service import FileService, StoredFile
+from app.services.file_service import FileService, build_download_url
 
 # GPU operation registry: op_name -> (cortex_endpoint, filename_suffix_template)
 _GPU_OPS: dict[str, tuple[str, str]] = {
@@ -43,53 +43,70 @@ def _ext_for_mime(content_type: str) -> str:
     return ""
 
 
+_DEFAULT_EXPIRES_IN = 24 * 3600
+
+
 class ImageService:
     def __init__(self, *, owner_user_id: int | None = None) -> None:
         self._files = FileService()
         self._owner_user_id = owner_user_id
 
-    def _to_result(self, stored: StoredFile, *, filename: str, credit_cost: int = 0) -> FileResult:
+    def _to_result(
+        self,
+        stored_file_id: str,
+        stored_size: int,
+        *,
+        filename: str,
+        content_type: str,
+        credit_cost: int = 0,
+    ) -> FileResult:
         if credit_cost > 0:
-            return self._to_gated_result(stored, filename=filename, credit_cost=credit_cost)
+            return self._to_gated_result(
+                stored_file_id, stored_size,
+                filename=filename, content_type=content_type, credit_cost=credit_cost,
+            )
         return FileResult(
-            file_id=stored.file_id,
+            file_id=stored_file_id,
             filename=filename,
-            size=stored.size,
-            content_type=stored.content_type,
-            download_url=self._files.build_download_url(file_id=stored.file_id, filename=filename),
-            expires_in=settings.file_retention_hours * 3600,
+            size=stored_size,
+            content_type=content_type,
+            download_url=build_download_url(file_id=stored_file_id, filename=filename),
+            expires_in=_DEFAULT_EXPIRES_IN,
         )
 
-    def _to_gated_result(self, stored: StoredFile, *, filename: str, credit_cost: int) -> FileResult:
-        """Save a watermarked preview and return a gated FileResult.
+    def _to_gated_result(
+        self,
+        clean_file_id: str,
+        clean_size: int,
+        *,
+        filename: str,
+        content_type: str,
+        credit_cost: int,
+    ) -> FileResult:
+        """Save a watermarked preview and return a gated FileResult."""
+        clean_path = self._files.get_path(clean_file_id)
+        clean_data = clean_path.read_bytes()
+        wm_data = apply_watermark(clean_data, content_type)
+        wm_stored = self._files.save_bytes(wm_data)
 
-        The clean original is stored but its download URL is NOT exposed.
-        The ``file_id`` in the returned result refers to the *watermarked*
-        preview; the clean original's ID is recorded in the preview's
-        metadata under ``clean_file_id``.
-        """
-        clean_data = stored.path.read_bytes()
-        wm_data = apply_watermark(clean_data, stored.content_type)
-        wm_stored = self._files.save_bytes(
-            data=wm_data,
-            filename=filename,
-            content_type=stored.content_type,
-            extra_meta={
-                "clean_file_id": stored.file_id,
-                "credit_cost": credit_cost,
-                **({"owner_user_id": self._owner_user_id} if self._owner_user_id is not None else {}),
-            },
-        )
+        meta = {
+            "clean_file_id": clean_file_id,
+            "credit_cost": credit_cost,
+        }
+        if self._owner_user_id is not None:
+            meta["owner_user_id"] = self._owner_user_id
+
         return FileResult(
             file_id=wm_stored.file_id,
             filename=filename,
-            size=stored.size,
-            content_type=stored.content_type,
+            size=clean_size,
+            content_type=content_type,
             download_url="",
-            preview_url=self._files.build_download_url(file_id=wm_stored.file_id, filename=filename),
+            preview_url=build_download_url(file_id=wm_stored.file_id, filename=filename),
             requires_credit=True,
             credit_cost=credit_cost,
-            expires_in=settings.file_retention_hours * 3600,
+            expires_in=_DEFAULT_EXPIRES_IN,
+            meta=meta,
         )
 
     # ── Local CPU operations ──────────────────────────────────────────
@@ -133,8 +150,8 @@ class ImageService:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Image compression failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-compressed{_ext_for_mime(mime)}"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type=mime, credit_cost=credit_cost)
 
     async def convert(
         self,
@@ -164,8 +181,8 @@ class ImageService:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Image conversion failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}{_ext_for_mime(mime)}"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type=mime, credit_cost=credit_cost)
 
     async def mosaic(
         self,
@@ -186,8 +203,8 @@ class ImageService:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Image mosaic failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-mosaic{_ext_for_mime(mime)}"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type=mime, credit_cost=credit_cost)
 
     async def scan_enhance(
         self,
@@ -207,8 +224,8 @@ class ImageService:
             raise AppError(code="IMAGE_PROCESS_FAILED", message="Scan enhancement failed", status_code=400) from exc
 
         out_name = f"{_safe_stem(filename)}-scan{_ext_for_mime(mime)}"
-        stored = self._files.save_bytes(data=out, filename=out_name, content_type=mime)
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type=mime, credit_cost=credit_cost)
 
     # ── GPU operations (via Cortex) ───────────────────────────────────
 
@@ -245,8 +262,8 @@ class ImageService:
 
         out_bytes = base64.b64decode(data["image_b64"])
         out_name = f"{_safe_stem(filename)}{suffix}"
-        stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out_bytes)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type="image/png", credit_cost=credit_cost)
 
     async def remove_bg(self, *, image_bytes: bytes, filename: str, credit_cost: int = 0, **params: Any) -> FileResult:
         return await self._gpu_process("remove_bg", image_bytes=image_bytes, filename=filename, credit_cost=credit_cost, **params)
@@ -286,8 +303,8 @@ class ImageService:
 
         out_bytes = base64.b64decode(data["image_b64"])
         out_name = f"{_safe_stem(filename)}-inpainted.png"
-        stored = self._files.save_bytes(data=out_bytes, filename=out_name, content_type="image/png")
-        return self._to_result(stored, filename=out_name, credit_cost=credit_cost)
+        stored = self._files.save_bytes(out_bytes)
+        return self._to_result(stored.file_id, stored.size, filename=out_name, content_type="image/png", credit_cost=credit_cost)
 
     async def ocr(self, *, image_bytes: bytes, lang: str = "ch_en", **params: Any) -> OcrResult:
         if lang not in ("ch", "en", "ch_en"):

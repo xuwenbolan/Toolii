@@ -35,6 +35,7 @@ All specifications are organized by module. Each file covers one module or cross
 - [credits-system.md](credits-system.md) — Credits & card code system (pricing, redemption, sharing)
 - [video-tools.md](video-tools.md) — Video & audio tools (compress, convert, GIF, trim, extract audio)
 - [file-hub.md](file-hub.md) — File hub (unified file management + sharing, replaces file transfer & file locker)
+- [collaborative-docs.md](collaborative-docs.md) — Collaborative docs (two-person real-time Markdown co-editing)
 - ~~[file-locker.md](file-locker.md)~~ — Outdated, superseded by file-hub.md
 - [visa-service.md](visa-service.md) — Visa materials full-service workflow
 

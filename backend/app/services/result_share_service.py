@@ -82,7 +82,7 @@ def _create_side_by_side(img1_bytes: bytes, img2_bytes: bytes) -> bytes:
 class ResultShareService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
-        self._files = FileService(storage_dir=settings.result_share_storage_dir)
+        self._files = FileService()
 
     @staticmethod
     def _compute_hash(
@@ -127,12 +127,7 @@ class ResultShareService:
         compressed, content_type = _compress_image(
             image_bytes, preserve_alpha=preserve_alpha,
         )
-        ext = "png" if content_type == "image/png" else "jpg"
-        stored = self._files.save_bytes(
-            data=compressed,
-            filename=f"share.{ext}",
-            content_type=content_type,
-        )
+        stored = self._files.save_bytes(compressed)
         return stored.file_id, content_type
 
     async def create_share(
@@ -210,11 +205,7 @@ class ResultShareService:
             return existing
 
         composite = _create_side_by_side(image1_bytes, image2_bytes)
-        stored = self._files.save_bytes(
-            data=composite,
-            filename="share.jpg",
-            content_type="image/jpeg",
-        )
+        stored = self._files.save_bytes(composite)
 
         token = await self._generate_unique_token()
         now = utcnow()
@@ -258,10 +249,9 @@ class ResultShareService:
             raise AppError(code="SHARE_EXPIRED", message="Share has expired", status_code=410)
         return share
 
-    def get_image(self, *, file_id: str) -> tuple[Path, str]:
-        """Return (path, content_type) for a stored share image."""
-        stored = self._files.get(file_id)
-        return stored.path, stored.content_type
+    def get_image_path(self, *, file_id: str) -> Path:
+        """Return path for a stored share image."""
+        return self._files.get_path(file_id)
 
     async def expire_shares(self, *, limit: int = 500) -> int:
         """Delete expired shares and their image files."""

@@ -261,36 +261,53 @@ class AdminProcessingHistoryListResponse(BaseModel):
 
 
 class StorageCleanupRequest(BaseModel):
-    target: str = Field(pattern=r"^(files|transfers|result_shares|all)$")
+    target: str = Field(pattern=r"^(hub|result_shares|all)$")
 
 
 class StorageCleanupResponse(BaseModel):
-    files_removed: int
-    transfers_expired: int
+    hub_expired: int
     shares_expired: int
 
 
-# ── Transfers & Shares ────────────────────────────────────
+# ── Hub Files & Share Groups ──────────────────────────────
 
-class AdminFileTransferItem(BaseModel):
+class AdminHubFileItem(BaseModel):
     id: int
-    token: str
-    user_id: int
-    user_email: str | None
-    file_count: int
-    total_size: int
-    download_count: int
-    max_downloads: int | None
+    user_id: int | None
+    user_email: str | None = None
+    file_name: str
+    size: int
+    content_type: str
+    source: str
     status: str
-    burn_after_read: bool
-    has_extract_code: bool
-    message: str | None
     expires_at: datetime
     created_at: datetime
 
 
-class AdminFileTransferListResponse(BaseModel):
-    items: list[AdminFileTransferItem]
+class AdminHubFileListResponse(BaseModel):
+    items: list[AdminHubFileItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminShareGroupItem(BaseModel):
+    id: int
+    user_id: int
+    user_email: str | None = None
+    token: str
+    file_count: int
+    total_size: int
+    download_count: int
+    has_extract_code: bool
+    message: str | None
+    status: str
+    expires_at: datetime | None
+    created_at: datetime
+
+
+class AdminShareGroupListResponse(BaseModel):
+    items: list[AdminShareGroupItem]
     total: int
     limit: int
     offset: int

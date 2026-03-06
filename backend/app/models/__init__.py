@@ -5,7 +5,7 @@ from app.models.credit_transaction import CreditTransaction
 from app.models.email_verification import EmailVerificationToken
 from app.models.result_share import ResultShare
 from app.models.feedback import Feedback
-from app.models.file_transfer import FileTransfer, TransferFile
+from app.models.user_file import ShareGroup, ShareGroupFile, UserFile
 from app.models.login_history import LoginHistory
 from app.models.password_reset import PasswordResetToken
 from app.models.processing_history import ProcessingHistory
@@ -23,15 +23,16 @@ __all__ = [
     "EmailVerificationToken",
     "ResultShare",
     "Feedback",
-    "FileTransfer",
     "LoginHistory",
     "PasswordResetToken",
     "ProcessingHistory",
     "ShareLink",
     "TokenBlacklistEntry",
     "Tool",
-    "TransferFile",
+    "ShareGroup",
+    "ShareGroupFile",
     "User",
+    "UserFile",
     "UserCredit",
 ]
 

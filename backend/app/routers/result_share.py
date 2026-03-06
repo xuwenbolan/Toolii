@@ -92,8 +92,8 @@ async def create_result_share(
         # Image tool flow: image is the "before", result_file_id is the "after"
         try:
             file_svc = FileService()
-            stored = file_svc.get(result_file_id)
-            result_image_bytes = stored.path.read_bytes()
+            path = file_svc.get_path(result_file_id)
+            result_image_bytes = path.read_bytes()
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Result file not found")  # noqa: B904
 
@@ -220,10 +220,10 @@ async def get_result_share_image(
     """Serve the stored result image. Public, no auth required."""
     svc = ResultShareService(db)
     share = await svc.get_share(token=token)
-    path, content_type = svc.get_image(file_id=share.image_file_id)
+    path = svc.get_image_path(file_id=share.image_file_id)
     return file_response(
         path,
-        media_type=content_type,
+        media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 
@@ -240,10 +240,10 @@ async def get_result_share_original(
     share = await svc.get_share(token=token)
     if not share.original_image_file_id:
         raise HTTPException(status_code=404, detail="No original image")
-    path, content_type = svc.get_image(file_id=share.original_image_file_id)
+    path = svc.get_image_path(file_id=share.original_image_file_id)
     return file_response(
         path,
-        media_type=content_type,
+        media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=86400"},
     )
 

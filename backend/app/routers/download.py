@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -17,7 +18,8 @@ from app.core.file_response import file_response
 from app.core.security import verify_download_signature
 from app.models.user import User
 from app.services.credit_service import CreditService
-from app.services.file_service import FileService
+from app.services.file_service import FileService, build_download_url
+from app.services.hub_service import HubService
 
 router = APIRouter(prefix=f"{settings.api_prefix}/download", tags=["download"])
 
@@ -37,13 +39,13 @@ async def download(
         raise HTTPException(status_code=403, detail="Invalid signature")
 
     try:
-        stored = FileService().get(file_id)
+        path = FileService().get_path(file_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Not found") from exc
 
     return file_response(
-        stored.path,
-        media_type=stored.content_type,
+        path,
+        media_type="application/octet-stream",
         filename=fn,
         headers={"Cache-Control": "private, max-age=0"},
     )
@@ -63,17 +65,22 @@ async def unlock(
     """Pay credits to unlock a gated file and receive a clean download URL.
 
     Two modes:
-    1. Image tools: *file_id* is the watermarked preview whose metadata
+    1. Image tools: *file_id* is the watermarked preview whose user_files.meta
        contains ``clean_file_id`` pointing to the unwatermarked original.
     2. PDF / non-image tools: *file_id* is the result file itself (no
-       watermark).  Metadata has ``credit_cost`` but no ``clean_file_id``.
+       watermark).  Meta has ``credit_cost`` but no ``clean_file_id``.
     """
-    files = FileService()
+    hub = HubService(db)
+    uf = await hub.get_by_file_id(file_id)
+    if not uf:
+        raise HTTPException(status_code=404, detail="File not found")
 
-    try:
-        meta = files.get_meta(file_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="File not found") from exc
+    meta: dict = {}
+    if uf.meta:
+        try:
+            meta = json.loads(uf.meta)
+        except (json.JSONDecodeError, ValueError):
+            pass
 
     clean_file_id = meta.get("clean_file_id")
     credit_cost = int(meta.get("credit_cost", 0))
@@ -93,10 +100,15 @@ async def unlock(
     # Determine the target file to serve
     target_file_id = clean_file_id or file_id
 
+    fs = FileService()
     try:
-        target_stored = files.get(target_file_id)
+        fs.get_path(target_file_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=410, detail="File expired") from exc
+
+    # Look up the target file for filename
+    target_uf = await hub.get_by_file_id(target_file_id) if clean_file_id else uf
+    target_filename = target_uf.original_filename if target_uf else "download"
 
     if credit_cost <= 0:
         credit_cost = 1
@@ -126,8 +138,8 @@ async def unlock(
             detail={"credit_cost": credit_cost},
         )
 
-    download_url = files.build_download_url(
+    download_url = build_download_url(
         file_id=target_file_id,
-        filename=target_stored.original_filename,
+        filename=target_filename,
     )
     return UnlockResult(download_url=download_url)

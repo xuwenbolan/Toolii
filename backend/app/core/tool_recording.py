@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi.routing import APIRoute
@@ -109,6 +110,48 @@ async def _check_balance(user_id: int, amount: int) -> None:
             )
 
 
+async def _register_tool_result(response: Response, user_id: int | None) -> None:
+    """Register tool result files in the hub (user_files table).
+
+    Parses the JSON response body; if it contains a file_id field, creates
+    a UserFile record so the file appears in the user's hub file list.
+    """
+    if not hasattr(response, "body"):
+        return
+    try:
+        body = json.loads(response.body)
+    except (json.JSONDecodeError, ValueError, AttributeError):
+        return
+
+    file_id = body.get("file_id")
+    if not file_id or not isinstance(file_id, str):
+        return
+
+    try:
+        from app.services.hub_service import HubService
+
+        async with _db.SessionLocal() as db:
+            hub = HubService(db)
+            meta_dict = body.get("meta")
+            # Exclude meta from the API response (internal field)
+            if "meta" in body:
+                del body["meta"]
+                response.body = json.dumps(body).encode("utf-8")
+                response.headers["content-length"] = str(len(response.body))
+
+            await hub.save_tool_result(
+                user_id=user_id,
+                file_id=file_id,
+                filename=body.get("filename", "download"),
+                content_type=body.get("content_type", "application/octet-stream"),
+                size=int(body.get("size", 0)),
+                meta=meta_dict,
+            )
+            await db.commit()
+    except Exception:
+        logger.warning("Failed to register tool result in hub", exc_info=True)
+
+
 class ToolGatewayRoute(APIRoute):
     """APIRoute subclass that enforces tool availability, access control,
     credit pre-checks, and records successful tool usage.
@@ -189,9 +232,10 @@ class ToolGatewayRoute(APIRoute):
             # 5. Execute the actual handler
             response = await original(request)
 
-            # 6. Record usage on success
+            # 6. Record usage and register tool result in hub on success
             if response.status_code < 400:
                 await _record_usage(tool_name, user_id, request)
+                await _register_tool_result(response, user_id)
 
             return response
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Copy, ExternalLink, Flame, PackageOpen, Trash2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, PackageOpen, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { SEOHead } from '@/components/common/SEOHead'
@@ -10,11 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatBytes } from '@/lib/fileValidation'
 import {
-  TRANSFER_STATUS,
-  deleteTransfer,
-  getMyTransfers,
-  type TransferMyItem,
-} from '@/services/transferApi'
+  deleteShare,
+  listShares,
+  type ShareGroupListItem,
+} from '@/services/hubApi'
 
 const PAGE_SIZE = 20
 
@@ -26,19 +25,19 @@ function formatTime(value: string, locale: string) {
 
 export function TransferListPage() {
   const { t, i18n } = useTranslation('transfer')
-  const [items, setItems] = useState<TransferMyItem[]>([])
+  const [items, setItems] = useState<ShareGroupListItem[]>([])
   const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<TransferMyItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ShareGroupListItem | null>(null)
 
   const fetchList = useCallback(async () => {
     setLoading(true)
     setLoadError(null)
     try {
-      const res = await getMyTransfers(PAGE_SIZE, offset)
+      const res = await listShares({ page, pageSize: PAGE_SIZE })
       setItems(res.items)
       setTotal(res.total)
     } catch {
@@ -46,7 +45,7 @@ export function TransferListPage() {
     } finally {
       setLoading(false)
     }
-  }, [offset, t])
+  }, [page, t])
 
   useEffect(() => {
     void fetchList()
@@ -66,7 +65,7 @@ export function TransferListPage() {
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return
     try {
-      await deleteTransfer(deleteTarget.id)
+      await deleteShare(deleteTarget.id)
       setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id))
       setTotal((prev) => prev - 1)
     } catch {
@@ -77,14 +76,14 @@ export function TransferListPage() {
   }, [deleteTarget])
 
   const statusBadge = (status: string) => {
-    if (status === TRANSFER_STATUS.ACTIVE)
+    if (status === 'active')
       return <Badge variant="outline" className="border-success/30 text-success">{t('list.statusActive')}</Badge>
-    if (status === TRANSFER_STATUS.EXPIRED)
+    if (status === 'expired')
       return <Badge variant="outline" className="border-warning/30 text-warning">{t('list.statusExpired')}</Badge>
-    if (status === TRANSFER_STATUS.BURNED)
-      return <Badge variant="outline" className="border-warning/30 text-warning">{t('list.statusBurned')}</Badge>
     return <Badge variant="outline" className="text-muted-foreground">{t('list.statusDeleted')}</Badge>
   }
+
+  const offset = (page - 1) * PAGE_SIZE
 
   return (
     <>
@@ -113,9 +112,6 @@ export function TransferListPage() {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {statusBadge(item.status)}
-                      {item.burn_after_read ? (
-                        <Flame className="h-3.5 w-3.5 text-warning" aria-label={t('create.burnAfterReadLabel')} />
-                      ) : null}
                       <span className="text-xs text-muted-foreground">
                         {t('list.files', { count: item.file_count })}
                       </span>
@@ -131,13 +127,15 @@ export function TransferListPage() {
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {t('list.expires', { date: formatTime(item.expires_at, i18n.language) })}
-                    </p>
+                    {item.expires_at ? (
+                      <p className="text-xs text-muted-foreground">
+                        {t('list.expires', { date: formatTime(item.expires_at, i18n.language) })}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {item.status === TRANSFER_STATUS.ACTIVE ? (
+                    {item.status === 'active' ? (
                       <>
                         <Button
                           type="button"
@@ -180,7 +178,6 @@ export function TransferListPage() {
               </Card>
             ))}
 
-            {/* Pagination */}
             {total > PAGE_SIZE ? (
               <div className="flex items-center justify-between pt-2 text-sm">
                 <span className="text-muted-foreground">
@@ -190,8 +187,8 @@ export function TransferListPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    disabled={offset === 0}
-                    onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
                   >
                     {t('list.previous')}
                   </Button>
@@ -199,7 +196,7 @@ export function TransferListPage() {
                     size="sm"
                     variant="outline"
                     disabled={offset + PAGE_SIZE >= total}
-                    onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                    onClick={() => setPage((p) => p + 1)}
                   >
                     {t('list.next')}
                   </Button>
@@ -210,7 +207,6 @@ export function TransferListPage() {
         )}
       </div>
 
-      {/* Delete confirmation dialog */}
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}

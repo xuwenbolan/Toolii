@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -17,4 +19,6 @@ class FileResult(BaseModel):
     requires_credit: bool = False
     credit_cost: int = 0
     expires_in: int
+    # Internal metadata for hub storage (not serialized to API response)
+    meta: dict[str, Any] | None = None
 
