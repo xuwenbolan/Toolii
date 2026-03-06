@@ -1,21 +1,43 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Download, FileIcon, FolderOpen, Trash2 } from 'lucide-react'
+import { useDropzone } from 'react-dropzone'
+import {
+  CalendarPlus,
+  Check,
+  Copy,
+  Download,
+  FileIcon,
+  FolderOpen,
+  Link2,
+  Loader2,
+  Pencil,
+  Share2,
+  Trash2,
+  UploadCloud,
+  X,
+} from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { formatBytes } from '@/lib/fileValidation'
 import {
   buildFileDownloadUrl,
+  createShare,
   deleteFiles,
+  extendFile,
   listFiles,
+  renameFile,
+  uploadFiles,
+  type ShareGroupResponse,
   type UserFileItem,
 } from '@/services/hubApi'
 
 const PAGE_SIZE = 20
+const RETENTION_OPTIONS = [1, 3, 7] as const
 
 function formatTime(value: string, locale: string) {
   const date = new Date(value)
@@ -24,6 +46,303 @@ function formatTime(value: string, locale: string) {
 }
 
 const SOURCE_FILTERS = ['all', 'upload', 'tool'] as const
+
+// ── Upload section ──────────────────────────────────────────
+
+function UploadSection({ onUploaded }: { onUploaded: () => void }) {
+  const { t } = useTranslation('hub')
+  const [pending, setPending] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [retentionDays, setRetentionDays] = useState<number>(3)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0 || pending) return
+    setPending(true)
+    setError(null)
+    setProgress(0)
+    try {
+      await uploadFiles(files, retentionDays, setProgress)
+      onUploaded()
+    } catch {
+      setError(t('uploadFailed'))
+    } finally {
+      setPending(false)
+    }
+  }, [pending, retentionDays, onUploaded, t])
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop: handleFiles,
+    multiple: true,
+    maxFiles: 20,
+    noClick: true,
+    noKeyboard: true,
+    disabled: pending,
+  })
+
+  return (
+    <div className="space-y-3">
+      <div
+        {...getRootProps()}
+        className={[
+          'flex min-h-[7rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors',
+          isDragActive ? 'border-primary/60 bg-accent/40' : 'border-border/60 hover:border-border hover:bg-muted/30',
+          pending ? 'pointer-events-none opacity-60' : '',
+        ].join(' ')}
+        onClick={open}
+      >
+        <input {...getInputProps()} />
+        {pending ? (
+          <>
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <p className="text-sm font-medium">{t('uploading')}</p>
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </>
+        ) : (
+          <>
+            <UploadCloud className="h-6 w-6 text-muted-foreground" />
+            <p className="text-sm font-medium">{t('uploadDrop')}</p>
+            <p className="text-xs text-muted-foreground">{t('uploadHint')}</p>
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">{t('retentionLabel')}</span>
+        {RETENTION_OPTIONS.map((days) => (
+          <Button
+            key={days}
+            type="button"
+            size="sm"
+            variant={retentionDays === days ? 'default' : 'outline'}
+            className="h-7 px-2.5 text-xs"
+            onClick={() => setRetentionDays(days)}
+          >
+            {t('retentionDays', { days })}
+          </Button>
+        ))}
+      </div>
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+    </div>
+  )
+}
+
+// ── Rename dialog ───────────────────────────────────────────
+
+function RenameDialog({
+  item,
+  onClose,
+  onDone,
+}: {
+  item: UserFileItem | null
+  onClose: () => void
+  onDone: () => void
+}) {
+  const { t } = useTranslation('hub')
+  const [name, setName] = useState('')
+  const [pending, setPending] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (item) {
+      setName(item.file_name)
+      setTimeout(() => inputRef.current?.select(), 50)
+    }
+  }, [item])
+
+  const handleSubmit = async () => {
+    if (!item || !name.trim() || pending) return
+    setPending(true)
+    try {
+      await renameFile(item.id, name.trim())
+      onDone()
+      onClose()
+    } catch {
+      // silent
+    } finally {
+      setPending(false)
+    }
+  }
+
+  if (!item) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl bg-background p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold">{t('renameTitle')}</h3>
+        <Input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
+          placeholder={t('renamePlaceholder')}
+        />
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
+          <Button size="sm" disabled={!name.trim() || pending} onClick={() => { void handleSubmit() }}>
+            {t('renameConfirm')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Extend dialog ───────────────────────────────────────────
+
+function ExtendDialog({
+  item,
+  onClose,
+  onDone,
+}: {
+  item: UserFileItem | null
+  onClose: () => void
+  onDone: () => void
+}) {
+  const { t } = useTranslation('hub')
+  const [days, setDays] = useState(3)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (item) { setDays(3); setError(null) }
+  }, [item])
+
+  const handleExtend = async () => {
+    if (!item || pending) return
+    setPending(true)
+    setError(null)
+    try {
+      await extendFile(item.id, days)
+      onDone()
+      onClose()
+    } catch {
+      setError(t('extendFailed'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  if (!item) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl bg-background p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold">{t('extendTitle')}</h3>
+        <div className="flex gap-2">
+          {([1, 3, 5] as const).map((d) => (
+            <Button
+              key={d}
+              size="sm"
+              variant={days === d ? 'default' : 'outline'}
+              onClick={() => setDays(d)}
+            >
+              {t('retentionDays', { days: d })}
+            </Button>
+          ))}
+        </div>
+        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
+          <Button size="sm" disabled={pending} onClick={() => { void handleExtend() }}>
+            {t('extendConfirm')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Share result dialog ─────────────────────────────────────
+
+function ShareResultDialog({
+  result,
+  onClose,
+}: {
+  result: ShareGroupResponse
+  onClose: () => void
+}) {
+  const { t } = useTranslation('hub')
+  const [copied, setCopied] = useState(false)
+
+  const shareUrl = `${window.location.origin}${result.share_url}`
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="mx-4 w-full max-w-md space-y-3 rounded-xl bg-background p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">{t('shareResult')}</h3>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
+          <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate text-sm">{shareUrl}</span>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => { void handleCopy() }}>
+            {copied ? <Check className="mr-1 h-3.5 w-3.5" /> : <Copy className="mr-1 h-3.5 w-3.5" />}
+            {copied ? t('copied') : t('copyLink')}
+          </Button>
+        </div>
+        {result.extract_code ? (
+          <p className="text-sm text-muted-foreground">
+            {t('extractCode', { code: result.extract_code })}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+// ── File action buttons ─────────────────────────────────────
+
+function FileActions({
+  item,
+  sharing,
+  onRename,
+  onExtend,
+  onShare,
+  onDownload,
+}: {
+  item: UserFileItem
+  sharing: boolean
+  onRename: () => void
+  onExtend: () => void
+  onShare: () => void
+  onDownload: () => void
+}) {
+  return (
+    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onShare} disabled={sharing}>
+        {sharing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+      </Button>
+      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRename}>
+        <Pencil className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onExtend}>
+        <CalendarPlus className="h-3.5 w-3.5" />
+      </Button>
+      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDownload}>
+        <Download className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
+}
+
+// ── Main page ───────────────────────────────────────────────
 
 export function HubFilesPage() {
   const { t, i18n } = useTranslation('hub')
@@ -37,6 +356,12 @@ export function HubFilesPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [deleteOpen, setDeleteOpen] = useState(false)
+
+  // Action dialogs
+  const [renameItem, setRenameItem] = useState<UserFileItem | null>(null)
+  const [extendItem, setExtendItem] = useState<UserFileItem | null>(null)
+  const [shareResult, setShareResult] = useState<ShareGroupResponse | null>(null)
+  const [sharingId, setSharingId] = useState<number | null>(null)
 
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -101,7 +426,21 @@ export function HubFilesPage() {
     a.remove()
   }, [])
 
+  const handleShare = useCallback(async (fileId: number) => {
+    if (sharingId) return
+    setSharingId(fileId)
+    try {
+      const res = await createShare({ fileIds: [fileId] })
+      setShareResult(res)
+    } catch {
+      // silent
+    } finally {
+      setSharingId(null)
+    }
+  }, [sharingId])
+
   const offset = (page - 1) * PAGE_SIZE
+  const usagePercent = quotaBytes > 0 ? Math.min((usedBytes / quotaBytes) * 100, 100) : 0
 
   const sourceBadge = (source: string) => {
     if (source === 'upload')
@@ -113,15 +452,29 @@ export function HubFilesPage() {
     <>
       <SEOHead title={t('title')} noindex />
 
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+      <div className="space-y-5">
+        {/* Header + quota bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+            {quotaBytes > 0 ? (
+              <span className="text-xs text-muted-foreground">
+                {t('usage', { used: formatBytes(usedBytes), quota: formatBytes(quotaBytes) })}
+              </span>
+            ) : null}
+          </div>
           {quotaBytes > 0 ? (
-            <span className="text-xs text-muted-foreground">
-              {t('usage', { used: formatBytes(usedBytes), quota: formatBytes(quotaBytes) })}
-            </span>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={`h-full rounded-full transition-all ${usagePercent > 90 ? 'bg-destructive' : 'bg-primary'}`}
+                style={{ width: `${usagePercent}%` }}
+              />
+            </div>
           ) : null}
         </div>
+
+        {/* Upload area */}
+        <UploadSection onUploaded={() => { setPage(1); void fetchList() }} />
 
         {/* Source filter */}
         <div className="flex items-center gap-2">
@@ -155,6 +508,7 @@ export function HubFilesPage() {
           </div>
         ) : null}
 
+        {/* File list */}
         {loading ? (
           <p className="text-sm text-muted-foreground">{t('loading')}</p>
         ) : loadError ? (
@@ -189,22 +543,18 @@ export function HubFilesPage() {
                       <span>{formatBytes(item.size)}</span>
                       <span>{t('expires', { date: formatTime(item.expires_at, i18n.language) })}</span>
                       {item.share_count > 0 ? (
-                        <span>{item.share_count} shares</span>
+                        <span>{t('shareCount', { count: item.share_count })}</span>
                       ) : null}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0 px-0"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDownload(item.id, item.file_name)
-                    }}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </Button>
+                  <FileActions
+                    item={item}
+                    sharing={sharingId === item.id}
+                    onRename={() => setRenameItem(item)}
+                    onExtend={() => setExtendItem(item)}
+                    onShare={() => { void handleShare(item.id) }}
+                    onDownload={() => handleDownload(item.id, item.file_name)}
+                  />
                 </CardContent>
               </Card>
             ))}
@@ -238,6 +588,7 @@ export function HubFilesPage() {
         )}
       </div>
 
+      {/* Delete confirm */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -248,6 +599,28 @@ export function HubFilesPage() {
         variant="destructive"
         onConfirm={() => { void handleDelete() }}
       />
+
+      {/* Rename dialog */}
+      <RenameDialog
+        item={renameItem}
+        onClose={() => setRenameItem(null)}
+        onDone={() => { void fetchList() }}
+      />
+
+      {/* Extend dialog */}
+      <ExtendDialog
+        item={extendItem}
+        onClose={() => setExtendItem(null)}
+        onDone={() => { void fetchList() }}
+      />
+
+      {/* Share result */}
+      {shareResult ? (
+        <ShareResultDialog
+          result={shareResult}
+          onClose={() => setShareResult(null)}
+        />
+      ) : null}
     </>
   )
 }
