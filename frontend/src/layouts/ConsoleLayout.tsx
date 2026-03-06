@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -22,7 +22,6 @@ import {
 import { cn } from '@/lib/utils'
 import { Logo } from '@/components/common/Logo'
 import { LanguageSwitcher } from '@/components/layout/LanguageSwitcher'
-import { useAuth } from '@/hooks/useAuth'
 import { useAuthStore } from '@/stores/authStore'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
@@ -73,23 +72,9 @@ const NAV_GROUPS: NavGroup[] = [
 
 export function ConsoleLayout() {
   const { t } = useTranslation('console')
-  const { bootstrap } = useAuth()
   const user = useAuthStore((s) => s.user)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    bootstrap().finally(() => setReady(true))
-  }, [bootstrap])
-
-  if (!ready) {
-    return (
-      <div className="flex h-svh items-center justify-center bg-background text-foreground">
-        <div className="text-sm text-muted-foreground">{t('common.loading')}</div>
-      </div>
-    )
-  }
 
   return (
     <div className="flex h-svh overflow-hidden bg-background text-foreground">
