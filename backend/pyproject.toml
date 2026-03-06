@@ -36,10 +36,17 @@ processing = [
   "pillow>=10.0.0",
   "pillow-heif>=0.18.0",
   "PyPDF2>=3.0.0",
-  "rembg[cpu]>=2.0.0",
+
   "reportlab>=4.0.0",
   "mediapipe>=0.10.0",
   "onnxruntime>=1.17.0",
+]
+
+[tool.uv]
+# Force mediapipe to use headless opencv instead of the full contrib build (~115MB savings)
+override-dependencies = [
+  "opencv-contrib-python>=4.10.0; sys_platform == 'never'",
+  "opencv-python>=4.10.0; sys_platform == 'never'",
 ]
 
 [tool.ruff]

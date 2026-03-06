@@ -204,7 +204,7 @@ class PhotoService:
 
         # Background removal (Cortex GPU with local fallback)
         try:
-            bg_result = await cortex_remove_bg(image_bytes)
+            bg_result = await cortex_remove_bg(image_bytes, model="portrait")
         except AppError:
             raise
         except Exception as exc:
