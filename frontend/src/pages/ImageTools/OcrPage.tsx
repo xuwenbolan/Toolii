@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ChevronLeft, ChevronRight, ClipboardCopy, FileText } from 'lucide-react'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
+import { OcrOverlay } from '@/components/tools/OcrOverlay'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
@@ -51,8 +52,10 @@ export function OcrPage() {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [hoverLineIndex, setHoverLineIndex] = useState<number | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lineListRef = useRef<HTMLDivElement>(null)
 
   // Preview URL for single-image mode
   const singlePreviewUrl = useObjectUrl(pdfMode ? null : file)
@@ -105,6 +108,7 @@ export function OcrPage() {
     setProgress(0)
     setError(null)
     setCopied(false)
+    setHoverLineIndex(null)
     if (abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
@@ -217,6 +221,13 @@ export function OcrPage() {
     })
   }, [combinedFullText])
 
+  // Scroll the hovered line into view in the right-side list
+  useEffect(() => {
+    if (hoverLineIndex == null || !lineListRef.current) return
+    const el = lineListRef.current.querySelector(`[data-line-index="${hoverLineIndex}"]`)
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [hoverLineIndex])
+
   return (
     <>
       <SEOHead
@@ -304,7 +315,7 @@ export function OcrPage() {
 
           {(file && !pdfConvertProgress) || hasResult ? (
             <div className="grid gap-5 lg:grid-cols-2">
-              {/* Left: image preview */}
+              {/* Left: image preview with detection overlay */}
               {inputPreviewUrl ? (
                 <div className="space-y-2 rounded-xl border border-border/70 bg-card/70 p-3">
                   <p className="text-xs font-medium text-muted-foreground">
@@ -312,16 +323,25 @@ export function OcrPage() {
                       ? t('ocr.pagePreview', { page: activePage + 1 })
                       : t('common:preview.input')}
                   </p>
-                  <img
-                    src={inputPreviewUrl}
-                    alt={file?.name}
-                    className="max-h-[60vh] w-full rounded-md object-contain"
-                  />
+                  {currentResult ? (
+                    <OcrOverlay
+                      imageUrl={inputPreviewUrl}
+                      lines={currentResult.lines}
+                      activeIndex={hoverLineIndex}
+                      onHoverIndex={setHoverLineIndex}
+                    />
+                  ) : (
+                    <img
+                      src={inputPreviewUrl}
+                      alt={file?.name}
+                      className="max-h-[60vh] w-full rounded-md object-contain"
+                    />
+                  )}
                   {fileInfo ? <p className="text-xs text-muted-foreground">{fileInfo}</p> : null}
                 </div>
               ) : null}
 
-              {/* Right: recognized text */}
+              {/* Right: recognized text lines */}
               {currentResult ? (
                 <div className="space-y-2 rounded-xl border border-border/70 bg-card/70 p-3">
                   <div className="flex items-center justify-between">
@@ -333,16 +353,57 @@ export function OcrPage() {
                       {copied ? t('ocr.copied') : (pdfMode ? t('ocr.copyAllPages') : t('ocr.copyAll'))}
                     </Button>
                   </div>
-                  <div className="max-h-[60vh] overflow-auto rounded-lg border border-border/50 bg-muted/30 p-3">
-                    <pre className="whitespace-pre-wrap break-words text-sm leading-relaxed">{currentResult.full_text}</pre>
+                  <div
+                    ref={lineListRef}
+                    className="max-h-[60vh] overflow-auto rounded-lg border border-border/50 bg-muted/30"
+                  >
+                    {currentResult.lines.length > 0 ? (
+                      <ul className="divide-y divide-border/30">
+                        {currentResult.lines.map((line, i) => (
+                          <li
+                            key={i}
+                            data-line-index={i}
+                            className={cn(
+                              'flex items-start gap-2 px-3 py-1.5 transition-colors',
+                              hoverLineIndex === i
+                                ? 'bg-blue-500/10'
+                                : 'hover:bg-muted/50',
+                            )}
+                            onPointerEnter={() => setHoverLineIndex(i)}
+                            onPointerLeave={() => setHoverLineIndex(null)}
+                          >
+                            <span className="shrink-0 pt-0.5">
+                              <span
+                                className={cn(
+                                  'inline-block h-2 w-2 rounded-full',
+                                  line.score >= 0.8
+                                    ? 'bg-emerald-500'
+                                    : line.score >= 0.5
+                                      ? 'bg-amber-500'
+                                      : 'bg-red-500',
+                                )}
+                                title={`${t('ocr.confidence')}: ${(line.score * 100).toFixed(0)}%`}
+                              />
+                            </span>
+                            <span className="min-w-0 flex-1 break-words text-sm leading-relaxed">
+                              {line.text}
+                            </span>
+                            <span className="shrink-0 pt-0.5 text-[10px] tabular-nums text-muted-foreground/60">
+                              {(line.score * 100).toFixed(0)}%
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="p-3 text-sm text-muted-foreground">{t('ocr.noTextFound')}</p>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {t('ocr.engine')}: {currentResult.engine} | {currentResult.width}x{currentResult.height}
                   </p>
                 </div>
               ) : (
-                // Show loading state for active page during processing
-                pending && pdfMode && !currentResult ? (
+                pending && pdfMode ? (
                   <div className={cn(
                     'flex items-center justify-center rounded-xl border border-border/70 bg-card/70 p-8',
                     'animate-pulse',

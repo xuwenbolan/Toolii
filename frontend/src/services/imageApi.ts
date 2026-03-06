@@ -111,10 +111,12 @@ export async function enhanceScan(
 
 export async function removeBackground(
   file: File,
+  opts: { model?: string } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
+  if (opts.model) fd.append('model', opts.model)
 
   const res = await api.post<FileResult>('/api/image/remove-bg', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),
@@ -124,12 +126,15 @@ export async function removeBackground(
 
 export async function upscaleImage(
   file: File,
-  opts: { scale?: number } = {},
+  opts: { scale?: number; model?: string; denoise_strength?: number; face_enhance?: boolean } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
   if (opts.scale != null) fd.append('scale', String(opts.scale))
+  if (opts.model) fd.append('model', opts.model)
+  if (opts.denoise_strength != null) fd.append('denoise_strength', String(opts.denoise_strength))
+  if (opts.face_enhance) fd.append('face_enhance', 'true')
 
   const res = await api.post<FileResult>('/api/image/upscale', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),
@@ -139,12 +144,13 @@ export async function upscaleImage(
 
 export async function restoreFace(
   file: File,
-  opts: { w?: number } = {},
+  opts: { w?: number; upscale?: number } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
   if (opts.w != null) fd.append('w', String(opts.w))
+  if (opts.upscale != null) fd.append('upscale', String(opts.upscale))
 
   const res = await api.post<FileResult>('/api/image/restore-face', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),
@@ -154,12 +160,14 @@ export async function restoreFace(
 
 export async function denoiseImage(
   file: File,
-  opts: { strength?: number } = {},
+  opts: { strength?: number; task?: string; model_width?: number } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
   if (opts.strength != null) fd.append('strength', String(opts.strength))
+  if (opts.task) fd.append('task', opts.task)
+  if (opts.model_width != null) fd.append('model_width', String(opts.model_width))
 
   const res = await api.post<FileResult>('/api/image/denoise', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),
@@ -169,10 +177,12 @@ export async function denoiseImage(
 
 export async function colorizeImage(
   file: File,
+  opts: { model?: string } = {},
   onProgress?: (percent: number) => void,
 ) {
   const fd = new FormData()
   fd.append('file', file)
+  if (opts.model) fd.append('model', opts.model)
 
   const res = await api.post<FileResult>('/api/image/colorize', fd, {
     onUploadProgress: getProgressHandler(onProgress, file.size),

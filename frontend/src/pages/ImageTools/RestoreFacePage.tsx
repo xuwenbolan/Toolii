@@ -25,6 +25,7 @@ export function RestoreFacePage() {
   const { t } = useTranslation(['tools', 'common'])
   const [file, setFile] = useState<File | null>(null)
   const [w, setW] = useState(0.5)
+  const [upscale, setUpscale] = useState<1 | 2>(2)
   const [result, setResult] = useState<FileResult | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
@@ -49,7 +50,7 @@ export function RestoreFacePage() {
     setResult(null)
     setResultPanelOpen(false)
     try {
-      const res = await run((onProgress) => restoreFace(file, { w }, onProgress))
+      const res = await run((onProgress) => restoreFace(file, { w, upscale }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -92,6 +93,29 @@ export function RestoreFacePage() {
             </div>
             <Slider min={0} max={1} step={0.05} value={[w]} onValueChange={([v]) => setW(v)} disabled={pending} />
             <p className="text-xs text-muted-foreground">{t('restoreFace.fidelityHint')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('restoreFace.upscaleLabel')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={upscale === 1 ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setUpscale(1)}
+              >
+                {t('restoreFace.upscaleNone')}
+              </Button>
+              <Button
+                type="button"
+                variant={upscale === 2 ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setUpscale(2)}
+              >
+                {t('restoreFace.upscale2x')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('restoreFace.upscaleHint')}</p>
           </div>
         </div>
       </ToolPageShell>

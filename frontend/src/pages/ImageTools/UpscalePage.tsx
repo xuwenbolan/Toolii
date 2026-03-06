@@ -12,6 +12,9 @@ import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { FileDropzone } from '@/components/upload/FileDropzone'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
@@ -25,6 +28,9 @@ export function UpscalePage() {
   const { t } = useTranslation(['tools', 'common'])
   const [file, setFile] = useState<File | null>(null)
   const [scale, setScale] = useState<Scale>(4)
+  const [model, setModel] = useState<'x4plus' | 'x4v3' | 'anime'>('x4plus')
+  const [denoiseStrength, setDenoiseStrength] = useState(0.5)
+  const [faceEnhance, setFaceEnhance] = useState(false)
   const [result, setResult] = useState<FileResult | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
@@ -49,7 +55,10 @@ export function UpscalePage() {
     setResult(null)
     setResultPanelOpen(false)
     try {
-      const res = await run((onProgress) => upscaleImage(file, { scale }, onProgress))
+      const opts: Parameters<typeof upscaleImage>[1] = { scale, model }
+      if (model === 'x4v3') opts.denoise_strength = denoiseStrength
+      if (faceEnhance) opts.face_enhance = true
+      const res = await run((onProgress) => upscaleImage(file, opts, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -105,6 +114,56 @@ export function UpscalePage() {
                 4x
               </Button>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{t('upscale.modelLabel')}</label>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant={model === 'x4plus' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModel('x4plus')}
+              >
+                {t('upscale.modelPhoto')}
+              </Button>
+              <Button
+                type="button"
+                variant={model === 'x4v3' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModel('x4v3')}
+              >
+                {t('upscale.modelPhotoV3')}
+              </Button>
+              <Button
+                type="button"
+                variant={model === 'anime' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModel('anime')}
+              >
+                {t('upscale.modelAnime')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t(`upscale.modelHint_${model}`)}</p>
+          </div>
+
+          {model === 'x4v3' ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>{t('upscale.denoiseLabel')}</Label>
+                <span className="text-sm tabular-nums text-muted-foreground">{Math.round(denoiseStrength * 100)}%</span>
+              </div>
+              <Slider min={0} max={1} step={0.05} value={[denoiseStrength]} onValueChange={([v]) => setDenoiseStrength(v)} disabled={pending} />
+              <p className="text-xs text-muted-foreground">{t('upscale.denoiseHint')}</p>
+            </div>
+          ) : null}
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>{t('upscale.faceEnhanceLabel')}</Label>
+              <p className="text-xs text-muted-foreground">{t('upscale.faceEnhanceHint')}</p>
+            </div>
+            <Switch checked={faceEnhance} onCheckedChange={setFaceEnhance} disabled={pending} />
           </div>
         </div>
       </ToolPageShell>

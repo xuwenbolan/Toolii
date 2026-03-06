@@ -11,6 +11,7 @@ import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { ToolWorkspaceDropzone } from '@/components/tools/ToolWorkspaceDropzone'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { useToolRunState } from '@/hooks/useToolRunState'
@@ -22,6 +23,7 @@ import { colorizeImage, getResultDisplayUrl, type FileResult } from '@/services/
 export function ColorizePage() {
   const { t } = useTranslation(['tools', 'common'])
   const [file, setFile] = useState<File | null>(null)
+  const [model, setModel] = useState<'artistic' | 'modelscope'>('artistic')
   const [result, setResult] = useState<FileResult | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
@@ -46,7 +48,7 @@ export function ColorizePage() {
     setResult(null)
     setResultPanelOpen(false)
     try {
-      const res = await run((onProgress) => colorizeImage(file, onProgress))
+      const res = await run((onProgress) => colorizeImage(file, { model }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -73,6 +75,29 @@ export function ColorizePage() {
             hint={t('colorize.dropHint')}
           />
           <ToolErrorBanner error={error} errorMeta={errorMeta} onRetry={file ? () => retry() : undefined} />
+
+          <div className="space-y-2">
+            <Label>{t('colorize.styleLabel')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={model === 'artistic' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModel('artistic')}
+              >
+                {t('colorize.styleArtistic')}
+              </Button>
+              <Button
+                type="button"
+                variant={model === 'modelscope' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModel('modelscope')}
+              >
+                {t('colorize.styleRealistic')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t(`colorize.styleHint_${model}`)}</p>
+          </div>
 
           {file ? (
             <ArtifactPreviewCard

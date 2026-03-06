@@ -27,6 +27,7 @@ export function RemoveBgPage() {
   const [file, setFile] = useState<File | null>(null)
   const [result, setResult] = useState<FileResult | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
+  const [bgModel, setBgModel] = useState<'general' | 'portrait' | 'matting'>('general')
   const [bgMode, setBgMode] = useState<BgMode>('transparent')
   const [customBgColor, setCustomBgColor] = useState('#dbeafe')
   const [showOriginalPreview, setShowOriginalPreview] = useState(false)
@@ -56,7 +57,7 @@ export function RemoveBgPage() {
     setResultPanelOpen(false)
 
     try {
-      const res = await run((onProgress) => removeBackground(file, onProgress))
+      const res = await run((onProgress) => removeBackground(file, { model: bgModel }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -196,6 +197,40 @@ export function RemoveBgPage() {
               </div>
             </div>
           ) : null}
+
+          <div className="space-y-2">
+            <Label>{t('removeBg.modelLabel')}</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={bgModel === 'general' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setBgModel('general')}
+              >
+                {t('removeBg.modelGeneral')}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={bgModel === 'portrait' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setBgModel('portrait')}
+              >
+                {t('removeBg.modelPortrait')}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={bgModel === 'matting' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setBgModel('matting')}
+              >
+                {t('removeBg.modelMatting')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t(`removeBg.modelHint_${bgModel}`)}</p>
+          </div>
 
           <p className="text-xs text-muted-foreground">{t('removeBg.outputHint')}</p>
         </div>

@@ -25,6 +25,8 @@ export function DenoisePage() {
   const { t } = useTranslation(['tools', 'common'])
   const [file, setFile] = useState<File | null>(null)
   const [strength, setStrength] = useState(0.5)
+  const [task, setTask] = useState<'denoise' | 'deblur'>('denoise')
+  const [modelWidth, setModelWidth] = useState<32 | 64>(64)
   const [result, setResult] = useState<FileResult | null>(null)
   const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
@@ -49,7 +51,7 @@ export function DenoisePage() {
     setResult(null)
     setResultPanelOpen(false)
     try {
-      const res = await run((onProgress) => denoiseImage(file, { strength }, onProgress))
+      const res = await run((onProgress) => denoiseImage(file, { strength, task, model_width: modelWidth }, onProgress))
       setResult(res)
       setResultPanelOpen(true)
     } catch {
@@ -85,6 +87,31 @@ export function DenoisePage() {
             />
           ) : null}
 
+          <div className="space-y-2">
+            <Label>{t('denoise.taskLabel')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={task === 'denoise' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setTask('denoise')}
+              >
+                {t('denoise.taskDenoise')}
+              </Button>
+              <Button
+                type="button"
+                variant={task === 'deblur' ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setTask('deblur')}
+              >
+                {t('denoise.taskDeblur')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {task === 'denoise' ? t('denoise.taskDenoiseHint') : t('denoise.taskDeblurHint')}
+            </p>
+          </div>
+
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>{t('denoise.strengthLabel')}</Label>
@@ -92,6 +119,29 @@ export function DenoisePage() {
             </div>
             <Slider min={0} max={1} step={0.05} value={[strength]} onValueChange={([v]) => setStrength(v)} disabled={pending} />
             <p className="text-xs text-muted-foreground">{t('denoise.strengthHint')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t('denoise.qualityLabel')}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={modelWidth === 64 ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModelWidth(64)}
+              >
+                {t('denoise.qualityHigh')}
+              </Button>
+              <Button
+                type="button"
+                variant={modelWidth === 32 ? 'secondary' : 'outline'}
+                disabled={pending}
+                onClick={() => setModelWidth(32)}
+              >
+                {t('denoise.qualityFast')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('denoise.qualityHint')}</p>
           </div>
         </div>
       </ToolPageShell>
