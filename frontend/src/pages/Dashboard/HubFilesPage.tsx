@@ -310,14 +310,12 @@ function ShareResultDialog({
 // ── File action buttons ─────────────────────────────────────
 
 function FileActions({
-  item,
   sharing,
   onRename,
   onExtend,
   onShare,
   onDownload,
 }: {
-  item: UserFileItem
   sharing: boolean
   onRename: () => void
   onExtend: () => void
@@ -548,7 +546,6 @@ export function HubFilesPage() {
                     </div>
                   </div>
                   <FileActions
-                    item={item}
                     sharing={sharingId === item.id}
                     onRename={() => setRenameItem(item)}
                     onExtend={() => setExtendItem(item)}
