@@ -77,7 +77,13 @@
       "recentProcessing": "最近使用",
       "procTool": "工具",
       "procStatus": "状态",
-      "procTime": "时间"
+      "procTime": "时间",
+      "hubSettings": "文件中心设置",
+      "hubQuotaMb": "存储配额 (MB)",
+      "hubMaxFiles": "最大文件数",
+      "hubMaxRetentionDays": "最长保留天数",
+      "hubSettingsHint": "留空 = 全局默认，0 = 无限制",
+      "hubSettingsSuccess": "文件中心设置已更新"
     }
   },
   "cards": {

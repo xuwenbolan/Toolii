@@ -78,6 +78,9 @@ export type AdminUserDetail = {
   email_verified: boolean
   is_admin: boolean
   created_at: string
+  hub_quota_mb: number | null
+  hub_max_files: number | null
+  hub_max_retention_days: number | null
   recent_logins: AdminLoginHistoryItem[]
   recent_transactions: AdminTransactionItem[]
   recent_processing: AdminProcessingHistoryItem[]
@@ -460,6 +463,18 @@ export async function updateUserStatus(userId: number, isActive: boolean) {
 
 export async function adjustUserCredits(userId: number, amount: number, description: string) {
   const res = await api.post(`/api/admin/users/${userId}/credits`, { amount, description })
+  return res.data
+}
+
+export async function updateUserHubSettings(
+  userId: number,
+  settings: {
+    hub_quota_mb: number | null
+    hub_max_files: number | null
+    hub_max_retention_days: number | null
+  },
+) {
+  const res = await api.put(`/api/admin/users/${userId}/hub-settings`, settings)
   return res.data
 }
 

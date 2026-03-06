@@ -42,7 +42,7 @@ def _file_to_item(uf, share_count: int = 0) -> dict:
         "size": uf.size,
         "content_type": uf.content_type,
         "source": uf.source,
-        "expires_at": uf.expires_at.isoformat(),
+        "expires_at": uf.expires_at.isoformat() if uf.expires_at else None,
         "created_at": uf.created_at.isoformat(),
         "share_count": share_count,
     }
@@ -155,7 +155,7 @@ async def extend_file(
     hub = HubService(db)
     uf = await hub.extend_file(file_id, user.id, body.days)
     await db.commit()
-    return FileExtendResponse(id=uf.id, expires_at=uf.expires_at.isoformat())
+    return FileExtendResponse(id=uf.id, expires_at=uf.expires_at.isoformat() if uf.expires_at else None)
 
 
 @router.delete("/files", response_model=FileDeleteResponse)
@@ -199,7 +199,7 @@ async def create_share(
         message=sg.message,
         file_count=file_count,
         total_size=total_size,
-        expires_at=sg.expires_at.isoformat(),
+        expires_at=sg.expires_at.isoformat() if sg.expires_at else None,
         created_at=sg.created_at.isoformat(),
     )
 
@@ -292,7 +292,7 @@ async def quick_share(
             message=sg.message,
             file_count=file_count,
             total_size=total_size,
-            expires_at=sg.expires_at.isoformat(),
+            expires_at=sg.expires_at.isoformat() if sg.expires_at else None,
             created_at=sg.created_at.isoformat(),
         ),
     )
@@ -329,7 +329,7 @@ async def share_existing_file(
         message=sg.message,
         file_count=file_count,
         total_size=total_size,
-        expires_at=sg.expires_at.isoformat(),
+        expires_at=sg.expires_at.isoformat() if sg.expires_at else None,
         created_at=sg.created_at.isoformat(),
     )
 

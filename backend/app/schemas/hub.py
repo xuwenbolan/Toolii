@@ -9,7 +9,7 @@ class UserFileItem(BaseModel):
     size: int
     content_type: str
     source: str
-    expires_at: str
+    expires_at: str | None
     created_at: str
     share_count: int = 0
 
@@ -40,7 +40,7 @@ class FileExtendRequest(BaseModel):
 
 class FileExtendResponse(BaseModel):
     id: int
-    expires_at: str
+    expires_at: str | None
 
 
 class FileDeleteRequest(BaseModel):
@@ -65,7 +65,7 @@ class ShareGroupResponse(BaseModel):
     message: str | None = None
     file_count: int
     total_size: int
-    expires_at: str
+    expires_at: str | None
     created_at: str
 
 
@@ -77,7 +77,7 @@ class ShareGroupListItem(BaseModel):
     file_count: int
     total_size: int
     download_count: int
-    expires_at: str
+    expires_at: str | None
     created_at: str
     status: str
 
@@ -105,7 +105,7 @@ class ShareInfoResponse(BaseModel):
     file_count: int
     total_size: int
     download_count: int
-    expires_at: str
+    expires_at: str | None
     has_extract_code: bool
     status: str
     created_at: str

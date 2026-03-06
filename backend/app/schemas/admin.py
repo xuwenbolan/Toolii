@@ -88,6 +88,9 @@ class AdminUserDetailResponse(BaseModel):
     email_verified: bool
     is_admin: bool
     created_at: datetime
+    hub_quota_mb: int | None = None
+    hub_max_files: int | None = None
+    hub_max_retention_days: int | None = None
     recent_logins: list[AdminLoginHistoryItem]
     recent_transactions: list[AdminTransactionItem]
     recent_processing: list[AdminProcessingHistoryItem]
@@ -95,6 +98,12 @@ class AdminUserDetailResponse(BaseModel):
 
 class UpdateUserStatusRequest(BaseModel):
     is_active: bool
+
+
+class UpdateHubSettingsRequest(BaseModel):
+    hub_quota_mb: int | None = None
+    hub_max_files: int | None = None
+    hub_max_retention_days: int | None = None
 
 
 class AdjustCreditsRequest(BaseModel):

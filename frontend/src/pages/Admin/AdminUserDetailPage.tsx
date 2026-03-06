@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
@@ -13,6 +13,7 @@ import { getTranslatedApiError } from '@/lib/apiErrors'
 import {
   adjustUserCredits,
   fetchAdminUserDetail,
+  updateUserHubSettings,
   updateUserStatus,
 } from '@/services/adminApi'
 import type {
@@ -29,6 +30,10 @@ export function AdminUserDetailPage() {
   const [creditAmount, setCreditAmount] = useState('')
   const [creditDesc, setCreditDesc] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
+  const [hubQuotaMb, setHubQuotaMb] = useState('')
+  const [hubMaxFiles, setHubMaxFiles] = useState('')
+  const [hubMaxRetentionDays, setHubMaxRetentionDays] = useState('')
+  const [hubInited, setHubInited] = useState(false)
 
   const queryKey = ['admin', 'user-detail', id]
   const { data: user, isLoading, isError, refetch } = useQuery({
@@ -36,6 +41,15 @@ export function AdminUserDetailPage() {
     queryFn: () => fetchAdminUserDetail(Number(id)),
     enabled: !!id,
   })
+
+  useEffect(() => {
+    if (user && !hubInited) {
+      setHubQuotaMb(user.hub_quota_mb != null ? String(user.hub_quota_mb) : '')
+      setHubMaxFiles(user.hub_max_files != null ? String(user.hub_max_files) : '')
+      setHubMaxRetentionDays(user.hub_max_retention_days != null ? String(user.hub_max_retention_days) : '')
+      setHubInited(true)
+    }
+  }, [user, hubInited])
 
   const toggleMutation = useMutation({
     mutationFn: () => updateUserStatus(user!.id, !user!.is_active),
@@ -70,6 +84,32 @@ export function AdminUserDetailPage() {
     const amount = Number(creditAmount)
     if (!amount || !creditDesc.trim()) return
     adjustMutation.mutate({ amount, description: creditDesc.trim() })
+  }
+
+  const hubMutation = useMutation({
+    mutationFn: (settings: {
+      hub_quota_mb: number | null
+      hub_max_files: number | null
+      hub_max_retention_days: number | null
+    }) => updateUserHubSettings(user!.id, settings),
+    onSuccess: () => {
+      toast.success(t('users.detail.hubSettingsSuccess'))
+      setHubInited(false)
+      queryClient.invalidateQueries({ queryKey: ['admin', 'user-detail', id] })
+    },
+    onError: (err) => {
+      toast.error(getTranslatedApiError(err, t('common.error')))
+    },
+  })
+
+  const handleHubSettings = (e: React.FormEvent) => {
+    e.preventDefault()
+    const parse = (v: string) => (v.trim() === '' ? null : Number(v))
+    hubMutation.mutate({
+      hub_quota_mb: parse(hubQuotaMb),
+      hub_max_files: parse(hubMaxFiles),
+      hub_max_retention_days: parse(hubMaxRetentionDays),
+    })
   }
 
   const loginColumns: Column<AdminLoginHistoryItem>[] = useMemo(
@@ -250,6 +290,62 @@ export function AdminUserDetailPage() {
               />
             </div>
             <Button type="submit" disabled={adjustMutation.isPending}>
+              {t('users.detail.adjustSubmit')}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Hub Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('users.detail.hubSettings')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            {t('users.detail.hubSettingsHint')}
+          </p>
+          <form onSubmit={handleHubSettings} className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('users.detail.hubQuotaMb')}
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={hubQuotaMb}
+                onChange={(e) => setHubQuotaMb(e.target.value)}
+                className="w-32"
+                placeholder="-"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('users.detail.hubMaxFiles')}
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={hubMaxFiles}
+                onChange={(e) => setHubMaxFiles(e.target.value)}
+                className="w-32"
+                placeholder="-"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                {t('users.detail.hubMaxRetentionDays')}
+              </label>
+              <Input
+                type="number"
+                min={0}
+                value={hubMaxRetentionDays}
+                onChange={(e) => setHubMaxRetentionDays(e.target.value)}
+                className="w-32"
+                placeholder="-"
+              />
+            </div>
+            <Button type="submit" disabled={hubMutation.isPending}>
               {t('users.detail.adjustSubmit')}
             </Button>
           </form>

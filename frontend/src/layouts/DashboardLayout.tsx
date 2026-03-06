@@ -10,7 +10,6 @@ const ITEMS = [
   { to: '/dashboard/history', labelKey: 'dashboard.processingHistory' },
   { to: '/dashboard/redeem', labelKey: 'dashboard.redeemShare' },
   { to: '/dashboard/hub', labelKey: 'dashboard.hub' },
-  { to: '/dashboard/transfers', labelKey: 'dashboard.transfers' },
   { to: '/dashboard/settings', labelKey: 'dashboard.settings' },
   { to: '/dashboard/feedback', labelKey: 'dashboard.feedback' },
 ]

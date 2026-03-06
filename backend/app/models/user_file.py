@@ -39,8 +39,9 @@ class UserFile(TimestampMixin, Base):
     # upload / tool_result / result_share
     source: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+    # NULL = never expires (unlimited retention)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
 
     # active / expired / deleted
@@ -85,9 +86,9 @@ class ShareGroup(TimestampMixin, Base):
         Integer, nullable=False, server_default="0"
     )
 
-    # Denormalized: MIN(user_files.expires_at) of linked files
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, index=True
+    # Denormalized: MIN(user_files.expires_at) of linked files. NULL = never expires.
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
     )
 
     # active / expired / deleted

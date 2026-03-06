@@ -77,7 +77,13 @@
       "recentProcessing": "Recent Processing",
       "procTool": "Tool",
       "procStatus": "Status",
-      "procTime": "Time"
+      "procTime": "Time",
+      "hubSettings": "Hub Settings",
+      "hubQuotaMb": "Storage Quota (MB)",
+      "hubMaxFiles": "Max Files",
+      "hubMaxRetentionDays": "Max Retention (days)",
+      "hubSettingsHint": "Empty = global default, 0 = unlimited",
+      "hubSettingsSuccess": "Hub settings updated"
     }
   },
   "cards": {

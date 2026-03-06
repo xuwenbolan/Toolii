@@ -263,6 +263,9 @@ class AdminService:
             "email_verified": user.email_verified,
             "is_admin": user.is_admin,
             "created_at": user.created_at,
+            "hub_quota_mb": user.hub_quota_mb,
+            "hub_max_files": user.hub_max_files,
+            "hub_max_retention_days": user.hub_max_retention_days,
             "recent_logins": [
                 {"id": l.id, "ip": l.ip, "user_agent": l.user_agent, "created_at": l.created_at}
                 for l in logins
@@ -291,6 +294,25 @@ class AdminService:
         if user.is_admin:
             raise AppError("Cannot change status of an admin user")
         user.is_active = is_active
+        await self._db.commit()
+
+    async def update_hub_settings(
+        self,
+        user_id: int,
+        *,
+        hub_quota_mb: int | None,
+        hub_max_files: int | None,
+        hub_max_retention_days: int | None,
+    ) -> None:
+        result = await self._db.execute(
+            select(User).where(User.id == user_id, User.deleted_at.is_(None))
+        )
+        user = result.scalar_one_or_none()
+        if user is None:
+            raise NotFoundError("User not found")
+        user.hub_quota_mb = hub_quota_mb
+        user.hub_max_files = hub_max_files
+        user.hub_max_retention_days = hub_max_retention_days
         await self._db.commit()
 
     async def adjust_credits(

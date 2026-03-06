@@ -13,6 +13,7 @@ from app.schemas.admin import (
     AdminUserListResponse,
     AdjustCreditsRequest,
     AdjustCreditsResponse,
+    UpdateHubSettingsRequest,
     UpdateUserStatusRequest,
 )
 from app.schemas.common import Message
@@ -98,3 +99,34 @@ async def adjust_credits(
         },
     )
     return AdjustCreditsResponse(**data)
+
+
+@router.put("/{user_id}/hub-settings", response_model=Message)
+@limiter.limit(admin_write_rate_limit)
+async def update_hub_settings(
+    request: Request,
+    payload: UpdateHubSettingsRequest,
+    user_id: int = Path(),
+    admin: User = Depends(get_admin_user),
+    db=Depends(get_db),
+) -> Message:
+    await AdminService(db).update_hub_settings(
+        user_id,
+        hub_quota_mb=payload.hub_quota_mb,
+        hub_max_files=payload.hub_max_files,
+        hub_max_retention_days=payload.hub_max_retention_days,
+    )
+    await audit(
+        category="admin",
+        action="update_hub_settings",
+        user_id=admin.id,
+        resource_type="user",
+        resource_id=user_id,
+        ip=get_remote_address(request),
+        detail={
+            "hub_quota_mb": payload.hub_quota_mb,
+            "hub_max_files": payload.hub_max_files,
+            "hub_max_retention_days": payload.hub_max_retention_days,
+        },
+    )
+    return Message(message="Hub settings updated")

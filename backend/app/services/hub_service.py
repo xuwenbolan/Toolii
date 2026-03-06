@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppError
+from app.models.user import User
 from app.models.user_file import (
     FileSource,
     FileStatus,
@@ -42,9 +43,50 @@ class HubService:
         self._db = db
         self._fs = FileService()
 
+    # ── Per-user limits ─────────────────────────────────────────────
+
+    async def _get_user_limits(self, user_id: int) -> tuple[int, int, int]:
+        """Return effective (max_bytes, max_files, max_retention_days) for a user.
+
+        Convention: DB value NULL = global default, 0 = unlimited.
+        """
+        result = await self._db.execute(
+            select(User.hub_quota_mb, User.hub_max_files, User.hub_max_retention_days)
+            .where(User.id == user_id)
+        )
+        row = result.one_or_none()
+
+        if row is None:
+            return (
+                settings.max_hub_total_mb * 1024 * 1024,
+                settings.max_hub_files,
+                7,
+            )
+
+        quota_mb, max_files, max_days = row
+
+        eff_bytes = (
+            settings.max_hub_total_mb * 1024 * 1024 if quota_mb is None
+            else 0 if quota_mb == 0
+            else quota_mb * 1024 * 1024
+        )
+        eff_files = (
+            settings.max_hub_files if max_files is None
+            else 0 if max_files == 0
+            else max_files
+        )
+        eff_days = (
+            7 if max_days is None
+            else 0 if max_days == 0
+            else max_days
+        )
+        return eff_bytes, eff_files, eff_days
+
     # ── Quota helpers ────────────────────────────────────────────────
 
     async def _check_quota(self, user_id: int, additional_bytes: int = 0, additional_count: int = 0) -> None:
+        max_bytes, max_files, _ = await self._get_user_limits(user_id)
+
         result = await self._db.execute(
             select(
                 func.coalesce(func.sum(UserFile.size), 0),
@@ -56,22 +98,22 @@ class HubService:
         )
         used_bytes, file_count = result.one()
 
-        max_bytes = settings.max_hub_total_mb * 1024 * 1024
-        if used_bytes + additional_bytes > max_bytes:
+        if max_bytes > 0 and used_bytes + additional_bytes > max_bytes:
             raise AppError(
                 code="QUOTA_EXCEEDED",
                 message="Storage quota exceeded",
                 status_code=413,
             )
-        if file_count + additional_count > settings.max_hub_files:
+        if max_files > 0 and file_count + additional_count > max_files:
             raise AppError(
                 code="FILE_LIMIT_EXCEEDED",
-                message=f"Maximum {settings.max_hub_files} files allowed",
+                message=f"Maximum {max_files} files allowed",
                 status_code=413,
             )
 
     async def get_usage(self, user_id: int) -> tuple[int, int]:
-        """Return (used_bytes, quota_bytes) for a user."""
+        """Return (used_bytes, quota_bytes) for a user. quota_bytes=0 means unlimited."""
+        max_bytes, _, _ = await self._get_user_limits(user_id)
         result = await self._db.execute(
             select(func.coalesce(func.sum(UserFile.size), 0)).where(
                 UserFile.user_id == user_id,
@@ -79,7 +121,7 @@ class HubService:
             )
         )
         used = result.scalar_one()
-        return used, settings.max_hub_total_mb * 1024 * 1024
+        return used, max_bytes
 
     # ── Save files ───────────────────────────────────────────────────
 
@@ -90,7 +132,7 @@ class HubService:
         data: bytes,
         filename: str,
         content_type: str,
-        retention_days: int = 3,
+        retention_days: int = 7,
     ) -> UserFile:
         max_bytes = settings.max_hub_file_mb * 1024 * 1024
         if len(data) > max_bytes:
@@ -102,8 +144,15 @@ class HubService:
 
         await self._check_quota(user_id, additional_bytes=len(data), additional_count=1)
 
+        _, _, max_days = await self._get_user_limits(user_id)
         stored = self._fs.save_bytes(data)
-        days = min(max(retention_days, 1), 7)
+
+        if max_days == 0:
+            # Unlimited retention — no expiration
+            expires = None
+        else:
+            days = min(max(retention_days, 1), max_days)
+            expires = utcnow() + timedelta(days=days)
 
         uf = UserFile(
             user_id=user_id,
@@ -112,7 +161,7 @@ class HubService:
             size=stored.size,
             content_type=content_type,
             source=FileSource.UPLOAD,
-            expires_at=utcnow() + timedelta(days=days),
+            expires_at=expires,
         )
         self._db.add(uf)
         await self._db.flush()
@@ -199,15 +248,24 @@ class HubService:
 
     async def extend_file(self, file_id: int, user_id: int, days: int) -> UserFile:
         uf = await self.get_file(file_id, user_id)
-        max_expiry = utcnow() + timedelta(days=7)
-        new_expiry = uf.expires_at + timedelta(days=days)
-        if new_expiry > max_expiry:
-            raise AppError(
-                code="MAX_RETENTION_EXCEEDED",
-                message="Cannot extend beyond 7 days from now",
-                status_code=400,
-            )
-        uf.expires_at = new_expiry
+        _, _, max_days = await self._get_user_limits(user_id)
+
+        if max_days == 0:
+            # Unlimited — just extend
+            if uf.expires_at is None:
+                return uf
+            uf.expires_at = uf.expires_at + timedelta(days=days)
+        else:
+            max_expiry = utcnow() + timedelta(days=max_days)
+            base = uf.expires_at or utcnow()
+            new_expiry = base + timedelta(days=days)
+            if new_expiry > max_expiry:
+                raise AppError(
+                    code="MAX_RETENTION_EXCEEDED",
+                    message=f"Cannot extend beyond {max_days} days from now",
+                    status_code=400,
+                )
+            uf.expires_at = new_expiry
         await self._db.flush()
 
         # Update share groups that include this file
@@ -282,7 +340,8 @@ class HubService:
                 status_code=400,
             )
 
-        earliest_expiry = min(f.expires_at for f in files)
+        expiries = [f.expires_at for f in files if f.expires_at is not None]
+        earliest_expiry = min(expiries) if expiries else None
 
         sg = ShareGroup(
             user_id=user_id,
@@ -336,7 +395,7 @@ class HubService:
                 "file_count": file_count,
                 "total_size": total_size,
                 "download_count": sg.download_count,
-                "expires_at": sg.expires_at.isoformat(),
+                "expires_at": sg.expires_at.isoformat() if sg.expires_at else None,
                 "created_at": sg.created_at.isoformat(),
                 "status": sg.status,
             })
