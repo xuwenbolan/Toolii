@@ -310,10 +310,57 @@ class AdminService:
         user = result.scalar_one_or_none()
         if user is None:
             raise NotFoundError("User not found")
+
+        old_retention = user.hub_max_retention_days
         user.hub_quota_mb = hub_quota_mb
         user.hub_max_files = hub_max_files
         user.hub_max_retention_days = hub_max_retention_days
+
+        # Sync existing active files' expires_at when retention setting changes
+        if hub_max_retention_days != old_retention:
+            await self._sync_file_expiry(user_id, hub_max_retention_days)
+
         await self._db.commit()
+
+    async def _sync_file_expiry(
+        self, user_id: int, new_retention_days: int | None
+    ) -> None:
+        """Update expires_at on all active files to match new retention setting.
+
+        Convention: NULL = global default (7 days), 0 = unlimited.
+        """
+        from sqlalchemy import update
+
+        if new_retention_days == 0:
+            # Unlimited — clear expiration on all active files
+            new_expires = None
+        else:
+            days = new_retention_days if new_retention_days else 7
+            # Recalculate from each file's created_at; cap at now so
+            # already-past files don't get revived
+            now = utcnow()
+            stmt = (
+                select(UserFile)
+                .where(
+                    UserFile.user_id == user_id,
+                    UserFile.status == FileStatus.ACTIVE,
+                )
+            )
+            result = await self._db.execute(stmt)
+            for uf in result.scalars():
+                new_exp = uf.created_at + timedelta(days=days)
+                uf.expires_at = new_exp if new_exp > now else uf.expires_at
+            return
+
+        # Unlimited case — bulk update
+        await self._db.execute(
+            update(UserFile)
+            .where(
+                UserFile.user_id == user_id,
+                UserFile.status == FileStatus.ACTIVE,
+            )
+            .values(expires_at=new_expires)
+        )
 
     async def adjust_credits(
         self, user_id: int, *, amount: int, description: str
