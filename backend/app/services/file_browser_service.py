@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from pathlib import Path
 
+from sqlalchemy import func, select
+
 from app.core.config import settings
+from app.core.database import SessionLocal
+from app.models.user_file import UserFile
 from app.services.file_service import build_download_url
 
 logger = logging.getLogger(__name__)
@@ -13,48 +16,6 @@ _PREVIEWABLE_TYPES = frozenset({
     "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
     "application/pdf",
 })
-
-
-def _scan_files(
-    dir_path: Path,
-    offset: int,
-    limit: int,
-    search: str | None,
-) -> tuple[list[dict], int]:
-    """Scan hub storage directory and return paginated file list."""
-    all_files: list[dict] = []
-    if not dir_path.exists():
-        return [], 0
-
-    for path in dir_path.rglob("*"):
-        if not path.is_file():
-            continue
-
-        file_id = path.name
-
-        if search:
-            needle = search.lower()
-            if needle not in file_id.lower():
-                continue
-
-        try:
-            stat = path.stat()
-        except OSError:
-            continue
-
-        all_files.append({
-            "file_id": file_id,
-            "original_filename": file_id,
-            "content_type": "application/octet-stream",
-            "size": stat.st_size,
-            "created_at": int(stat.st_mtime),
-            "previewable": False,
-        })
-
-    all_files.sort(key=lambda f: f["created_at"], reverse=True)
-
-    total = len(all_files)
-    return all_files[offset: offset + limit], total
 
 
 class FileBrowserService:
@@ -69,14 +30,40 @@ class FileBrowserService:
         if directory != "hub":
             return {"items": [], "total": 0, "directory": directory}
 
-        dir_path = Path(settings.hub_storage_dir)
-        loop = asyncio.get_running_loop()
-        items, total = await loop.run_in_executor(
-            None, _scan_files, dir_path, offset, limit, search,
-        )
+        async with SessionLocal() as session:
+            base = select(UserFile).where(UserFile.status == "active")
+            count_base = select(func.count(UserFile.id)).where(UserFile.status == "active")
+
+            if search:
+                needle = f"%{search}%"
+                base = base.where(UserFile.original_filename.ilike(needle))
+                count_base = count_base.where(UserFile.original_filename.ilike(needle))
+
+            total = (await session.execute(count_base)).scalar() or 0
+
+            stmt = (
+                base
+                .order_by(UserFile.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+
+            items = [
+                {
+                    "file_id": row.file_id,
+                    "original_filename": row.original_filename,
+                    "content_type": row.content_type,
+                    "size": row.size,
+                    "created_at": int(row.created_at.timestamp()),
+                    "previewable": row.content_type in _PREVIEWABLE_TYPES,
+                }
+                for row in rows
+            ]
+
         return {"items": items, "total": total, "directory": directory}
 
-    def get_admin_download_url(self, directory: str, file_id: str) -> str:
+    async def get_admin_download_url(self, directory: str, file_id: str) -> str:
         """Generate a signed download URL for admin file access."""
         if directory != "hub":
             raise FileNotFoundError(f"Unknown directory: {directory}")
@@ -85,4 +72,12 @@ class FileBrowserService:
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_id}")
 
-        return build_download_url(file_id=file_id, filename=file_id, ttl_seconds=3600)
+        # Look up original filename from database
+        filename = file_id
+        async with SessionLocal() as session:
+            stmt = select(UserFile.original_filename).where(UserFile.file_id == file_id).limit(1)
+            result = (await session.execute(stmt)).scalar()
+            if result:
+                filename = result
+
+        return build_download_url(file_id=file_id, filename=filename, ttl_seconds=3600)

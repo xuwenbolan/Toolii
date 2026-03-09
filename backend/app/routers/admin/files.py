@@ -37,7 +37,7 @@ async def get_download_url(
     admin: User = Depends(get_admin_user),
 ) -> AdminFileDownloadResponse:
     try:
-        url = FileBrowserService().get_admin_download_url(directory, file_id)
+        url = await FileBrowserService().get_admin_download_url(directory, file_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail="File not found") from exc
     await audit(

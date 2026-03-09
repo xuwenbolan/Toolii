@@ -29,6 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatBytes } from '@/lib/fileValidation'
+import { useFileDownload } from '@/hooks/useFileDownload'
 import {
   buildFileDownloadUrl,
   createShare,
@@ -613,6 +614,7 @@ export function HubFilesPage() {
   // Action dialogs
   const [renameItem, setRenameItem] = useState<UserFileItem | null>(null)
   const [extendItem, setExtendItem] = useState<UserFileItem | null>(null)
+  const download = useFileDownload()
 
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -669,13 +671,8 @@ export function HubFilesPage() {
   }, [selected, fetchList])
 
   const handleDownload = useCallback((fileId: number, fileName: string) => {
-    const a = document.createElement('a')
-    a.href = buildFileDownloadUrl(fileId)
-    a.download = fileName
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-  }, [])
+    void download(buildFileDownloadUrl(fileId), fileName)
+  }, [download])
 
   const handleTabChange = useCallback((value: string) => {
     setSearchParams(value === 'shares' ? { tab: 'shares' } : {}, { replace: true })
