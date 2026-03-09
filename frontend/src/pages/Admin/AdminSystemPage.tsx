@@ -2,16 +2,45 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import {
+  AlertTriangle,
+  Thermometer,
+  HardDrive,
+  Clock,
+  CircleSlash,
+  X,
+} from 'lucide-react'
 
 import { AdminErrorState, DataTable, StatusBadge } from '@/components/admin'
 import type { Column } from '@/components/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   fetchCortexStatus,
   checkCortexModels,
   checkCortexModel,
   unloadAllCortexModels,
+  unloadCortexModel,
+  enableCortexModel,
+  disableCortexModel,
   fetchCortexTimeline,
 } from '@/services/adminApi'
 import type {
@@ -19,11 +48,17 @@ import type {
   CortexModelCheckResult,
   CortexModelEvent,
   CortexVramSample,
+  CortexGpuInfo,
+  CortexModelsSummary,
+  CortexQueueInfo,
 } from '@/services/adminApi'
+
+// -- Status & event color maps --
 
 const MODEL_STATUS_COLORS: Record<string, string> = {
   loaded: 'bg-success-light text-success border-success/20',
   available: 'bg-info-light text-info border-info/20',
+  disabled: 'bg-muted text-muted-foreground border-border',
   missing: 'bg-destructive-light text-destructive border-destructive/20',
 }
 
@@ -32,10 +67,13 @@ const EVENT_COLORS: Record<string, string> = {
   evicted_lru: 'bg-warning-light text-warning border-warning/20',
   evicted_idle: 'bg-warning-light text-warning border-warning/20',
   evicted_budget: 'bg-warning-light text-warning border-warning/20',
+  evicted_workspace: 'bg-warning-light text-warning border-warning/20',
   oom_retry: 'bg-destructive-light text-destructive border-destructive/20',
+  disabled: 'bg-muted text-muted-foreground border-border',
 }
 
-// Display MB values, switching to GB when >= 1024 MB
+// -- Format helpers --
+
 function formatMB(mb: number): string {
   if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`
   return `${mb} MB`
@@ -70,14 +108,299 @@ function formatEventTime(timestamp: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+// -- Ring Gauge (SVG) --
+
+function RingGauge({
+  value,
+  max,
+  label,
+  unit,
+  warningThreshold,
+  criticalThreshold,
+  size = 64,
+}: {
+  value: number
+  max: number
+  label: string
+  unit: string
+  warningThreshold: number
+  criticalThreshold: number
+  size?: number
+}) {
+  const r = (size - 8) / 2
+  const circumference = 2 * Math.PI * r
+  const pct = max > 0 ? Math.min(value / max, 1) : 0
+  const offset = circumference * (1 - pct)
+
+  let strokeColor = 'var(--foreground)'
+  let strokeOpacity = 0.7
+  if (value >= criticalThreshold) {
+    strokeColor = 'var(--destructive)'
+    strokeOpacity = 1
+  } else if (value >= warningThreshold) {
+    strokeColor = 'var(--warning)'
+    strokeOpacity = 1
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke="var(--muted)" strokeWidth={4}
+          />
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke={strokeColor} strokeOpacity={strokeOpacity}
+            strokeWidth={4} strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className="transition-all duration-500"
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-sm font-semibold">{value}</span>
+          <span className="text-[10px] text-muted-foreground">{unit}</span>
+        </div>
+      </div>
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  )
+}
+
+// -- VRAM Stacked Bar --
+
+function VramStackedBar({
+  gpu,
+  summary,
+}: {
+  gpu: CortexGpuInfo
+  summary: CortexModelsSummary
+}) {
+  const { t } = useTranslation('console')
+  const total = gpu.vram_total_mb
+  if (total <= 0) return null
+
+  const modelsMb = summary.vram_real_mb
+  const otherMb = Math.max(0, gpu.vram_used_mb - modelsMb)
+  const freeMb = Math.max(0, total - gpu.vram_used_mb)
+
+  const modelsPct = (modelsMb / total) * 100
+  const otherPct = (otherMb / total) * 100
+  const usedPct = Math.round(((modelsMb + otherMb) / total) * 100)
+
+  const budgetPct = summary.vram_budget_mb > 0
+    ? Math.round(summary.vram_utilization * 100)
+    : 0
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between">
+        <div className="flex items-baseline gap-1">
+          <span className="text-lg font-semibold">{formatMB(gpu.vram_used_mb)}</span>
+          <span className="text-sm text-muted-foreground">/ {formatMB(total)}</span>
+        </div>
+        <span className="text-sm text-muted-foreground">{usedPct}%</span>
+      </div>
+
+      {/* Stacked bar */}
+      <div className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full bg-foreground transition-all"
+          style={{ width: `${modelsPct}%` }}
+          title={`${t('system.vramModels')}: ${formatMB(modelsMb)}`}
+        />
+        <div
+          className="h-full bg-muted-foreground/50 transition-all"
+          style={{ width: `${otherPct}%` }}
+          title={`${t('system.vramOther')}: ${formatMB(otherMb)}`}
+        />
+      </div>
+
+      {/* Legend */}
+      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-foreground" />
+          {t('system.vramModels')} {formatMB(modelsMb)}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-muted-foreground/50" />
+          {t('system.vramOther')} {formatMB(otherMb)}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block h-2 w-2 rounded-sm bg-muted" />
+          {formatMB(freeMb)}
+        </span>
+      </div>
+
+      {/* Budget line */}
+      <div className="mt-1.5 text-xs text-muted-foreground">
+        {t('system.vramBudget')}: {formatMB(summary.vram_real_mb)} / {formatMB(summary.vram_budget_mb)} ({budgetPct}%)
+        <span className="ml-2">&middot; {summary.loaded} / {summary.registered} {t('system.modelsLoaded')}</span>
+      </div>
+    </div>
+  )
+}
+
+// -- Queue Live Indicator --
+
+function QueueIndicator({ queue }: { queue: CortexQueueInfo }) {
+  const { t } = useTranslation('console')
+  const max = queue.max_concurrent
+  const active = queue.active
+  const isSaturated = active >= max
+
+  let statusText = t('system.queueIdle')
+  let statusClass = 'text-muted-foreground'
+  if (isSaturated) {
+    statusText = t('system.queueSaturated')
+    statusClass = 'text-destructive'
+  } else if (active > 0) {
+    statusText = t('system.queueProcessing')
+    statusClass = 'text-foreground'
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-lg font-semibold">{active}</span>
+        <span className="text-sm text-muted-foreground">/ {max}</span>
+        <span className="ml-2 text-sm text-muted-foreground">
+          {t('system.queueTimeout')}: {queue.timeout_seconds}s
+        </span>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <svg width={max * 18 + 4} height={16} className="shrink-0">
+          {Array.from({ length: max }, (_, i) => {
+            const filled = i < active
+            const cx = 8 + i * 18
+            if (isSaturated) {
+              return <circle key={i} cx={cx} cy={8} r={5} fill="var(--destructive)" />
+            }
+            if (filled) {
+              return (
+                <circle key={i} cx={cx} cy={8} r={5} fill="var(--foreground)">
+                  <animate attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite" />
+                </circle>
+              )
+            }
+            return (
+              <circle key={i} cx={cx} cy={8} r={4.5}
+                fill="none" stroke="var(--muted-foreground)" strokeWidth={1} />
+            )
+          })}
+        </svg>
+        <span className={`text-xs ${statusClass}`}>{statusText}</span>
+      </div>
+    </div>
+  )
+}
+
+// -- Alert bar --
+
+type AlertLevel = 'info' | 'warning' | 'critical'
+type AlertItem = { key: string; level: AlertLevel; icon: React.ReactNode; message: string }
+
+const ALERT_STYLES: Record<AlertLevel, string> = {
+  info: 'border-info/20 bg-info-light text-info',
+  warning: 'border-warning/20 bg-warning-light text-warning',
+  critical: 'border-destructive/20 bg-destructive-light text-destructive',
+}
+
+function computeAlerts(
+  gpu: CortexGpuInfo,
+  modelList: CortexModelItem[],
+  events: CortexModelEvent[],
+  queue: CortexQueueInfo | undefined,
+  t: (key: string, vars?: Record<string, unknown>) => string,
+): AlertItem[] {
+  const alerts: AlertItem[] = []
+
+  // Temperature
+  if (gpu.temperature_c != null && gpu.temperature_c >= 90) {
+    alerts.push({
+      key: 'temp-critical',
+      level: 'critical',
+      icon: <Thermometer className="h-4 w-4" />,
+      message: t('system.alertTempHigh', { temp: `${gpu.temperature_c}C`, threshold: '90C' }),
+    })
+  } else if (gpu.temperature_c != null && gpu.temperature_c >= 80) {
+    alerts.push({
+      key: 'temp-warn',
+      level: 'warning',
+      icon: <Thermometer className="h-4 w-4" />,
+      message: t('system.alertTempHigh', { temp: `${gpu.temperature_c}C`, threshold: '80C' }),
+    })
+  }
+
+  // VRAM utilization (budget-based)
+  const budgetPct = gpu.vram_total_mb > 0
+    ? Math.round((gpu.vram_used_mb / gpu.vram_total_mb) * 100)
+    : 0
+  if (budgetPct >= 90) {
+    alerts.push({
+      key: 'vram-high',
+      level: 'warning',
+      icon: <HardDrive className="h-4 w-4" />,
+      message: t('system.alertVramHigh', { pct: budgetPct }),
+    })
+  }
+
+  // Missing required models
+  const missingRequired = modelList.filter(m => m.status === 'missing' && m.required)
+  if (missingRequired.length > 0) {
+    alerts.push({
+      key: 'missing-models',
+      level: 'critical',
+      icon: <AlertTriangle className="h-4 w-4" />,
+      message: t('system.alertMissingModels', { count: missingRequired.length }),
+    })
+  }
+
+  // OOM retries in recent events
+  const recentOom = events.some(e => e.event === 'oom_retry')
+  if (recentOom) {
+    alerts.push({
+      key: 'oom-retries',
+      level: 'warning',
+      icon: <AlertTriangle className="h-4 w-4" />,
+      message: t('system.alertOomRetries'),
+    })
+  }
+
+  // Queue saturated
+  if (queue && queue.active >= queue.max_concurrent) {
+    alerts.push({
+      key: 'queue-full',
+      level: 'info',
+      icon: <Clock className="h-4 w-4" />,
+      message: t('system.alertQueueFull'),
+    })
+  }
+
+  // Disabled models
+  const disabledCount = modelList.filter(m => !m.enabled).length
+  if (disabledCount > 0) {
+    alerts.push({
+      key: 'disabled-models',
+      level: 'info',
+      icon: <CircleSlash className="h-4 w-4" />,
+      message: t('system.alertDisabledModels', { count: disabledCount }),
+    })
+  }
+
+  return alerts
+}
+
 // -- VRAM Timeline interactive chart (wheel zoom + drag pan) --
 
 const TL_W = 600
 const TL_H = 224
-const TL_PX = 44   // left padding (Y-axis labels)
-const TL_PR = 12   // right padding
-const TL_PT = 14   // top padding
-const TL_PB = 28   // bottom padding (X-axis labels)
+const TL_PX = 44
+const TL_PR = 12
+const TL_PT = 14
+const TL_PB = 28
 const TL_CW = TL_W - TL_PX - TL_PR
 const TL_CH = TL_H - TL_PT - TL_PB
 const TL_MIN_SPAN = 30
@@ -88,22 +411,18 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   const { t } = useTranslation('console')
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
-  // null = default view (follow latest, last 5 min). Non-null = user-controlled.
   const [view, setView] = useState<{ start: number; end: number } | null>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Data bounds
   const dataStart = samples.length > 1 ? samples[0].t : 0
   const dataEnd = samples.length > 1 ? samples[samples.length - 1].t : 1
   const dataRange = dataEnd - dataStart || 1
 
-  // Resolve view window
   const defaultSpan = Math.min(300, dataRange)
   const vEnd = view ? view.end : dataEnd
   const vStart = view ? view.start : Math.max(dataStart, dataEnd - defaultSpan)
   const vSpan = vEnd - vStart || 1
 
-  // Refs for non-passive event handlers (avoid stale closures)
   const viewRef = useRef({ start: vStart, end: vEnd, span: vSpan })
   const boundsRef = useRef({ start: dataStart, end: dataEnd, range: dataRange })
   useEffect(() => {
@@ -111,14 +430,12 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
     boundsRef.current = { start: dataStart, end: dataEnd, range: dataRange }
   })
 
-  // Filter visible samples (with small margin for line continuity)
   const visible = useMemo(() => {
     if (samples.length < 2) return []
     const m = vSpan * 0.02
     return samples.filter(s => s.t >= vStart - m && s.t <= vEnd + m)
   }, [samples, vStart, vEnd, vSpan])
 
-  // Non-passive wheel zoom
   const hasData = samples.length >= 2
   useEffect(() => {
     const svg = svgRef.current
@@ -151,7 +468,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
     )
   }
 
-  // Y-axis: adaptive range from visible data
   let yDataMin = Infinity, yDataMax = -Infinity
   for (const s of visible) {
     if (s.vram_used_mb < yDataMin) yDataMin = s.vram_used_mb
@@ -164,22 +480,18 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   const yMax = Math.min(vramTotal, Math.ceil((yDataMax + ym) / 128) * 128)
   const yRange = yMax - yMin || 1
 
-  // Coordinate mapping
   const toX = (tv: number) => TL_PX + ((tv - vStart) / vSpan) * TL_CW
   const toY = (mb: number) => TL_PT + TL_CH - ((mb - yMin) / yRange) * TL_CH
 
-  // Polyline + events
   const vramPoints = visible.map(s => `${toX(s.t)},${toY(s.vram_used_mb)}`).join(' ')
   const eventSamples = visible.filter(s => s.event)
   const yMid = Math.round((yMin + yMax) / 2)
   const yLabels = [yMin, yMid, yMax]
 
-  // X-axis ticks
   const tickStep = TL_TICK_STEPS.find(s => s >= vSpan / 5) ?? 86400
   const xTicks: number[] = []
   for (let tv = Math.ceil(vStart / tickStep) * tickStep; tv <= vEnd; tv += tickStep) xTicks.push(tv)
 
-  // Formatters
   const fmtMb = (mb: number) => mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${mb}M`
   const fmtTickTime = (ts: number) => {
     const d = new Date(ts * 1000)
@@ -200,7 +512,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
     return `${(sec / 3600).toFixed(1)}h`
   }
 
-  // -- Drag pan --
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return
     e.preventDefault()
@@ -230,7 +541,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
     window.addEventListener('mouseup', onUp)
   }
 
-  // -- Hover tooltip --
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (isDragging) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -259,7 +569,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
         onMouseLeave={() => !isDragging && setHoverIdx(null)}
         onDoubleClick={() => setView(null)}
       >
-        {/* Y grid + labels */}
         {yLabels.map(mb => (
           <g key={mb}>
             <line x1={TL_PX} y1={toY(mb)} x2={TL_W - TL_PR} y2={toY(mb)}
@@ -271,7 +580,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           </g>
         ))}
 
-        {/* X-axis ticks + labels */}
         {xTicks.map(tv => (
           <g key={tv}>
             <line x1={toX(tv)} y1={TL_PT + TL_CH} x2={toX(tv)} y2={TL_PT + TL_CH + 4}
@@ -283,7 +591,6 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           </g>
         ))}
 
-        {/* VRAM area fill */}
         {visible.length >= 2 && (
           <polygon
             points={`${toX(visible[0].t)},${toY(yMin)} ${vramPoints} ${toX(visible[visible.length - 1].t)},${toY(yMin)}`}
@@ -291,19 +598,16 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           />
         )}
 
-        {/* VRAM line */}
         {visible.length >= 2 && (
           <polyline points={vramPoints} fill="none" stroke="var(--chart-palette-1)" strokeWidth={1.5} />
         )}
 
-        {/* Event markers */}
         {eventSamples.map((s, i) => (
           <circle key={i} cx={toX(s.t)} cy={toY(s.vram_used_mb)} r={3} fill="var(--chart-palette-3)">
             <title>{s.event}</title>
           </circle>
         ))}
 
-        {/* Hover crosshair */}
         {hovered && (
           <>
             <line x1={toX(hovered.t)} y1={TL_PT} x2={toX(hovered.t)} y2={TL_PT + TL_CH}
@@ -313,14 +617,12 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           </>
         )}
 
-        {/* Span indicator (top-right) */}
         <text x={TL_W - TL_PR} y={TL_PT + 10} textAnchor="end"
           fill="currentColor" fillOpacity={0.35} fontSize={10} fontFamily="var(--font-mono)">
           {fmtSpan(vSpan)}
         </text>
       </svg>
 
-      {/* Tooltip */}
       {hovered && (
         <div
           className="pointer-events-none absolute top-1 rounded-lg border bg-popover px-3 py-2 text-xs shadow-lg"
@@ -330,8 +632,8 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           }}
         >
           <div className="font-mono text-muted-foreground">{fmtTooltipTime(hovered.t)}</div>
-          <div>VRAM: <span className="font-semibold">{fmtMb(hovered.vram_used_mb)}</span> / {fmtMb(vramTotal)}</div>
-          <div>RAM: {fmtMb(hovered.sys_ram_mb)}</div>
+          <div>VRAM: <span className="font-semibold">{formatMB(hovered.vram_used_mb)}</span> / {formatMB(vramTotal)}</div>
+          <div>RAM: {formatMB(hovered.sys_ram_mb)}</div>
           <div>Models: {hovered.models}</div>
           {hovered.event && <div className="text-warning">{hovered.event}</div>}
         </div>
@@ -340,15 +642,27 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   )
 }
 
+// -- Time range options --
+const TIME_RANGES = [
+  { key: '5m', last: 300 },
+  { key: '15m', last: 900 },
+  { key: '1h', last: 3600 },
+] as const
+
+// =======================================================================
+// Main Page
+// =======================================================================
+
 export function AdminSystemPage() {
   const { t } = useTranslation('console')
   const queryClient = useQueryClient()
   const [checkResults, setCheckResults] = useState<Record<string, CortexModelCheckResult>>({})
   const [checkingModel, setCheckingModel] = useState<string | null>(null)
   const [checkingAll, setCheckingAll] = useState(false)
-  const [unloading, setUnloading] = useState(false)
-  const [eventsExpanded, setEventsExpanded] = useState(false)
-  const [timelineExpanded, setTimelineExpanded] = useState(false)
+  const [unloadingModel, setUnloadingModel] = useState<string | null>(null)
+  const [togglingModel, setTogglingModel] = useState<string | null>(null)
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
+  const [timeRange, setTimeRange] = useState<(typeof TIME_RANGES)[number]>(TIME_RANGES[0])
 
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['admin', 'cortex-status'],
@@ -357,10 +671,10 @@ export function AdminSystemPage() {
   })
 
   const { data: timeline } = useQuery({
-    queryKey: ['admin', 'cortex-timeline'],
-    queryFn: () => fetchCortexTimeline(0),
+    queryKey: ['admin', 'cortex-timeline', timeRange.last],
+    queryFn: () => fetchCortexTimeline(timeRange.last),
     refetchInterval: 60_000,
-    enabled: data?.online === true && timelineExpanded,
+    enabled: data?.online === true,
   })
 
   const online = data?.online ?? false
@@ -375,12 +689,17 @@ export function AdminSystemPage() {
   const sharedMemoryWarning = health?.shared_memory_warning ?? false
   const uptime = models?.uptime_seconds ?? 0
 
+  // Compute alerts
+  const alerts = useMemo(() => {
+    if (!online || !gpu) return []
+    return computeAlerts(gpu, modelList, events, queue, t)
+      .filter(a => !dismissedAlerts.has(a.key))
+  }, [online, gpu, modelList, events, queue, t, dismissedAlerts])
+
   const handleRefresh = () => {
     setCheckResults({})
     queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-status'] })
-    if (timelineExpanded) {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-timeline'] })
-    }
+    queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-timeline'] })
   }
 
   const handleCheckAll = async () => {
@@ -389,9 +708,7 @@ export function AdminSystemPage() {
       const result = await checkCortexModels()
       if (result.models) {
         const map: Record<string, CortexModelCheckResult> = {}
-        for (const m of result.models) {
-          map[m.name] = m
-        }
+        for (const m of result.models) map[m.name] = m
         setCheckResults(map)
       }
     } catch {
@@ -405,7 +722,7 @@ export function AdminSystemPage() {
     setCheckingModel(name)
     try {
       const result = await checkCortexModel(name)
-      setCheckResults((prev) => ({ ...prev, [name]: result }))
+      setCheckResults(prev => ({ ...prev, [name]: result }))
     } catch {
       toast.error(t('common.error'))
     } finally {
@@ -414,15 +731,43 @@ export function AdminSystemPage() {
   }
 
   const handleUnloadAll = async () => {
-    setUnloading(true)
     try {
       await unloadAllCortexModels()
       toast.success(t('system.unloadAllSuccess'))
       handleRefresh()
     } catch {
       toast.error(t('common.error'))
+    }
+  }
+
+  const handleUnloadModel = async (name: string) => {
+    setUnloadingModel(name)
+    try {
+      await unloadCortexModel(name)
+      toast.success(t('system.unloadSuccess'))
+      handleRefresh()
+    } catch {
+      toast.error(t('common.error'))
     } finally {
-      setUnloading(false)
+      setUnloadingModel(null)
+    }
+  }
+
+  const handleToggleModel = async (name: string, enable: boolean) => {
+    setTogglingModel(name)
+    try {
+      if (enable) {
+        await enableCortexModel(name)
+        toast.success(t('system.enableSuccess'))
+      } else {
+        await disableCortexModel(name)
+        toast.success(t('system.disableSuccess'))
+      }
+      handleRefresh()
+    } catch {
+      toast.error(t('common.error'))
+    } finally {
+      setTogglingModel(null)
     }
   }
 
@@ -436,23 +781,80 @@ export function AdminSystemPage() {
     )
   }
 
-  const vramPercent =
-    gpu && gpu.vram_total_mb > 0
-      ? Math.round((gpu.vram_used_mb / gpu.vram_total_mb) * 100)
-      : 0
-
-  const budgetPercent =
-    summary && summary.vram_budget_mb > 0
-      ? Math.round(summary.vram_utilization * 100)
-      : 0
-
   // -- Model table columns --
 
   const modelColumns: Column<CortexModelItem>[] = [
     {
       key: 'name',
       header: t('system.model'),
-      render: (row) => <span className="font-mono text-sm">{row.name}</span>,
+      render: (row) => (
+        <span className={`font-mono text-sm ${!row.enabled ? 'opacity-50' : ''}`}>{row.name}</span>
+      ),
+    },
+    {
+      key: 'enabled',
+      header: t('system.enabled'),
+      render: (row) => {
+        if (row.required) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <Switch checked={true} disabled />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{t('system.requiredCannotDisable')}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )
+        }
+
+        if (row.enabled) {
+          // Disabling: show AlertDialog confirmation
+          return (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <div>
+                  <Switch
+                    checked={true}
+                    disabled={togglingModel === row.name}
+                    onCheckedChange={() => {/* handled by AlertDialog */}}
+                  />
+                </div>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('system.confirmDisableTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('system.confirmDisableDesc', { model: row.name })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('system.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => handleToggleModel(row.name, false)}
+                  >
+                    {t('system.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )
+        }
+
+        // Enabling: no confirmation needed
+        return (
+          <Switch
+            checked={false}
+            disabled={togglingModel === row.name}
+            onCheckedChange={() => handleToggleModel(row.name, true)}
+          />
+        )
+      },
     },
     {
       key: 'status',
@@ -460,7 +862,7 @@ export function AdminSystemPage() {
       render: (row) => {
         const check = checkResults[row.name]
         return (
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${!row.enabled ? 'opacity-50' : ''}`}>
             <StatusBadge
               status={row.status}
               colorMap={MODEL_STATUS_COLORS}
@@ -480,14 +882,18 @@ export function AdminSystemPage() {
       header: t('system.required'),
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">{row.required ? t('system.yes') : t('system.no')}</span>
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
+          {row.required ? t('system.yes') : t('system.no')}
+        </span>
       ),
     },
     {
       key: 'vram_mb',
       header: 'VRAM',
       align: 'right',
-      render: (row) => <span className="text-sm">{formatMB(row.vram_mb)}</span>,
+      render: (row) => (
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>{formatMB(row.vram_mb)}</span>
+      ),
     },
     {
       key: 'vram_delta',
@@ -495,7 +901,7 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.vram_delta_mb != null ? formatMB(row.vram_delta_mb) : '-'}
         </span>
       ),
@@ -506,7 +912,7 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.workspace_measured_mb != null
             ? formatMB(row.workspace_measured_mb)
             : row.workspace_mb > 0
@@ -521,7 +927,7 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.inference_count != null ? row.inference_count : '-'}
         </span>
       ),
@@ -532,19 +938,8 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.file_size_mb != null ? formatMB(row.file_size_mb) : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'load_time',
-      header: t('system.loadTime'),
-      align: 'right',
-      hiddenOnMobile: true,
-      render: (row) => (
-        <span className="text-sm">
-          {row.load_time_ms != null ? `${row.load_time_ms}ms` : '-'}
         </span>
       ),
     },
@@ -554,7 +949,7 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.loaded_at != null ? formatRelativeTime(row.loaded_at) : '-'}
         </span>
       ),
@@ -565,7 +960,7 @@ export function AdminSystemPage() {
       align: 'right',
       hiddenOnMobile: true,
       render: (row) => (
-        <span className="text-sm">
+        <span className={`text-sm ${!row.enabled ? 'opacity-50' : ''}`}>
           {row.idle_seconds != null ? formatIdleTime(row.idle_seconds) : '-'}
         </span>
       ),
@@ -575,19 +970,53 @@ export function AdminSystemPage() {
       header: '',
       align: 'right',
       render: (row) => (
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={checkingModel === row.name || !online}
-          onClick={() => handleCheckModel(row.name)}
-        >
-          {checkingModel === row.name ? '...' : t('system.check')}
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          {/* Unload button: only for loaded models */}
+          {row.status === 'loaded' && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={unloadingModel === row.name}
+                >
+                  {unloadingModel === row.name ? '...' : t('system.unload')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('system.confirmUnloadTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('system.confirmUnloadDesc', { model: row.name })}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('system.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={() => handleUnloadModel(row.name)}
+                  >
+                    {t('system.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          {/* Check button */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={checkingModel === row.name || !online}
+            onClick={() => handleCheckModel(row.name)}
+          >
+            {checkingModel === row.name ? '...' : t('system.check')}
+          </Button>
+        </div>
       ),
     },
   ]
 
-  // -- Inference stats as array --
+  // -- Inference stats with error rate --
 
   const inferenceEntries = Object.entries(inferenceStats).map(([ep, s]) => ({
     endpoint: ep,
@@ -612,31 +1041,48 @@ export function AdminSystemPage() {
       key: 'errors',
       header: t('system.errors'),
       align: 'right',
-      render: (row) => (
-        <span className={`text-sm ${row.errors > 0 ? 'text-destructive' : ''}`}>
-          {row.errors}
-        </span>
-      ),
+      render: (row) => {
+        const rate = row.calls > 0 ? (row.errors / row.calls) * 100 : 0
+        let rateClass = ''
+        if (rate > 20) rateClass = 'text-destructive'
+        else if (rate > 5) rateClass = 'text-warning'
+        else if (row.errors > 0) rateClass = 'text-destructive'
+
+        return (
+          <span className={`text-sm ${rateClass}`}>
+            {row.errors}
+            {row.errors > 0 && row.calls > 0 && (
+              <span className="ml-1 text-xs">({rate.toFixed(1)}%)</span>
+            )}
+          </span>
+        )
+      },
     },
     {
       key: 'avg_ms',
       header: t('system.avgLatency'),
       align: 'right',
-      render: (row) => <span className="text-sm">{row.avg_ms}ms</span>,
+      render: (row) => (
+        <span className="text-sm">
+          {row.avg_ms}ms
+          <span className="ml-1 text-xs text-muted-foreground">
+            ({row.min_ms}~{row.max_ms})
+          </span>
+        </span>
+      ),
     },
     {
-      key: 'min_ms',
-      header: t('system.minLatency'),
+      key: 'error_rate',
+      header: t('system.errorRate'),
       align: 'right',
       hiddenOnMobile: true,
-      render: (row) => <span className="text-sm">{row.min_ms}ms</span>,
-    },
-    {
-      key: 'max_ms',
-      header: t('system.maxLatency'),
-      align: 'right',
-      hiddenOnMobile: true,
-      render: (row) => <span className="text-sm">{row.max_ms}ms</span>,
+      render: (row) => {
+        const rate = row.calls > 0 ? (row.errors / row.calls) * 100 : 0
+        let cls = 'text-sm'
+        if (rate > 20) cls += ' text-destructive font-medium'
+        else if (rate > 5) cls += ' text-warning font-medium'
+        return <span className={cls}>{rate.toFixed(1)}%</span>
+      },
     },
     {
       key: 'last_call',
@@ -707,27 +1153,36 @@ export function AdminSystemPage() {
         <h1 className="text-xl font-semibold">{t('system.title')}</h1>
         <div className="flex items-center gap-2">
           {online && summary && summary.loaded > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={unloading}
-              onClick={handleUnloadAll}
-            >
-              {unloading ? t('common.loading') : t('system.unloadAll')}
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {t('system.unloadAll')}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{t('system.confirmUnloadAllTitle')}</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {t('system.confirmUnloadAllDesc')}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{t('system.cancel')}</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    onClick={handleUnloadAll}
+                  >
+                    {t('system.confirm')}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
           <Button variant="outline" size="sm" disabled={isFetching} onClick={handleRefresh}>
             {isFetching ? t('common.loading') : t('system.refresh')}
           </Button>
         </div>
       </div>
-
-      {/* Shared memory warning */}
-      {online && sharedMemoryWarning && (
-        <div className="rounded-xl border border-warning/30 bg-warning-light px-4 py-3 text-sm text-warning">
-          {t('system.sharedMemoryWarning')}
-        </div>
-      )}
 
       {/* Connection status */}
       <div className="flex items-center gap-2 text-sm">
@@ -744,6 +1199,34 @@ export function AdminSystemPage() {
         )}
       </div>
 
+      {/* Alert bar */}
+      {alerts.length > 0 && (
+        <div className="space-y-2">
+          {alerts.map(alert => (
+            <div
+              key={alert.key}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${ALERT_STYLES[alert.level]}`}
+            >
+              {alert.icon}
+              <span className="flex-1">{alert.message}</span>
+              <button
+                onClick={() => setDismissedAlerts(prev => new Set([...prev, alert.key]))}
+                className="opacity-60 hover:opacity-100"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Shared memory warning */}
+      {online && sharedMemoryWarning && (
+        <div className="rounded-xl border border-warning/30 bg-warning-light px-4 py-3 text-sm text-warning">
+          {t('system.sharedMemoryWarning')}
+        </div>
+      )}
+
       {!online && (
         <Card>
           <CardContent className="py-10 text-center text-muted-foreground">
@@ -754,155 +1237,104 @@ export function AdminSystemPage() {
 
       {online && gpu && summary && (
         <>
-          {/* GPU overview cards */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {/* Card 1: GPU info */}
+          {/* GPU overview: 3-column grid */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {/* Card 1: GPU Vitals with ring gauges */}
             <Card>
               <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">{t('system.gpu')}</div>
-                <div className="mt-1 text-lg font-semibold">{gpu.name}</div>
-                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {(gpu.driver_version != null || gpu.cuda_version != null) && (
-                    <div>
-                      {gpu.driver_version != null && (
-                        <span>{t('system.driverVersion')} {gpu.driver_version}</span>
-                      )}
-                      {gpu.driver_version != null && gpu.cuda_version != null && (
-                        <span className="mx-1.5">|</span>
-                      )}
-                      {gpu.cuda_version != null && (
-                        <span>{t('system.cudaVersion')} {gpu.cuda_version}</span>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-4">
+                <div className="mb-3 text-sm text-muted-foreground">{t('system.gpu')}</div>
+                <div className="flex items-start gap-4">
+                  {/* Ring gauges */}
+                  <div className="flex gap-3">
                     {gpu.gpu_utilization_pct != null && (
-                      <span>{t('system.gpuUtilization')} {gpu.gpu_utilization_pct}%</span>
+                      <RingGauge
+                        value={gpu.gpu_utilization_pct}
+                        max={100}
+                        label="GPU"
+                        unit="%"
+                        warningThreshold={70}
+                        criticalThreshold={90}
+                      />
                     )}
                     {gpu.memory_utilization_pct != null && (
-                      <span>{t('system.memoryUtilization')} {gpu.memory_utilization_pct}%</span>
+                      <RingGauge
+                        value={gpu.memory_utilization_pct}
+                        max={100}
+                        label="Mem"
+                        unit="%"
+                        warningThreshold={70}
+                        criticalThreshold={90}
+                      />
                     )}
-                  </div>
-                  <div className="flex gap-4">
                     {gpu.temperature_c != null && (
-                      <span>{t('system.temperature')} {gpu.temperature_c}C</span>
-                    )}
-                    {gpu.power_watts != null && (
-                      <span>{t('system.power')} {gpu.power_watts}W</span>
+                      <RingGauge
+                        value={gpu.temperature_c}
+                        max={100}
+                        label="Temp"
+                        unit="C"
+                        warningThreshold={65}
+                        criticalThreshold={80}
+                      />
                     )}
                   </div>
+                  {/* Power */}
+                  {gpu.power_watts != null && (
+                    <span className="mt-4 text-sm text-muted-foreground">{gpu.power_watts}W</span>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground">
+                  {gpu.name}
+                  {gpu.driver_version != null && <span> &middot; {t('system.driverVersion')} {gpu.driver_version}</span>}
+                  {gpu.cuda_version != null && <span> &middot; {t('system.cudaVersion')} {gpu.cuda_version}</span>}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Card 2: GPU VRAM */}
+            {/* Card 2: VRAM stacked bar (merged with budget) */}
             <Card>
               <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">{t('system.gpuVram')}</div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-lg font-semibold">{formatMB(gpu.vram_used_mb)}</span>
-                  <span className="text-sm text-muted-foreground">
-                    / {formatMB(gpu.vram_total_mb)}
-                  </span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground/70 transition-all"
-                    style={{ width: `${vramPercent}%` }}
-                  />
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground text-right">{vramPercent}%</div>
+                <div className="mb-3 text-sm text-muted-foreground">{t('system.gpuVram')}</div>
+                <VramStackedBar gpu={gpu} summary={summary} />
               </CardContent>
             </Card>
 
-            {/* Card 3: Model budget */}
+            {/* Card 3: Queue */}
             <Card>
               <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">{t('system.modelBudget')}</div>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-lg font-semibold">{formatMB(summary.vram_real_mb)}</span>
-                  <span className="text-sm text-muted-foreground">
-                    / {formatMB(summary.vram_budget_mb)}
-                  </span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-foreground/70 transition-all"
-                    style={{ width: `${budgetPercent}%` }}
-                  />
-                </div>
-                <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    {summary.loaded} / {summary.registered} {t('system.modelsLoaded')}
-                  </span>
-                  <span>{budgetPercent}%</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Card 4: Queue */}
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">{t('system.queue')}</div>
+                <div className="mb-3 text-sm text-muted-foreground">{t('system.queue')}</div>
                 {queue ? (
-                  <div className="mt-2 space-y-1.5">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-lg font-semibold">{queue.active}</span>
-                      <span className="text-sm text-muted-foreground">
-                        / {queue.max_concurrent}
-                      </span>
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {t('system.queueTimeout')}: {queue.timeout_seconds}s
-                    </div>
-                  </div>
+                  <QueueIndicator queue={queue} />
                 ) : (
-                  <div className="mt-2 text-sm text-muted-foreground">--</div>
+                  <div className="text-sm text-muted-foreground">--</div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* VRAM Timeline */}
+          {/* VRAM Timeline (always on) */}
           <Card>
             <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle>{t('system.vramTimeline')}</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setTimelineExpanded(!timelineExpanded)}
-              >
-                {timelineExpanded ? t('system.hideTimeline') : t('system.showTimeline')}
-              </Button>
-            </CardHeader>
-            {timelineExpanded && (
-              <CardContent>
-                <VramTimelineChart
-                  samples={timeline?.samples ?? []}
-                  vramTotal={gpu.vram_total_mb}
-                />
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Models table */}
-          <Card>
-            <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <CardTitle>{t('system.modelRegistry')}</CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={checkingAll}
-                onClick={handleCheckAll}
-              >
-                {checkingAll ? t('common.loading') : t('system.checkAll')}
-              </Button>
+              <div className="flex items-center gap-1">
+                {TIME_RANGES.map(tr => (
+                  <Button
+                    key={tr.key}
+                    variant={timeRange.key === tr.key ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      setTimeRange(tr)
+                      queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-timeline'] })
+                    }}
+                  >
+                    {t(`system.timeRange${tr.key}`)}
+                  </Button>
+                ))}
+              </div>
             </CardHeader>
             <CardContent>
-              <DataTable
-                columns={modelColumns}
-                data={modelList}
-                rowKey={(row) => row.name}
+              <VramTimelineChart
+                samples={timeline?.samples ?? []}
+                vramTotal={gpu.vram_total_mb}
               />
             </CardContent>
           </Card>
@@ -927,9 +1359,31 @@ export function AdminSystemPage() {
             </CardContent>
           </Card>
 
-          {/* Model events log */}
+          {/* Models table */}
           <Card>
             <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle>{t('system.modelRegistry')}</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={checkingAll}
+                onClick={handleCheckAll}
+              >
+                {checkingAll ? t('common.loading') : t('system.checkAll')}
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={modelColumns}
+                data={modelList}
+                rowKey={(row) => row.name}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Model events log (default expanded) */}
+          <Card>
+            <CardHeader>
               <CardTitle>
                 {t('system.modelEvents')}
                 {events.length > 0 && (
@@ -938,32 +1392,20 @@ export function AdminSystemPage() {
                   </span>
                 )}
               </CardTitle>
-              {events.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEventsExpanded(!eventsExpanded)}
-                >
-                  {eventsExpanded ? t('system.hideEvents') : t('system.showEvents')}
-                </Button>
-              )}
             </CardHeader>
-            {eventsExpanded && (
-              <CardContent>
+            <CardContent>
+              {recentEvents.length > 0 ? (
                 <DataTable
                   columns={eventColumns}
                   data={recentEvents}
                   rowKey={(row) => `${row.timestamp}-${row.model}-${row.event}`}
                 />
-              </CardContent>
-            )}
-            {!eventsExpanded && events.length === 0 && (
-              <CardContent>
+              ) : (
                 <div className="py-6 text-center text-sm text-muted-foreground">
                   {t('system.noEvents')}
                 </div>
-              </CardContent>
-            )}
+              )}
+            </CardContent>
           </Card>
         </>
       )}
