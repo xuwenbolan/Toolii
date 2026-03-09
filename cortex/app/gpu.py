@@ -195,10 +195,20 @@ class VramSample:
 
 
 class VramTimeline:
-    """Background VRAM sampler with shared memory detection."""
+    """Two-tier RRD-style VRAM sampler.
 
-    def __init__(self, maxlen: int = 3600) -> None:
-        self._samples: deque[VramSample] = deque(maxlen=maxlen)
+    Hot tier:  1-second resolution, last 1 hour  (~3 600 samples).
+    Cold tier: 30-second resolution (peak per window), up to 47 hours (~5 640 samples).
+    Total coverage: 48 hours, ~9 240 samples, ~2.5 MB.
+    """
+
+    _HOT_SECONDS = 3600
+    _COLD_INTERVAL = 30
+    _COLD_MAXLEN = 47 * 3600 // 30  # 5640
+
+    def __init__(self) -> None:
+        self._hot: deque[VramSample] = deque()
+        self._cold: deque[VramSample] = deque(maxlen=self._COLD_MAXLEN)
         self._model_count_fn: Callable[[], int] | None = None
         self._stop = threading.Event()
         self._pending_event: str = ""
@@ -214,7 +224,11 @@ class VramTimeline:
             name="vram-timeline",
         )
         t.start()
-        logger.info("VRAM timeline sampler started (interval=%.1fs)", interval)
+        logger.info(
+            "VRAM timeline sampler started (interval=%.1fs, hot=%ds, cold=%ds@%ds)",
+            interval, self._HOT_SECONDS,
+            self._COLD_MAXLEN * self._COLD_INTERVAL, self._COLD_INTERVAL,
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -227,9 +241,9 @@ class VramTimeline:
     def get_samples(self, last_n: int = 0) -> list[dict[str, Any]]:
         """Return recent samples as dicts. last_n=0 returns all."""
         with self._lock:
-            items = list(self._samples)
+            merged = list(self._cold) + list(self._hot)
         if last_n > 0:
-            items = items[-last_n:]
+            merged = merged[-last_n:]
         return [
             {
                 "t": s.timestamp,
@@ -239,7 +253,7 @@ class VramTimeline:
                 "models": s.loaded_models,
                 "event": s.event,
             }
-            for s in items
+            for s in merged
         ]
 
     def shared_memory_detected(self) -> bool:
@@ -250,7 +264,7 @@ class VramTimeline:
         - System RAM spiked > 500MB between adjacent samples
         """
         with self._lock:
-            samples = list(self._samples)
+            samples = list(self._hot)
         if len(samples) < 2:
             return False
         for i in range(max(0, len(samples) - 60), len(samples)):
@@ -264,11 +278,19 @@ class VramTimeline:
         return False
 
     def _sample_loop(self, interval: float) -> None:
+        compact_counter = 0
         while not self._stop.is_set():
             try:
                 self._take_sample()
             except Exception:
                 logger.debug("VRAM sample failed", exc_info=True)
+            compact_counter += 1
+            if compact_counter >= self._COLD_INTERVAL:
+                try:
+                    self._compact()
+                except Exception:
+                    logger.debug("VRAM compact failed", exc_info=True)
+                compact_counter = 0
             self._stop.wait(interval)
 
     def _take_sample(self) -> None:
@@ -285,4 +307,19 @@ class VramTimeline:
             event=event,
         )
         with self._lock:
-            self._samples.append(sample)
+            self._hot.append(sample)
+
+    def _compact(self) -> None:
+        """Move expired hot samples to cold tier with peak aggregation."""
+        cutoff = time.time() - self._HOT_SECONDS
+        with self._lock:
+            expired: list[VramSample] = []
+            while self._hot and self._hot[0].timestamp < cutoff:
+                expired.append(self._hot.popleft())
+            if not expired:
+                return
+            peak = max(expired, key=lambda s: s.vram_used_mb)
+            self._cold.append(peak)
+            for s in expired:
+                if s.event and s is not peak:
+                    self._cold.append(s)

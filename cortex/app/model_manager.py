@@ -28,6 +28,11 @@ class ModelInfo:
     required: bool = True
     workspace_mb: int = 0     # inference workspace; 0 = auto (max(500, vram_mb))
     cpu_only: bool = False    # force CPU execution (for models with GPU-unfriendly ops)
+    enabled: bool = True      # admin toggle; disabled models reject requests
+
+
+class ModelDisabledError(RuntimeError):
+    """Raised when a disabled model is requested."""
 
 
 @dataclass
@@ -78,7 +83,7 @@ class OnnxModelManager:
     - Circuit breaker: temporarily disable models that fail to load repeatedly
     """
 
-    def __init__(self, vram_budget_mb: int) -> None:
+    def __init__(self, vram_budget_mb: int, data_dir: Path | None = None) -> None:
         self._models: OrderedDict[str, LoadedModel] = OrderedDict()
         self._lock = threading.Lock()
         self._registry: dict[str, ModelInfo] = {}
@@ -87,6 +92,7 @@ class OnnxModelManager:
         self._events: deque[ModelEvent] = deque(maxlen=200)
         self._profile_data: dict[str, dict[str, Any]] = {}
         self._circuit: dict[str, _CircuitState] = {}
+        self._state_file = data_dir / "model_state.json" if data_dir else None
 
     @property
     def vram_budget_mb(self) -> int:
@@ -336,16 +342,18 @@ class OnnxModelManager:
         with self._lock:
             self._check_circuit(model_name)
 
+            info = self._registry.get(model_name)
+            if info is None:
+                raise ValueError(f"Unknown model: {model_name}")
+            if not info.enabled:
+                raise ModelDisabledError(f"Model '{model_name}' is disabled by admin")
+
             loaded = self._models.get(model_name)
             if loaded is not None:
                 loaded.last_used = time.time()
                 self._models.move_to_end(model_name)
                 self._ensure_workspace_headroom(model_name)
                 return loaded.session
-
-            info = self._registry.get(model_name)
-            if info is None:
-                raise ValueError(f"Unknown model: {model_name}")
 
             if not info.onnx_path.exists():
                 raise FileNotFoundError(f"Model file not found: {info.onnx_path}")
@@ -592,6 +600,70 @@ class OnnxModelManager:
         if names:
             logger.info("Unloaded %d models: %s", len(names), names)
 
+    # -- Enable / Disable ------------------------------------------------------
+
+    def enable_model(self, model_name: str) -> dict[str, Any]:
+        """Re-enable a disabled model."""
+        info = self._registry.get(model_name)
+        if info is None:
+            return {"status": "error", "error": "not_registered"}
+        info.enabled = True
+        self._save_model_state()
+        logger.info("Model %s enabled", model_name)
+        return {"status": "ok", "model": model_name, "enabled": True}
+
+    def disable_model(self, model_name: str) -> dict[str, Any]:
+        """Disable a model. Required models cannot be disabled.
+
+        Unloads the model if currently loaded.
+        """
+        info = self._registry.get(model_name)
+        if info is None:
+            return {"status": "error", "error": "not_registered"}
+        if info.required:
+            return {"status": "error", "error": "cannot_disable_required"}
+        info.enabled = False
+        vram_freed = 0
+        with self._lock:
+            loaded = self._models.get(model_name)
+            if loaded:
+                vram_before = gpu.vram_used_mb()
+                self._evict_model(model_name, reason="disabled")
+                vram_freed = max(0, vram_before - gpu.vram_used_mb())
+        self._save_model_state()
+        logger.info("Model %s disabled (freed %dMB)", model_name, vram_freed)
+        return {"status": "ok", "model": model_name, "enabled": False,
+                "vram_freed_mb": vram_freed}
+
+    def _save_model_state(self) -> None:
+        """Persist enabled/disabled state to JSON."""
+        if self._state_file is None:
+            return
+        disabled = [n for n, info in self._registry.items() if not info.enabled]
+        try:
+            self._state_file.parent.mkdir(parents=True, exist_ok=True)
+            self._state_file.write_text(json.dumps({"disabled": disabled}, indent=2))
+        except Exception:
+            logger.warning("Failed to save model state to %s", self._state_file,
+                           exc_info=True)
+
+    def load_model_state(self) -> None:
+        """Restore enabled/disabled state from JSON."""
+        if self._state_file is None or not self._state_file.exists():
+            return
+        try:
+            data = json.loads(self._state_file.read_text())
+            disabled = data.get("disabled", [])
+            for name in disabled:
+                info = self._registry.get(name)
+                if info and not info.required:
+                    info.enabled = False
+            if disabled:
+                logger.info("Restored disabled models: %s", disabled)
+        except Exception:
+            logger.warning("Failed to load model state from %s", self._state_file,
+                           exc_info=True)
+
     # -- Idle eviction ---------------------------------------------------------
 
     def start_idle_evictor(self, idle_minutes: int, check_interval: int = 60) -> None:
@@ -665,6 +737,7 @@ class OnnxModelManager:
         result: dict[str, Any] = {
             "name": model_name,
             "required": info.required,
+            "enabled": info.enabled,
             "vram_mb": info.vram_mb,
             "workspace_mb": info.workspace_mb,
             "path": str(info.onnx_path),
@@ -752,11 +825,20 @@ class OnnxModelManager:
                 file_size_mb = round(info.onnx_path.stat().st_size / 1024 / 1024, 1) \
                     if file_exists else None
 
+                if loaded:
+                    status = "loaded"
+                elif not info.enabled:
+                    status = "disabled"
+                elif file_exists:
+                    status = "available"
+                else:
+                    status = "missing"
+
                 entry: dict[str, Any] = {
                     "name": name,
-                    "status": "loaded" if loaded else (
-                        "available" if file_exists else "missing"),
+                    "status": status,
                     "required": info.required,
+                    "enabled": info.enabled,
                     "vram_mb": info.vram_mb,
                     "workspace_mb": info.workspace_mb,
                     "file_size_mb": file_size_mb,

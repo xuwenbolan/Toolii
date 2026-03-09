@@ -15,7 +15,7 @@ from starlette.responses import JSONResponse
 from app import gpu
 from app.config import settings
 from app.engines.base import BaseEngine
-from app.model_manager import OnnxModelManager
+from app.model_manager import ModelDisabledError, OnnxModelManager
 from app.router import CortexRouter, create_cortex_router
 
 logging.basicConfig(level=settings.log_level)
@@ -95,8 +95,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Initialize GPU monitoring
     gpu.init()
     budget = _resolve_budget()
-    manager = OnnxModelManager(vram_budget_mb=budget)
-    timeline = gpu.VramTimeline(maxlen=3600)
+    manager = OnnxModelManager(vram_budget_mb=budget, data_dir=settings.data_dir)
+    timeline = gpu.VramTimeline()
 
     # Register engine models
     engine_map = _build_engine_map()
@@ -107,6 +107,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.profile_file.exists():
         manager.load_profile(settings.profile_file)
         logger.info("Loaded VRAM profile from %s", settings.profile_file)
+
+    # Restore per-model enabled/disabled state
+    manager.load_model_state()
 
     if settings.warmup:
         logger.info("Warming up required models...")
@@ -222,6 +225,54 @@ def create_app() -> FastAPI:
         mgr: OnnxModelManager = request.app.state.manager
         mgr.unload_all()
         return {"status": "ok", "vram_mb": gpu.vram_used_mb()}
+
+    @app.post("/admin/unload/{model_name}")
+    async def admin_unload_model(model_name: str, request: Request) -> dict:
+        """Unload a single model to free VRAM."""
+        mgr: OnnxModelManager = request.app.state.manager
+        if model_name not in mgr._registry:
+            return JSONResponse(
+                {"error": {"code": "MODEL_NOT_FOUND",
+                           "message": f"Unknown model: {model_name}"}},
+                status_code=400,
+            )
+        if model_name not in mgr._models:
+            return JSONResponse(
+                {"error": {"code": "MODEL_NOT_LOADED",
+                           "message": f"Model not loaded: {model_name}"}},
+                status_code=400,
+            )
+        vram_before = gpu.vram_used_mb()
+        mgr.unload(model_name)
+        vram_freed = max(0, vram_before - gpu.vram_used_mb())
+        return {"status": "ok", "model": model_name, "vram_freed_mb": vram_freed}
+
+    @app.post("/admin/models/{model_name}/enable")
+    async def admin_enable_model(model_name: str, request: Request) -> dict:
+        """Re-enable a disabled model."""
+        mgr: OnnxModelManager = request.app.state.manager
+        result = mgr.enable_model(model_name)
+        if result.get("error"):
+            return JSONResponse(
+                {"error": {"code": result["error"].upper(),
+                           "message": result["error"]}},
+                status_code=400,
+            )
+        return result
+
+    @app.post("/admin/models/{model_name}/disable")
+    async def admin_disable_model(model_name: str, request: Request) -> dict:
+        """Disable a model (unloads if loaded, rejects future requests)."""
+        mgr: OnnxModelManager = request.app.state.manager
+        result = mgr.disable_model(model_name)
+        if result.get("error"):
+            status = 409 if result["error"] == "cannot_disable_required" else 400
+            return JSONResponse(
+                {"error": {"code": result["error"].upper(),
+                           "message": result["error"]}},
+                status_code=status,
+            )
+        return result
 
     @app.post("/admin/save-profile")
     async def admin_save_profile(request: Request) -> dict:

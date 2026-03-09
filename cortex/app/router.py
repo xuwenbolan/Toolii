@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from app import gpu
 from app.config import settings
 from app.engines.base import BaseEngine
-from app.model_manager import CircuitBreakerOpen, OnnxModelManager
+from app.model_manager import CircuitBreakerOpen, ModelDisabledError, OnnxModelManager
 from app.utils import decode_image
 
 logger = logging.getLogger(__name__)
@@ -431,6 +431,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("remove-background", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("remove-background", 0, error=True)
             return _error("MODEL_NOT_FOUND", f"Model '{req.model}' not found", 400)
@@ -474,6 +476,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("upscale", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("upscale", 0, error=True)
             return _error("MODEL_NOT_FOUND", f"Model '{req.model}' not found", 400)
@@ -518,6 +522,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("restore-face", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("restore-face", 0, error=True)
             return _error("MODEL_NOT_FOUND", "GFPGAN model not found", 400)
@@ -561,6 +567,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("denoise", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("denoise", 0, error=True)
             return _error("MODEL_NOT_FOUND", "NAFNet model not found", 400)
@@ -602,6 +610,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("colorize", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("colorize", 0, error=True)
             return _error("MODEL_NOT_FOUND", f"DDColor model '{req.model}' not found", 400)
@@ -656,6 +666,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("inpaint", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except (FileNotFoundError, ValueError):
             _record_stat("inpaint", 0, error=True)
             return _error("MODEL_NOT_FOUND", f"Inpaint model '{model}' not found", 400)
@@ -701,6 +713,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("ocr", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except Exception as exc:
             logger.exception("ocr failed")
             _record_stat("ocr", 0, error=True)
@@ -741,6 +755,8 @@ def create_cortex_router(
         except ModelUnavailableError as exc:
             _record_stat("segment", 0, error=True)
             return _error("MODEL_UNAVAILABLE", str(exc), 503)
+        except ModelDisabledError as exc:
+            return _error("MODEL_DISABLED", str(exc), 400)
         except Exception as exc:
             logger.exception("segment failed")
             _record_stat("segment", 0, error=True)
