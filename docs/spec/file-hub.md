@@ -1,4 +1,4 @@
-# File Hub (文件中心)
+# File Hub (文件中心)（还需要文件预览图，重新设计文件管理页面）
 
 Status: draft | Updated: 2026-03-06
 
