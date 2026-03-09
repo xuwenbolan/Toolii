@@ -6,6 +6,50 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 const SITE_URL = 'https://www.toolii.cc'
 const SITE_NAME = 'Toolii'
+const DOC_EDITOR_MODULE = path.resolve(__dirname, 'src/components/editor/TyporaEditor.tsx')
+
+function stripQuery(id: string) {
+  return id.split('?')[0]
+}
+
+function isDocEditorOnlyModule(
+  id: string,
+  getModuleInfo: (id: string) => { importers: readonly string[]; dynamicImporters: readonly string[] } | null,
+) {
+  const seen = new Set<string>()
+  const stack = [id]
+  let foundEditorImporter = false
+
+  while (stack.length > 0) {
+    const current = stack.pop()
+    if (!current) continue
+
+    const normalizedCurrent = stripQuery(current)
+    if (seen.has(normalizedCurrent)) continue
+    seen.add(normalizedCurrent)
+
+    const info = getModuleInfo(current) ?? getModuleInfo(normalizedCurrent)
+    if (!info) return false
+
+    const importers = [...info.importers, ...info.dynamicImporters]
+    if (importers.length === 0) return false
+
+    for (const importer of importers) {
+      const normalizedImporter = stripQuery(importer)
+      if (normalizedImporter === DOC_EDITOR_MODULE) {
+        foundEditorImporter = true
+        continue
+      }
+      if (normalizedImporter.includes('/node_modules/')) {
+        stack.push(importer)
+        continue
+      }
+      return false
+    }
+  }
+
+  return foundEditorImporter
+}
 
 // All public routes for sitemap and SEO meta injection.
 // Auth, dashboard, admin, and share routes are excluded.
@@ -215,13 +259,16 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        hoistTransitiveImports: false,
+        manualChunks(id, { getModuleInfo }) {
           if (!id.includes('node_modules')) return
           if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
             return 'react-core'
           }
+          if (isDocEditorOnlyModule(id, getModuleInfo)) {
+            return 'doc-editor'
+          }
           if (id.includes('@tanstack/react-query')) return 'query'
-          if (id.includes('i18next') || id.includes('react-i18next')) return 'i18n'
           if (id.includes('@radix-ui')) return 'radix'
           if (id.includes('recharts') || id.includes('/d3-') || id.includes('victory-vendor')) return 'charts'
           if (id.includes('@dnd-kit')) return 'dnd'

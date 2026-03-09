@@ -1,18 +1,42 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, PanelLeftClose, PanelRightClose, Printer, RefreshCw, Save, Undo2 } from 'lucide-react'
+import { useBlocker, useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Download,
+  EllipsisVertical,
+  Loader2,
+  PanelLeft,
+  Pencil,
+  Printer,
+  RefreshCw,
+  Save,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { EditorStatusBar } from '@/components/editor/EditorStatusBar'
 import { SEOHead } from '@/components/common/SEOHead'
-import { MarkdownPreview } from '@/components/editor/MarkdownPreview'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { getTranslatedApiError } from '@/lib/apiErrors'
-import { cn } from '@/lib/utils'
 import {
   getFileContent,
   getFileMeta,
@@ -21,65 +45,41 @@ import {
   type UserFileDetailResponse,
 } from '@/services/hubApi'
 
-const AUTOSAVE_DELAY = 1200
+const AUTOSAVE_DELAY = 60_000
+const RETRY_DELAY = 30_000
 const MAX_BYTES = 1024 * 1024
+const WARN_BYTES = 900 * 1024
 
-type InsertMode = {
-  prefix: string
-  suffix?: string
-  placeholder?: string
-}
-
-function formatTime(value: string | null, locale: string) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(locale, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const TyporaEditor = lazy(() =>
+  import('@/components/editor/TyporaEditor').then((module) => ({ default: module.TyporaEditor })),
+)
+const EditorOutline = lazy(() =>
+  import('@/components/editor/EditorOutline').then((module) => ({ default: module.EditorOutline })),
+)
 
 function byteLength(value: string) {
   return new TextEncoder().encode(value).length
 }
 
-function insertMarkdown(
-  textarea: HTMLTextAreaElement,
-  mode: InsertMode,
-  setValue: (next: string) => void,
-) {
-  const { selectionStart, selectionEnd, value } = textarea
-  const selectedText = value.slice(selectionStart, selectionEnd)
-  const content = selectedText || mode.placeholder || ''
-  const next = `${value.slice(0, selectionStart)}${mode.prefix}${content}${mode.suffix ?? ''}${value.slice(selectionEnd)}`
-  setValue(next)
-
-  const start = selectionStart + mode.prefix.length
-  const end = start + content.length
-  requestAnimationFrame(() => {
-    textarea.focus()
-    textarea.setSelectionRange(start, end)
-  })
-}
-
-function buildDefaultContent(title: string) {
-  const base = title.replace(/\.md$/i, '')
-  return `# ${base}\n\n`
+function getInitialOutlineOpen(): boolean {
+  try {
+    return localStorage.getItem('doc-outline-open') !== 'false' && window.innerWidth >= 1024
+  } catch {
+    return window.innerWidth >= 1024
+  }
 }
 
 export function DocEditorPage() {
   const { id = '' } = useParams()
   const fileId = Number(id)
   const navigate = useNavigate()
-  const { t, i18n } = useTranslation('docs')
+  const { t } = useTranslation('docs')
   const { t: tCommon } = useTranslation('common')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [editorRevision, setEditorRevision] = useState(0)
 
   const [meta, setMeta] = useState<UserFileDetailResponse | null>(null)
   const [fileNameDraft, setFileNameDraft] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
   const [content, setContent] = useState('')
   const [lastSavedContent, setLastSavedContent] = useState('')
   const [updatedAt, setUpdatedAt] = useState<string | null>(null)
@@ -88,13 +88,37 @@ export function DocEditorPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [renamePending, setRenamePending] = useState(false)
-  const [showPreview, setShowPreview] = useState(true)
   const [conflictOpen, setConflictOpen] = useState(false)
   const [leavingOpen, setLeavingOpen] = useState(false)
+  const [rateLimited, setRateLimited] = useState(false)
+  const [outlineOpen, setOutlineOpen] = useState(getInitialOutlineOpen)
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   const isDirty = content !== lastSavedContent
   const currentBytes = useMemo(() => byteLength(content), [content])
   const isOversize = currentBytes > MAX_BYTES
+  const isApproachingLimit = !isOversize && currentBytes > WARN_BYTES
+  const autoSaveTimerRef = useRef<number>(0)
+  const retryTimerRef = useRef<number>(0)
+  const pendingLeaveRef = useRef<(() => void) | null>(null)
+
+  const saveStatus = loading
+    ? 'loading' as const
+    : saving
+      ? 'saving' as const
+      : saveError
+        ? 'error' as const
+        : isDirty
+          ? 'unsaved' as const
+          : 'saved' as const
+
+  const toggleOutline = useCallback(() => {
+    setOutlineOpen((prev) => {
+      const next = !prev
+      try { localStorage.setItem('doc-outline-open', String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }, [])
 
   const loadDocument = useCallback(async () => {
     if (!Number.isFinite(fileId)) {
@@ -112,6 +136,7 @@ export function DocEditorPage() {
       setLastSavedContent(body.content)
       setUpdatedAt(body.updated_at)
       setSaveError(null)
+      setEditorRevision((prev) => prev + 1)
     } catch (err) {
       setError(getTranslatedApiError(err, t('loadFailed')))
     } finally {
@@ -123,6 +148,11 @@ export function DocEditorPage() {
     void loadDocument()
   }, [loadDocument])
 
+  // Clean up retry timer on unmount
+  useEffect(() => {
+    return () => window.clearTimeout(retryTimerRef.current)
+  }, [])
+
   const handleSave = useCallback(async () => {
     if (loading || saving || isOversize || !isDirty) return
     setSaving(true)
@@ -131,26 +161,54 @@ export function DocEditorPage() {
       const result = await saveFileContent(fileId, content, updatedAt)
       setUpdatedAt(result.updated_at)
       setLastSavedContent(content)
-      setMeta((prev) => (prev ? { ...prev, size: currentBytes, updated_at: result.updated_at } : prev))
+      setMeta((prev) => (prev ? { ...prev, size: result.size, updated_at: result.updated_at } : prev))
+      if (pendingLeaveRef.current) {
+        const leave = pendingLeaveRef.current
+        pendingLeaveRef.current = null
+        leave()
+      }
     } catch (err) {
+      pendingLeaveRef.current = null
+      const status = (err as { response?: { status?: number } })?.response?.status
       const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code
       if (code === 'CONTENT_CONFLICT') {
         setConflictOpen(true)
+      } else if (status === 429) {
+        setRateLimited(true)
+        window.clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = window.setTimeout(() => {
+          setRateLimited(false)
+        }, RETRY_DELAY)
       } else {
         setSaveError(getTranslatedApiError(err, t('saveFailed')))
       }
     } finally {
       setSaving(false)
     }
-  }, [content, currentBytes, fileId, isDirty, isOversize, loading, saving, t, updatedAt])
+  }, [content, fileId, isDirty, isOversize, loading, saving, t, updatedAt])
 
+  // Auto-save
   useEffect(() => {
-    if (!isDirty || loading || saving || isOversize || conflictOpen) return
-    const timer = window.setTimeout(() => {
+    if (!isDirty || loading || saving || isOversize || conflictOpen || rateLimited) return
+    autoSaveTimerRef.current = window.setTimeout(() => {
       void handleSave()
     }, AUTOSAVE_DELAY)
-    return () => window.clearTimeout(timer)
-  }, [conflictOpen, handleSave, isDirty, isOversize, loading, saving])
+    return () => window.clearTimeout(autoSaveTimerRef.current)
+  }, [conflictOpen, handleSave, isDirty, isOversize, loading, rateLimited, saving])
+
+  // Ctrl+S / Cmd+S
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        window.clearTimeout(autoSaveTimerRef.current)
+        window.clearTimeout(retryTimerRef.current)
+        void handleSave()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave])
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -163,6 +221,7 @@ export function DocEditorPage() {
   }, [isDirty, saving])
 
   const handleRenameCommit = useCallback(async () => {
+    setIsEditingName(false)
     const nextName = fileNameDraft.trim()
     if (!meta || !nextName || nextName === meta.file_name || renamePending) return
     setRenamePending(true)
@@ -179,16 +238,17 @@ export function DocEditorPage() {
     }
   }, [fileNameDraft, meta, renamePending, t])
 
-  const handleInsert = useCallback((mode: InsertMode) => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    insertMarkdown(textarea, mode, setContent)
+  const startRename = useCallback(() => {
+    setIsEditingName(true)
+    requestAnimationFrame(() => nameInputRef.current?.select())
   }, [])
 
   const handleReloadLatest = useCallback(async () => {
     setConflictOpen(false)
     await loadDocument()
   }, [loadDocument])
+
+  const blocker = useBlocker(isDirty)
 
   const handleBack = useCallback(() => {
     if (isDirty) {
@@ -198,184 +258,307 @@ export function DocEditorPage() {
     navigate('/dashboard/hub')
   }, [isDirty, navigate])
 
-  const statusLabel = loading
-    ? t('statusLoading')
-    : saving
-      ? t('statusSaving')
-      : saveError
-        ? saveError
-        : isOversize
-          ? t('oversizeInline', { size: '1 MB' })
-          : isDirty
-            ? t('statusUnsaved')
-            : t('statusSaved', { date: formatTime(updatedAt, i18n.language) })
+  // Called once on editor init with the round-trip normalized markdown.
+  // Syncs both content and lastSavedContent to prevent false dirty state.
+  const handleNormalized = useCallback((markdown: string) => {
+    setContent(markdown)
+    setLastSavedContent(markdown)
+  }, [])
+
+  const handleExportMd = useCallback(() => {
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = meta?.file_name ?? 'document.md'
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [content, meta?.file_name])
 
   return (
     <>
       <SEOHead title={meta ? `${meta.file_name} - ${t('seoTitle')}` : t('seoTitle')} noindex />
 
-      <div className="min-h-svh bg-[radial-gradient(circle_at_top_left,_rgba(193,255,114,0.18),_transparent_30%),linear-gradient(180deg,_#f8faf7_0%,_#eef2ea_100%)] text-foreground">
-        <div className="mx-auto flex min-h-svh max-w-[1600px] flex-col px-3 py-3 sm:px-4 lg:px-6 lg:py-5">
-          <header className="mb-3 rounded-[28px] border border-white/70 bg-white/75 px-4 py-3 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.45)] backdrop-blur xl:px-5 print:hidden">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-h-svh flex-col bg-background text-foreground print:min-h-0 print:bg-white">
+        {/* ── Header ── */}
+        <header className="sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur-sm print:hidden">
+          <div className="mx-auto flex h-11 max-w-[1600px] items-center gap-1 px-2 sm:px-3 lg:px-4">
+            {/* Back */}
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label={t('backToHub')}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+
+            {/* Outline toggle */}
+            <button
+              type="button"
+              onClick={toggleOutline}
+              className={[
+                'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition',
+                outlineOpen
+                  ? 'bg-muted text-foreground'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              ].join(' ')}
+              aria-label={t('outline')}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+
+            {/* File name */}
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 pl-1">
+              {isEditingName ? (
+                <Input
+                  ref={nameInputRef}
+                  value={fileNameDraft}
+                  onChange={(event) => setFileNameDraft(event.target.value)}
+                  onBlur={() => { void handleRenameCommit() }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void handleRenameCommit()
+                    }
+                    if (event.key === 'Escape') {
+                      setIsEditingName(false)
+                      if (meta) setFileNameDraft(meta.file_name)
+                    }
+                  }}
+                  className="h-7 max-w-xs border-border/60 bg-background px-2 text-sm font-medium shadow-sm"
+                  disabled={!meta || renamePending}
+                  aria-label={t('fileName')}
+                />
+              ) : (
                 <button
                   type="button"
-                  onClick={handleBack}
-                  className="inline-flex h-10 shrink-0 items-center rounded-full border border-border/70 bg-background/70 px-3 text-sm font-medium text-muted-foreground transition hover:text-foreground"
+                  onClick={startRename}
+                  disabled={!meta || renamePending}
+                  className="group flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 text-sm font-medium transition hover:bg-muted disabled:pointer-events-none"
                 >
-                  <Undo2 className="mr-2 h-4 w-4" />
-                  {t('backToHub')}
+                  <span className="truncate">{fileNameDraft || t('untitled')}</span>
+                  <Pencil className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
                 </button>
-                <div className="min-w-0">
-                  <Input
-                    value={fileNameDraft}
-                    onChange={(event) => setFileNameDraft(event.target.value)}
-                    onBlur={() => { void handleRenameCommit() }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault()
-                        void handleRenameCommit()
-                      }
-                    }}
-                    className="h-11 min-w-[16rem] max-w-xl rounded-2xl border-transparent bg-transparent px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
-                    disabled={!meta || renamePending}
-                    aria-label={t('fileName')}
-                  />
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span>{t('byteUsage', { used: currentBytes.toLocaleString(), max: MAX_BYTES.toLocaleString() })}</span>
-                    {meta ? <span>{t('metaExpires', { date: formatTime(meta.expires_at, i18n.language) })}</span> : null}
-                    <span>{statusLabel}</span>
-                  </div>
-                </div>
-              </div>
+              )}
+            </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <Button type="button" size="sm" variant="outline" onClick={() => setShowPreview((prev) => !prev)}>
-                  {showPreview ? <PanelRightClose className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-                  {showPreview ? t('hidePreview') : t('showPreview')}
+            {/* Desktop action buttons */}
+            <div className="hidden items-center gap-0.5 sm:flex">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={handleExportMd}
+                aria-label={t('exportMd')}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => window.print()}
+                aria-label={t('exportPdf')}
+              >
+                <Printer className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Save button */}
+            <Button
+              type="button"
+              size="sm"
+              disabled={!isDirty || isOversize || saving || loading}
+              onClick={() => { void handleSave() }}
+              className="h-7 gap-1 px-2.5 text-xs"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{t('saveNow')}</span>
+            </Button>
+
+            {/* Mobile: more menu with export + reload | Desktop: just reload */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0">
+                  <EllipsisVertical className="h-4 w-4" />
                 </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => window.print()}>
-                  <Printer className="h-4 w-4" />
-                  {t('print')}
-                </Button>
-                <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => { void loadDocument() }}>
-                  <RefreshCw className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-36">
+                <DropdownMenuItem className="sm:hidden" onClick={handleExportMd}>
+                  <Download className="mr-2 h-4 w-4" />
+                  {t('exportMd')}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="sm:hidden" onClick={() => window.print()}>
+                  <Printer className="mr-2 h-4 w-4" />
+                  {t('exportPdf')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { void loadDocument() }} disabled={loading}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
                   {t('reload')}
-                </Button>
-                <Button type="button" size="sm" disabled={!isDirty || isOversize || saving || loading} onClick={() => { void handleSave() }}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {t('saveNow')}
-                </Button>
-              </div>
-            </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              {[
-                { label: t('toolbar.h1'), prefix: '# ', placeholder: t('toolbar.headingPlaceholder') },
-                { label: t('toolbar.h2'), prefix: '## ', placeholder: t('toolbar.headingPlaceholder') },
-                { label: t('toolbar.bold'), prefix: '**', suffix: '**', placeholder: t('toolbar.boldPlaceholder') },
-                { label: t('toolbar.italic'), prefix: '_', suffix: '_', placeholder: t('toolbar.italicPlaceholder') },
-                { label: t('toolbar.quote'), prefix: '> ', placeholder: t('toolbar.quotePlaceholder') },
-                { label: t('toolbar.list'), prefix: '- ', placeholder: t('toolbar.listPlaceholder') },
-                { label: t('toolbar.link'), prefix: '[', suffix: '](https://)', placeholder: t('toolbar.linkPlaceholder') },
-                { label: t('toolbar.code'), prefix: '```\n', suffix: '\n```', placeholder: t('toolbar.codePlaceholder') },
-              ].map((item) => (
-                <Button
-                  key={item.label}
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="rounded-full bg-background/80"
-                  onClick={() => handleInsert(item)}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-          </header>
-
-          {loading ? (
-            <div className="flex flex-1 items-center justify-center rounded-[32px] border border-dashed border-border/70 bg-white/60 print:hidden">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t('statusLoading')}
-              </div>
-            </div>
-          ) : error ? (
-            <div className="flex flex-1 items-center justify-center print:hidden">
-              <Card className="w-full max-w-lg rounded-[28px] border-destructive/30 bg-white/85">
-                <CardContent className="space-y-4 p-8 text-center">
-                  <p className="text-lg font-semibold">{t('loadErrorTitle')}</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
-                  <div className="flex justify-center gap-2">
-                    <Button type="button" onClick={() => { void loadDocument() }}>{t('reload')}</Button>
-                    <Button type="button" variant="outline" onClick={() => navigate('/dashboard/hub')}>{tCommon('actions.back')}</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <>
-              <div className={cn('grid min-h-0 flex-1 gap-3', showPreview ? 'lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]' : 'grid-cols-1')}>
-                <section className="flex min-h-[45vh] flex-col overflow-hidden rounded-[30px] border border-zinc-900/10 bg-zinc-950 text-zinc-100 shadow-[0_30px_80px_-55px_rgba(15,23,42,0.65)] print:hidden">
-                  <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                    <p className="text-xs font-medium uppercase tracking-[0.24em] text-zinc-400">{t('sourceTitle')}</p>
-                    <p className="text-xs text-zinc-500">{meta?.file_name}</p>
-                  </div>
-                  <Textarea
-                    ref={textareaRef}
-                    value={content}
-                    onChange={(event) => setContent(event.target.value)}
-                    spellCheck={false}
-                    className="min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-4 font-['Source_Code_Pro'] text-sm leading-7 text-zinc-100 shadow-none focus-visible:ring-0"
-                    placeholder={buildDefaultContent(fileNameDraft || 'Untitled')}
-                  />
-                </section>
-
-                {showPreview ? (
-                  <section className="min-h-[45vh] overflow-hidden rounded-[30px] border border-white/80 bg-white/90 shadow-[0_30px_80px_-55px_rgba(15,23,42,0.45)]">
-                    <div className="flex items-center justify-between border-b border-border/70 px-4 py-3">
-                      <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">{t('previewTitle')}</p>
-                      <p className="text-xs text-muted-foreground">{t('previewHint')}</p>
-                    </div>
-                    <div className="h-full overflow-auto px-5 py-5 sm:px-7">
-                      <MarkdownPreview content={content} />
-                    </div>
-                  </section>
-                ) : null}
-              </div>
-
-              <div className="hidden print:block">
-                <div className="mx-auto max-w-3xl bg-white px-8 py-10 text-black">
-                  <h1 className="mb-8 text-2xl font-semibold">{meta?.file_name}</h1>
-                  <MarkdownPreview content={content} className="text-black [&_a]:text-black [&_blockquote]:text-zinc-700 [&_code]:bg-zinc-100 [&_pre]:border-zinc-200 [&_pre]:bg-zinc-950 [&_table]:border-zinc-300 [&_td]:border-zinc-300 [&_th]:border-zinc-300 [&_th]:bg-zinc-100" />
+        {/* ── Main content area ── */}
+        {loading ? (
+          <EditorSkeleton />
+        ) : error ? (
+          <div className="flex min-h-[60vh] items-center justify-center print:hidden">
+            <Card className="w-full max-w-lg rounded-2xl border-destructive/30">
+              <CardContent className="space-y-4 p-8 text-center">
+                <p className="text-lg font-semibold">{t('loadErrorTitle')}</p>
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <div className="flex justify-center gap-2">
+                  <Button type="button" onClick={() => { void loadDocument() }}>{t('reload')}</Button>
+                  <Button type="button" variant="outline" onClick={() => navigate('/dashboard/hub')}>{tCommon('actions.back')}</Button>
                 </div>
-              </div>
-            </>
-          )}
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1">
+            {/* Outline sidebar */}
+            {outlineOpen && (
+              <Suspense fallback={null}>
+                <EditorOutline content={content} />
+              </Suspense>
+            )}
+
+            {/* Editor */}
+            <div className="min-h-0 min-w-0 flex-1">
+              <Suspense fallback={<EditorSkeleton />}>
+                <TyporaEditor
+                  key={`${fileId}:${editorRevision}`}
+                  initialContent={content}
+                  placeholder={t('wysiwygHint')}
+                  onChange={setContent}
+                  onNormalized={handleNormalized}
+                />
+              </Suspense>
+            </div>
+          </div>
+        )}
+
+        {/* ── Print preview (hidden, visible only during print) ── */}
+        <div className="hidden print:block" id="doc-print-preview">
+          <Suspense fallback={null}>
+            <MilkdownPrintPreview content={content} />
+          </Suspense>
         </div>
+
+        {/* ── Bottom status bar ── */}
+        <EditorStatusBar
+          content={content}
+          currentBytes={currentBytes}
+          maxBytes={MAX_BYTES}
+          saveStatus={saveStatus}
+          saveError={saveError}
+          savedTime={updatedAt}
+          isApproachingLimit={isApproachingLimit}
+          isOversize={isOversize}
+        />
       </div>
 
-      <ConfirmDialog
-        open={conflictOpen}
-        onOpenChange={setConflictOpen}
-        title={t('conflictTitle')}
-        description={t('conflictDescription')}
-        confirmLabel={t('reloadLatest')}
-        cancelLabel={t('keepEditing')}
-        onConfirm={() => { void handleReloadLatest() }}
-      />
+      <AlertDialog open={conflictOpen} onOpenChange={setConflictOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('conflictTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('conflictDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('keepEditing')}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { void handleReloadLatest() }}>{t('reloadLatest')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      <ConfirmDialog
-        open={leavingOpen}
-        onOpenChange={setLeavingOpen}
-        title={t('leaveTitle')}
-        description={t('leaveDescription')}
-        confirmLabel={t('leaveAnyway')}
-        cancelLabel={t('stayHere')}
-        onConfirm={() => navigate('/dashboard/hub')}
+      <LeaveDialog
+        open={leavingOpen || blocker.state === 'blocked'}
+        onSaveAndLeave={() => {
+          const destination = blocker.state === 'blocked'
+            ? blocker.location.pathname + blocker.location.search
+            : '/dashboard/hub'
+          setLeavingOpen(false)
+          if (blocker.state === 'blocked') blocker.reset()
+          pendingLeaveRef.current = () => navigate(destination)
+          void handleSave()
+        }}
+        onDiscard={() => {
+          setLeavingOpen(false)
+          setLastSavedContent(content)
+          if (blocker.state === 'blocked') blocker.proceed()
+          else navigate('/dashboard/hub')
+        }}
+        onCancel={() => {
+          setLeavingOpen(false)
+          if (blocker.state === 'blocked') blocker.reset()
+        }}
+        saving={saving}
+        t={t}
       />
     </>
+  )
+}
+
+// ── Sub-components ──────────────────────────────────────────
+
+function EditorSkeleton() {
+  return (
+    <div className="mx-auto w-full max-w-[52rem] space-y-6 px-6 py-12 print:hidden">
+      <Skeleton className="h-9 w-2/5" />
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-3/4" />
+      </div>
+    </div>
+  )
+}
+
+const MilkdownPrintPreview = lazy(() =>
+  import('@/components/editor/MilkdownPreview').then((module) => ({ default: module.MilkdownPreview })),
+)
+
+function LeaveDialog({
+  open,
+  onSaveAndLeave,
+  onDiscard,
+  onCancel,
+  saving,
+  t,
+}: {
+  open: boolean
+  onSaveAndLeave: () => void
+  onDiscard: () => void
+  onCancel: () => void
+  saving: boolean
+  t: (key: string) => string
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t('leaveTitle')}</AlertDialogTitle>
+          <AlertDialogDescription>{t('leaveDescription')}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel}>{t('stayHere')}</AlertDialogCancel>
+          <AlertDialogAction className={buttonVariants({ variant: 'outline' })} onClick={onDiscard}>{t('leaveAnyway')}</AlertDialogAction>
+          <AlertDialogAction onClick={onSaveAndLeave} disabled={saving}>
+            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {t('saveAndLeave')}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

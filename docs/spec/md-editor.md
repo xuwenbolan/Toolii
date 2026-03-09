@@ -150,51 +150,57 @@ Implementation should prefer atomic replace semantics (temp file in same directo
 ### Dependencies
 
 ```
-pnpm add @milkdown/kit @milkdown/theme-nord
+pnpm add @milkdown/crepe @milkdown/react
 ```
 
-Milkdown v7: ProseMirror-based WYSIWYG Markdown editor. `@milkdown/kit` includes core, commonmark, gfm, and essential plugins.
+Milkdown Crepe v7: ProseMirror-based WYSIWYG Markdown editor with built-in slash menu, floating toolbar, block handle, and link tooltip. No separate toolbar component needed.
 
 ### Components
 
-#### `MilkdownEditor`
+#### `TyporaEditor`
 
-Location: `frontend/src/components/editor/MilkdownEditor.tsx`
+Location: `frontend/src/components/editor/TyporaEditor.tsx`
 
 Props:
 - `initialContent: string` — Markdown text to load
-- `readonly?: boolean` — If true, render as preview (no editing)
-- `onChange?: (markdown: string) => void` — Called on content change
+- `placeholder?: string` — Placeholder text for empty document
+- `onChange: (markdown: string) => void` — Called on content change
+
+Uses Milkdown Crepe with all built-in features except `ImageBlock` and `Latex`. Crepe provides slash menu (`/`), floating format toolbar (on text selection), and block handles — no separate `EditorToolbar` component needed.
 
 Mobile: editor is functional but not optimized; no mobile-specific restrictions for now.
 
-Plugins:
-- `commonmark` — Headings, bold, italic, lists, code, links, images, blockquote
-- `gfm` — Tables, strikethrough, task lists
-- `history` — Undo/redo
-- `listener` — Track changes
+#### `MilkdownPreview`
 
-#### `EditorToolbar`
+Location: `frontend/src/components/editor/MilkdownPreview.tsx`
 
-Location: `frontend/src/components/editor/EditorToolbar.tsx`
+Props:
+- `content: string` — Markdown text to render
+- `className?: string`
 
-Minimal toolbar:
-- Headings (H1-H3)
-- Bold, Italic, Strikethrough
-- Bullet list, Ordered list, Task list
-- Code block, Blockquote
-- Link, Horizontal rule, Table
+Uses Milkdown Crepe in readonly mode (`crepe.setReadonly(true)`) with `Placeholder`, `BlockEdit`, `Cursor`, and `Toolbar` features disabled. Produces identical rendering to the editor. Used for:
+- Share preview pages (replaces `react-markdown`)
+- Print/PDF export preview (hidden div, visible only in `@media print`)
 
-Styled with Radix UI + Tailwind.
+#### `EditorOutline`
 
-#### `DocPrintPreview`
+Location: `frontend/src/components/editor/EditorOutline.tsx`
 
-Location: `frontend/src/components/editor/DocPrintPreview.tsx`
+Collapsible left sidebar (220px, desktop only by default) showing document headings as a table of contents:
+- Extracts h1-h6 from markdown content
+- Click scrolls editor to heading via `scrollIntoView`
+- Highlights currently visible heading via IntersectionObserver
+- State persisted in localStorage (`doc-outline-open`)
+- Toggle via PanelLeft button in header
 
-Purpose:
-- Render the current Markdown as a clean readonly preview subtree
-- Act as the print/PDF source in the editor page
-- Avoid printing the live `contenteditable` editor DOM directly
+#### `EditorStatusBar`
+
+Location: `frontend/src/components/editor/EditorStatusBar.tsx`
+
+Fixed bottom bar (28px) showing:
+- **Left:** save status with color-coded dot (green=saved, amber=unsaved/saving, red=error)
+- **Center:** word count + character count (CJK-aware)
+- **Right:** content size vs 1 MB limit, with warnings
 
 ### Pages
 
@@ -202,20 +208,33 @@ Purpose:
 
 Location: `frontend/src/pages/Docs/DocEditorPage.tsx`
 Route: `/doc/edit/:id`
-Layout: **Full-screen standalone** — no DashboardLayout, no sidebar. Header has: back button (→ Hub), file name (clickable to rename), save status indicator, save button, export dropdown.
+
+Layout: **Full-screen standalone** — no DashboardLayout.
+
+```
+Header (h-11, sticky): [←] [Outline toggle] [filename ✏] ---- [Export .md] [Print] [Save] [⋮]
+├── EditorOutline (left sidebar, 220px, collapsible, lg+ only)
+└── TyporaEditor (flex-1)
+Print preview (hidden div, visible only in @media print via MilkdownPreview readonly)
+EditorStatusBar (fixed bottom, h-7): [status dot + label] --- [word count] [char count] [size/limit]
+```
+
+Desktop: Export .md and Print buttons shown as icon buttons. Mobile: collapsed into overflow menu.
+Status information (save state, word count, size) lives entirely in the bottom status bar — not in the header.
 
 Flow:
 1. Fetch file metadata (`GET /api/hub/files/{id}`) to verify it exists and has `.md` extension
 2. Fetch content (`GET /api/hub/files/{id}/content`)
-3. Render `MilkdownEditor` with content
+3. Render `TyporaEditor` with content; show loading skeleton during fetch
 4. Track dirty state (content changed since last successful save)
-5. If initial file size is > 1 MB, show warning state and disable save until content is reduced
+5. If initial file size is > 1 MB, show warning in status bar and disable save until content is reduced
 6. Save triggers:
    - **Auto-save**: debounce 10 seconds after last edit
    - **Manual**: Ctrl+S (Cmd+S on Mac) or Save button
    - **On leave**: if dirty, attempt save before navigating away
 7. On 409 `CONTENT_CONFLICT`, stop auto-save and show conflict dialog with reload guidance
-8. Unsaved changes guard: `beforeunload` + React Router `useBlocker`
+8. On 429 (rate limited), suppress auto-save for 30 seconds then resume
+9. Unsaved changes guard: `beforeunload` + React Router `useBlocker`
 
 #### New document creation
 
@@ -253,12 +272,12 @@ In `TransferReceivePage` (`/t/{token}`):
 
 **Single `.md` file:**
 - Auto-fetch content via `GET /api/hub/s/{token}/{file_id}/content`
-- Render sanitized readonly preview
+- Render readonly preview using `MilkdownPreview` (Crepe readonly mode) — same renderer as editor
 - Show download button (`.md`) and "Export PDF" button below preview
 
 **Multiple files (with some `.md`):**
 - Keep existing file list UI
-- `.md` files get a "Preview" button → opens modal with sanitized readonly preview
+- `.md` files get a "Preview" button → opens modal with `MilkdownPreview` readonly preview
 
 **Extract code compatibility:**
 - Reuse the existing share access flow
@@ -329,10 +348,10 @@ User edits → reset 10s timer → timer fires → save API call
 - `@media print` CSS handles: page margins, font sizing, code block styling, table borders, page-break rules
 
 **In editor page** (`/doc/edit/:id`):
-1. Click "Export PDF"
+1. Click "Export PDF" (Print icon in header)
 2. `window.print()` directly on current page
-3. `@media print` CSS hides toolbar, header, and other non-content elements
-4. Print source is `DocPrintPreview`, not the live editable DOM
+3. `@media print` CSS hides header, sidebar, status bar, and the live editor
+4. Print source is a hidden `MilkdownPreview` (readonly) div (`#doc-print-preview`), which becomes visible only during print — avoids printing `contenteditable` DOM artifacts
 
 **In share preview page** (`/t/{token}`):
 - Content is already rendered as readonly preview on the page
@@ -449,8 +468,8 @@ Representative translation keys:
 | Phase | Task | Details |
 |-------|------|---------|
 | 1 | Backend endpoints | Single-file metadata endpoint + content endpoints + `FileService.overwrite_bytes` + content/quota validation |
-| 2 | Editor rendering layer | `MilkdownEditor` + `EditorToolbar` + sanitized readonly/print preview |
+| 2 | Editor rendering layer | `TyporaEditor` (Crepe WYSIWYG) + `MilkdownPreview` (Crepe readonly) |
 | 3 | Editor page | `DocEditorPage` with auto-save + manual save + dirty state + oversize handling + export |
 | 4 | Hub integration | "New Document" button + click file name / Edit action for `.md` files |
-| 5 | Share preview | Sanitized readonly preview on `/t/{token}` for `.md` shares, reusing existing extract-code flow |
-| 6 | Polish | i18n, error handling, keyboard shortcuts, mobile responsive, print CSS |
+| 5 | Share preview | `MilkdownPreview` readonly on `/t/{token}` for `.md` shares, reusing existing extract-code flow |
+| 6 | Polish | `EditorOutline` sidebar, `EditorStatusBar`, header UX, loading skeleton, print CSS, i18n |

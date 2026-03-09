@@ -1,0 +1,289 @@
+/* Typora-like WYSIWYG editor overrides for Milkdown Crepe */
+
+/* ── Crepe variable overrides (theme integration) ──────────── */
+.milkdown {
+  --crepe-font-title: 'Source Sans 3', 'Noto Serif', Georgia, serif;
+  --crepe-font-default: 'Source Sans 3', 'Noto Sans', system-ui, sans-serif;
+  --crepe-font-code: 'Source Code Pro', 'Fira Code', Menlo, monospace;
+
+  --crepe-color-background: var(--background);
+  --crepe-color-on-background: var(--foreground);
+  --crepe-color-surface: var(--popover);
+  --crepe-color-surface-low: var(--muted);
+  --crepe-color-on-surface: var(--popover-foreground);
+  --crepe-color-on-surface-variant: var(--muted-foreground);
+  --crepe-color-outline: var(--muted-foreground);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-secondary: var(--secondary);
+  --crepe-color-on-secondary: var(--secondary-foreground);
+  --crepe-color-inverse: var(--accent);
+  --crepe-color-on-inverse: var(--accent-foreground);
+  --crepe-color-inline-code: var(--foreground);
+  --crepe-color-error: var(--destructive);
+  --crepe-color-hover: var(--accent);
+  --crepe-color-selected: var(--accent);
+  --crepe-color-inline-area: var(--muted);
+
+  --crepe-shadow-1: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --crepe-shadow-2: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* ── Editor writing area ────────────────────────────────────── */
+.typora-root .milkdown {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.typora-root .milkdown .ProseMirror {
+  max-width: 52rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+  min-height: calc(100vh - 5rem);
+  font-size: 1.0625rem;
+  line-height: 1.8;
+  color: var(--foreground);
+}
+
+@media (min-width: 640px) {
+  .typora-root .milkdown .ProseMirror {
+    padding: 3rem 2.5rem 6rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .typora-root .milkdown .ProseMirror {
+    padding: 3.5rem 3rem 7rem;
+  }
+}
+
+/* ── Focus ring suppression for clean look ──────────────────── */
+.typora-root .milkdown .ProseMirror:focus {
+  outline: none;
+}
+
+.typora-root .milkdown .ProseMirror-focused {
+  outline: none;
+}
+
+/* ── Typography ─────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.typora-root .milkdown .ProseMirror h2 {
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.35;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.typora-root .milkdown .ProseMirror h3 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.typora-root .milkdown .ProseMirror h4 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.45;
+  margin-top: 1.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.typora-root .milkdown .ProseMirror h1:first-child,
+.typora-root .milkdown .ProseMirror h2:first-child,
+.typora-root .milkdown .ProseMirror h3:first-child {
+  margin-top: 0;
+}
+
+/* ── Paragraphs ─────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror p {
+  margin: 0.75rem 0;
+}
+
+/* ── Blockquotes ────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1.25rem;
+  margin: 1rem 0;
+  color: var(--muted-foreground);
+}
+
+.typora-root .milkdown .ProseMirror blockquote p {
+  color: inherit;
+}
+
+/* ── Inline code ────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror code {
+  font-family: var(--crepe-font-code);
+  font-size: 0.9em;
+  background: var(--muted);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  color: var(--foreground);
+}
+
+/* ── Links ──────────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror a {
+  color: var(--info);
+  text-decoration: none;
+}
+
+.typora-root .milkdown .ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+/* ── Horizontal rule ────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+/* ── Lists ──────────────────────────────────────────────────── */
+/* Crepe uses custom node views with SVG bullets in flex layout.
+   Only add left padding for visual indentation from the text column. */
+.typora-root .milkdown .ProseMirror ul,
+.typora-root .milkdown .ProseMirror ol {
+  padding-left: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.typora-root .milkdown .ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.typora-root .milkdown .ProseMirror li > p {
+  margin: 0.25rem 0;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.typora-root .milkdown .ProseMirror th,
+.typora-root .milkdown .ProseMirror td {
+  border: 1px solid var(--border);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.typora-root .milkdown .ProseMirror th {
+  background: var(--muted);
+  font-weight: 600;
+}
+
+.typora-root .milkdown .ProseMirror tbody tr:nth-child(even) {
+  background: color-mix(in oklch, var(--muted), transparent 60%);
+}
+
+/* ── Images ─────────────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror img {
+  max-width: 100%;
+  border-radius: 6px;
+  margin: 0.5rem 0;
+}
+
+/* ── Table block interactive controls ──────────────────────── */
+/* Hide drag handles and button groups in readonly/preview mode */
+.typora-root[data-readonly] .milkdown .cell-handle,
+.typora-root[data-readonly] .milkdown .line-handle,
+.typora-root[data-readonly] .milkdown .drag-preview {
+  display: none !important;
+}
+
+/* ── Floating UI z-index (above editor content, below header z-30) ── */
+.typora-root .milkdown .milkdown-toolbar,
+.typora-root .milkdown .milkdown-slash-menu,
+.typora-root .milkdown .milkdown-link-preview,
+.typora-root .milkdown .milkdown-link-edit,
+.typora-root .milkdown .milkdown-block-handle {
+  z-index: 20;
+}
+
+/* ── Placeholder styling ────────────────────────────────────── */
+.typora-root .milkdown .crepe-placeholder::before {
+  color: var(--muted-foreground);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+/* ── Print styles ───────────────────────────────────────────── */
+@media print {
+  .typora-root {
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+
+  .typora-root .milkdown {
+    background: white !important;
+  }
+
+  .typora-root .milkdown .ProseMirror {
+    max-width: none;
+    padding: 0;
+    min-height: auto;
+    font-size: 12pt;
+    line-height: 1.6;
+    color: #000;
+  }
+
+  /* Hide all editor chrome */
+  .typora-root .milkdown .milkdown-toolbar,
+  .typora-root .milkdown .milkdown-slash-menu,
+  .typora-root .milkdown .milkdown-block-handle,
+  .typora-root .milkdown .crepe-placeholder::before {
+    display: none !important;
+  }
+
+  .typora-root .milkdown .ProseMirror h1 {
+    border-bottom-color: #ccc;
+    page-break-after: avoid;
+  }
+
+  .typora-root .milkdown .ProseMirror h2 {
+    border-bottom-color: #ddd;
+    page-break-after: avoid;
+  }
+
+  .typora-root .milkdown .ProseMirror h3,
+  .typora-root .milkdown .ProseMirror h4 {
+    page-break-after: avoid;
+  }
+
+  .typora-root .milkdown .ProseMirror pre,
+  .typora-root .milkdown .ProseMirror table,
+  .typora-root .milkdown .ProseMirror img {
+    page-break-inside: avoid;
+  }
+
+  .typora-root .milkdown .ProseMirror pre {
+    background: #f5f5f5 !important;
+    border: 1px solid #ddd;
+    color: #333 !important;
+  }
+
+  .typora-root .milkdown .ProseMirror code {
+    color: #333;
+    background: #f0f0f0;
+  }
+}
+
