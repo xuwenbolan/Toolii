@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
@@ -12,6 +13,7 @@ from app.schemas.admin import (
     AdminResultShareListResponse,
     AdminShareGroupListResponse,
 )
+from app.schemas.common import Message
 from app.services.admin_service import AdminService
 
 router = APIRouter(prefix="/transfers", tags=["admin-transfers"])
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/transfers", tags=["admin-transfers"])
 @router.get("/hub-files", response_model=AdminHubFileListResponse)
 async def list_hub_files(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     source: str | None = Query(default=None),
@@ -31,14 +33,14 @@ async def list_hub_files(
     return AdminHubFileListResponse(**data)
 
 
-@router.delete("/hub-files/{file_id}")
+@router.delete("/hub-files/{file_id}", response_model=Message)
 @limiter.limit(admin_write_rate_limit)
 async def delete_hub_file(
     request: Request,
     file_id: int,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
-) -> dict:
+    db: AsyncSession = Depends(get_db),
+) -> Message:
     await AdminService(db).delete_hub_file(file_id)
     await audit(
         category="admin",
@@ -48,13 +50,13 @@ async def delete_hub_file(
         resource_id=file_id,
         ip=get_remote_address(request),
     )
-    return {"status": "ok"}
+    return Message(message="Hub file deleted")
 
 
 @router.get("/share-groups", response_model=AdminShareGroupListResponse)
 async def list_share_groups(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
@@ -65,14 +67,14 @@ async def list_share_groups(
     return AdminShareGroupListResponse(**data)
 
 
-@router.delete("/share-groups/{group_id}")
+@router.delete("/share-groups/{group_id}", response_model=Message)
 @limiter.limit(admin_write_rate_limit)
 async def delete_share_group(
     request: Request,
     group_id: int,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
-) -> dict:
+    db: AsyncSession = Depends(get_db),
+) -> Message:
     await AdminService(db).delete_share_group(group_id)
     await audit(
         category="admin",
@@ -82,13 +84,13 @@ async def delete_share_group(
         resource_id=group_id,
         ip=get_remote_address(request),
     )
-    return {"status": "ok"}
+    return Message(message="Share group deleted")
 
 
 @router.get("/result-shares", response_model=AdminResultShareListResponse)
 async def list_result_shares(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     share_type: str | None = Query(default=None),
@@ -100,14 +102,14 @@ async def list_result_shares(
     return AdminResultShareListResponse(**data)
 
 
-@router.delete("/result-shares/{share_id}")
+@router.delete("/result-shares/{share_id}", response_model=Message)
 @limiter.limit(admin_write_rate_limit)
 async def delete_result_share(
     request: Request,
     share_id: int,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
-) -> dict:
+    db: AsyncSession = Depends(get_db),
+) -> Message:
     await AdminService(db).delete_result_share(share_id)
     await audit(
         category="admin",
@@ -117,4 +119,4 @@ async def delete_result_share(
         resource_id=share_id,
         ip=get_remote_address(request),
     )
-    return {"status": "ok"}
+    return Message(message="Result share deleted")

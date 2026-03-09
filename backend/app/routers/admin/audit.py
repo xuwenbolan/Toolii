@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/audit", tags=["admin-audit"])
 @router.get("/logs", response_model=AuditLogListResponse)
 async def list_audit_logs(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     category: str | None = Query(default=None),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/storage", tags=["admin-storage"])
 @router.get("/overview", response_model=StorageOverviewResponse)
 async def get_storage_overview(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> StorageOverviewResponse:
     data = await StorageAdminService(db).get_overview()
     return StorageOverviewResponse(**data)
@@ -32,7 +33,7 @@ async def run_cleanup(
     request: Request,
     body: StorageCleanupRequest,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> StorageCleanupResponse:
     data = await StorageAdminService(db).run_cleanup(body.target)
     await audit(

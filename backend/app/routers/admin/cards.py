@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Path, Query, Request
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/cards", tags=["admin-cards"])
 @router.get("", response_model=AdminCardListResponse)
 async def list_cards(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
@@ -40,7 +41,7 @@ async def generate_cards(
     request: Request,
     payload: CardGenerateRequest,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> CardGenerateResponse:
     codes = await AdminService(db).generate_cards(
         count=payload.count,
@@ -69,7 +70,7 @@ async def disable_card(
     request: Request,
     card_id: int = Path(),
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Message:
     await AdminService(db).disable_card(card_id)
     await audit(
@@ -86,7 +87,7 @@ async def disable_card(
 @router.get("/summary", response_model=CardSummaryResponse)
 async def get_card_summary(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> CardSummaryResponse:
     data = await AdminService(db).get_card_summary()
     return CardSummaryResponse(**data)

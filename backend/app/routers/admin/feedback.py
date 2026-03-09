@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user, get_db
@@ -18,10 +19,10 @@ from app.services.feedback_service import FeedbackService
 router = APIRouter(prefix="/feedback", tags=["admin-feedback"])
 
 
-@router.get("/", response_model=AdminFeedbackListResponse)
+@router.get("", response_model=AdminFeedbackListResponse)
 async def list_feedback(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     status: str | None = Query(default=None),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=100),
@@ -41,7 +42,7 @@ async def update_feedback(
     feedback_id: int,
     body: AdminUpdateFeedbackRequest,
     admin: User = Depends(get_admin_user),
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> FeedbackItem:
     svc = FeedbackService(db)
     fb = await svc.update(

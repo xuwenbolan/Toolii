@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/operations", tags=["admin-operations"])
 @router.get("/tool-usage", response_model=ToolUsageResponse)
 async def get_tool_usage(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     days: int = Query(default=30, ge=1, le=365),
     tool_name: str | None = Query(default=None),
 ) -> ToolUsageResponse:
@@ -30,7 +31,7 @@ async def get_tool_usage(
 @router.get("/transactions", response_model=GlobalTransactionListResponse)
 async def list_transactions(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     tx_type: str | None = Query(default=None),
@@ -44,7 +45,7 @@ async def list_transactions(
 @router.get("/share-links", response_model=AdminShareLinkListResponse)
 async def list_share_links(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
@@ -58,7 +59,7 @@ async def list_share_links(
 @router.get("/revenue", response_model=RevenueResponse)
 async def get_revenue(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     granularity: str = Query(default="day", pattern="^(day|week|month)$"),
     days: int = Query(default=30, ge=1, le=365),
 ) -> RevenueResponse:
@@ -69,7 +70,7 @@ async def get_revenue(
 @router.get("/usage-log", response_model=AdminProcessingHistoryListResponse)
 async def list_usage_log(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
-    db=Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     tool_name: str | None = Query(default=None),

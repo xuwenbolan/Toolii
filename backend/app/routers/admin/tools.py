@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Request
 from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
@@ -44,12 +44,12 @@ async def list_tools(
     return AdminToolListResponse(tools=items)
 
 
-@router.put("/{tool_name:path}", response_model=AdminToolItem)
+@router.put("/{tool_name}", response_model=AdminToolItem)
 @limiter.limit(admin_write_rate_limit)
 async def update_tool(
     request: Request,
-    tool_name: str,
     body: AdminToolUpdateRequest,
+    tool_name: str = Path(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_-]*$"),
     admin: User = Depends(get_admin_user),
 ) -> AdminToolItem:
     """Update a tool's configuration. Only provided fields are updated."""

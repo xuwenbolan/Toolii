@@ -149,6 +149,30 @@ async def fetch_timeline(last: int = 300) -> dict[str, Any]:
     return resp.json()
 
 
+async def unload_model(model_name: str) -> dict[str, Any]:
+    """Unload a single model on Cortex."""
+    client = _get_client()
+    resp = await client.post(f"/admin/unload/{model_name}")
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def enable_model(model_name: str) -> dict[str, Any]:
+    """Re-enable a disabled model on Cortex."""
+    client = _get_client()
+    resp = await client.post(f"/admin/models/{model_name}/enable")
+    resp.raise_for_status()
+    return resp.json()
+
+
+async def disable_model(model_name: str) -> dict[str, Any]:
+    """Disable a model on Cortex (unloads + rejects future requests)."""
+    client = _get_client()
+    resp = await client.post(f"/admin/models/{model_name}/disable")
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def close() -> None:
     """Close the HTTP client connection pool."""
     global _client  # noqa: PLW0603

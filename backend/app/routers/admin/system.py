@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
@@ -44,7 +44,7 @@ async def cortex_models_check(
 
 @router.get("/cortex/models/{model_name}/check")
 async def cortex_model_check(
-    model_name: str,
+    model_name: str = Path(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"),
     admin: User = Depends(get_admin_user),  # noqa: ARG001
 ) -> dict[str, Any]:
     """Validate a single Cortex model."""
@@ -76,9 +76,78 @@ async def cortex_unload_all(
         return {"status": "error", "error": "cortex_unavailable"}
 
 
+@router.post("/cortex/models/{model_name}/unload")
+@limiter.limit(admin_write_rate_limit)
+async def cortex_unload_model(
+    request: Request,
+    model_name: str = Path(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"),
+    admin: User = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Unload a single Cortex model to free VRAM."""
+    try:
+        result = await cortex_client.unload_model(model_name)
+        await audit(
+            category="admin",
+            action="cortex_unload_model",
+            user_id=admin.id,
+            ip=get_remote_address(request),
+            detail=model_name,
+        )
+        return result
+    except Exception:
+        logger.warning("Cortex unavailable for unload: %s", model_name, exc_info=True)
+        return {"status": "error", "error": "cortex_unavailable"}
+
+
+@router.post("/cortex/models/{model_name}/enable")
+@limiter.limit(admin_write_rate_limit)
+async def cortex_enable_model(
+    request: Request,
+    model_name: str = Path(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"),
+    admin: User = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Re-enable a disabled Cortex model."""
+    try:
+        result = await cortex_client.enable_model(model_name)
+        await audit(
+            category="admin",
+            action="cortex_enable_model",
+            user_id=admin.id,
+            ip=get_remote_address(request),
+            detail=model_name,
+        )
+        return result
+    except Exception:
+        logger.warning("Cortex unavailable for enable: %s", model_name, exc_info=True)
+        return {"status": "error", "error": "cortex_unavailable"}
+
+
+@router.post("/cortex/models/{model_name}/disable")
+@limiter.limit(admin_write_rate_limit)
+async def cortex_disable_model(
+    request: Request,
+    model_name: str = Path(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$"),
+    admin: User = Depends(get_admin_user),
+) -> dict[str, Any]:
+    """Disable a Cortex model (unloads + rejects future requests)."""
+    try:
+        result = await cortex_client.disable_model(model_name)
+        await audit(
+            category="admin",
+            action="cortex_disable_model",
+            user_id=admin.id,
+            ip=get_remote_address(request),
+            detail=model_name,
+        )
+        return result
+    except Exception:
+        logger.warning("Cortex unavailable for disable: %s", model_name, exc_info=True)
+        return {"status": "error", "error": "cortex_unavailable"}
+
+
 @router.get("/cortex/timeline")
 async def cortex_timeline(
-    last: int = 300,
+    last: int = Query(default=300, ge=1, le=3600),
     admin: User = Depends(get_admin_user),  # noqa: ARG001
 ) -> dict[str, Any]:
     """Fetch recent VRAM timeline samples from Cortex."""
