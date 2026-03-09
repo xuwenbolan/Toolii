@@ -40,7 +40,7 @@ class FileUploadResponse(BaseModel):
 
 
 class FileRenameRequest(BaseModel):
-    file_name: str
+    file_name: str = Field(min_length=1, max_length=255)
 
 
 class FileRenameResponse(BaseModel):
@@ -49,7 +49,7 @@ class FileRenameResponse(BaseModel):
 
 
 class FileExtendRequest(BaseModel):
-    days: int
+    days: int = Field(ge=1, le=365)
 
 
 class FileExtendResponse(BaseModel):
@@ -58,7 +58,7 @@ class FileExtendResponse(BaseModel):
 
 
 class FileDeleteRequest(BaseModel):
-    ids: list[int]
+    ids: list[int] = Field(min_length=1, max_length=50)
 
 
 class FileDeleteResponse(BaseModel):
@@ -71,7 +71,7 @@ class FileContentResponse(BaseModel):
 
 
 class FileContentUpdateRequest(BaseModel):
-    content: str
+    content: str = Field(max_length=1_048_576)
     base_updated_at: str = Field(
         validation_alias=AliasChoices("base_updated_at", "expected_updated_at")
     )
@@ -82,10 +82,15 @@ class FileContentUpdateResponse(BaseModel):
     updated_at: str
 
 
+class EditorImageUploadResponse(BaseModel):
+    file_id: str
+    url: str
+
+
 class ShareGroupCreate(BaseModel):
-    file_ids: list[int]
+    file_ids: list[int] = Field(min_length=1)
     use_extract_code: bool = False
-    message: str | None = None
+    message: str | None = Field(None, max_length=500)
 
 
 class ShareGroupResponse(BaseModel):

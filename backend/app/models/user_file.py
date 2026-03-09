@@ -12,10 +12,12 @@ class FileSource:
     UPLOAD = "upload"
     TOOL_RESULT = "tool_result"
     RESULT_SHARE = "result_share"
+    EDITOR_IMAGE = "editor_image"
 
 
 class FileStatus:
     ACTIVE = "active"
+    PENDING = "pending"
     EXPIRED = "expired"
     DELETED = "deleted"
 
@@ -30,13 +32,13 @@ class UserFile(TimestampMixin, Base):
     )
 
     # FileService storage UUID (32-char hex)
-    file_id: Mapped[str] = mapped_column(String(32), nullable=False)
+    file_id: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
 
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     size: Mapped[int] = mapped_column(Integer, nullable=False)
     content_type: Mapped[str] = mapped_column(String(128), nullable=False)
 
-    # upload / tool_result / result_share
+    # upload / tool_result / result_share / editor_image
     source: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # NULL = never expires (unlimited retention)
@@ -44,13 +46,18 @@ class UserFile(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True, index=True
     )
 
-    # active / expired / deleted
+    # active / pending / expired / deleted
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default="active"
     )
 
     # Optional JSON for tool-specific metadata (e.g. clean_file_id, credit_cost)
     meta: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Parent document id for editor images (indexed for GC and lifecycle queries)
+    parent_file_id: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
 
 
 class ShareGroupStatus:

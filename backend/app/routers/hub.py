@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -14,6 +15,7 @@ from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.core.transfer_validation import validate_transfer_file
 from app.models.user import User
 from app.schemas.hub import (
+    EditorImageUploadResponse,
     FileDeleteRequest,
     FileDeleteResponse,
     FileContentResponse,
@@ -34,7 +36,7 @@ from app.schemas.hub import (
     UserFileItem,
     UserFileListResponse,
 )
-from app.services.hub_service import HubService, share_count_query
+from app.services.hub_service import ALLOWED_IMAGE_TYPES, HubService, share_count_query
 
 router = APIRouter(prefix=f"{settings.api_prefix}/hub", tags=["hub"])
 
@@ -122,12 +124,24 @@ async def list_files(
     files, total = await hub.list_files(user.id, page=page, page_size=page_size, source=source)
     usage = await hub.get_usage(user.id)
 
-    items = []
-    for uf in files:
-        sc_result = await db.execute(share_count_query(uf.id))
-        sc = sc_result.scalar_one()
-        items.append(_file_to_item(uf, share_count=sc))
+    # Batch-fetch share counts to avoid N+1 queries
+    file_ids = [uf.id for uf in files]
+    share_count_map: dict[int, int] = {}
+    if file_ids:
+        from sqlalchemy import func as sa_func, select
+        from app.models.user_file import ShareGroup, ShareGroupFile, ShareGroupStatus
+        sc_result = await db.execute(
+            select(ShareGroupFile.user_file_id, sa_func.count())
+            .join(ShareGroup, ShareGroupFile.share_group_id == ShareGroup.id)
+            .where(
+                ShareGroupFile.user_file_id.in_(file_ids),
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+            )
+            .group_by(ShareGroupFile.user_file_id)
+        )
+        share_count_map = dict(sc_result.all())
 
+    items = [_file_to_item(uf, share_count=share_count_map.get(uf.id, 0)) for uf in files]
     return UserFileListResponse(items=items, total=total, **usage)
 
 
@@ -177,6 +191,36 @@ async def save_file_content(
     return FileContentUpdateResponse(size=uf.size, updated_at=uf.updated_at.isoformat())
 
 
+@router.post("/files/{file_id}/images", response_model=EditorImageUploadResponse)
+@limiter.limit("20/minute")
+async def upload_editor_image(
+    request: Request,
+    file_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> EditorImageUploadResponse:
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF, and WebP images are supported")
+
+    data = await file.read()
+    max_bytes = settings.max_editor_image_mb * 1024 * 1024
+    if len(data) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Image exceeds {settings.max_editor_image_mb} MB limit")
+
+    hub = HubService(db)
+    storage_id, url = await hub.upload_editor_image(
+        file_id,
+        user.id,
+        filename=file.filename or "image",
+        data=data,
+        content_type=content_type,
+    )
+    await db.commit()
+    return EditorImageUploadResponse(file_id=storage_id, url=url)
+
+
 @router.get("/files/{file_id}/download")
 @limiter.limit("30/minute")
 async def download_own_file(
@@ -187,7 +231,7 @@ async def download_own_file(
 ) -> Response:
     hub = HubService(db)
     uf = await hub.get_file(file_id, user.id)
-    path = hub._fs.get_path(uf.file_id)
+    path = hub.get_file_path(uf.file_id)
     return file_response(path, media_type=uf.content_type, filename=uf.original_filename)
 
 
@@ -233,6 +277,33 @@ async def delete_files(
     count = await hub.delete_files(body.ids, user.id)
     await db.commit()
     return FileDeleteResponse(deleted=count)
+
+
+# ── Editor image serving (public) ────────────────────────────────────
+
+_IMAGE_FILE_ID_RE = re.compile(r"^[a-f0-9]{32}$")
+
+
+@router.get("/images/{file_id}")
+@limiter.limit("200/minute")
+async def serve_editor_image(
+    request: Request,
+    file_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    if not _IMAGE_FILE_ID_RE.match(file_id):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    hub = HubService(db)
+    path, content_type = await hub.get_editor_image(file_id)
+    return file_response(
+        path,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 # ── Share groups ─────────────────────────────────────────────────────
@@ -430,7 +501,7 @@ async def share_download_file(
     if not uf:
         raise HTTPException(status_code=404, detail="File not found")
     await db.commit()
-    path = hub._fs.get_path(uf.file_id)
+    path = hub.get_file_path(uf.file_id)
     return file_response(path, media_type=uf.content_type, filename=uf.original_filename)
 
 
@@ -474,7 +545,7 @@ async def share_download_zip(
                     name = f"{name}_{seen[name]}"
             else:
                 seen[name] = 0
-            path = hub._fs.get_path(uf.file_id)
+            path = hub.get_file_path(uf.file_id)
             zf.write(path, name)
     buf.seek(0)
 

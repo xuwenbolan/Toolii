@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     max_hub_total_mb: int = Field(default=500, alias="MAX_HUB_TOTAL_MB")
     max_hub_files: int = Field(default=50, alias="MAX_HUB_FILES")
     max_hub_share_files: int = Field(default=20, alias="MAX_HUB_SHARE_FILES")
+    max_editor_image_mb: int = Field(default=5, alias="MAX_EDITOR_IMAGE_MB")
 
     # Email settings
     email_provider: str = Field(default="dev", alias="EMAIL_PROVIDER")

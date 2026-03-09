@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import re
 import secrets
 import string
-from datetime import timedelta
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete, func, select, update
@@ -30,9 +33,37 @@ _TOKEN_CHARS = string.ascii_letters + string.digits
 _CODE_CHARS = string.ascii_lowercase + string.digits
 _MARKDOWN_MAX_BYTES = 1024 * 1024
 
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+
+# Each entry is a list of check-groups. ALL groups must pass.
+# Each group is a list of (bytes, offset) alternatives — ANY one must match.
+_MAGIC_BYTES: dict[str, list[list[tuple[bytes, int]]]] = {
+    "image/png": [[(b"\x89PNG\r\n\x1a\n", 0)]],
+    "image/jpeg": [[(b"\xff\xd8\xff", 0)]],
+    "image/gif": [[(b"GIF87a", 0), (b"GIF89a", 0)]],  # either version
+    "image/webp": [[(b"RIFF", 0)], [(b"WEBP", 8)]],   # both must match
+}
+
+_IMAGE_URL_PREFIX = f"{settings.api_prefix}/hub/images/"
+_IMAGE_REF_RE = re.compile(re.escape(_IMAGE_URL_PREFIX) + r"([a-f0-9]{32})")
+
 
 def _is_markdown_filename(filename: str) -> bool:
     return filename.lower().endswith(".md")
+
+
+def _validate_image_magic(data: bytes, content_type: str) -> bool:
+    """Check that file header bytes match the declared content type."""
+    groups = _MAGIC_BYTES.get(content_type)
+    if not groups:
+        return False
+    for alternatives in groups:
+        if not any(
+            len(data) >= offset + len(magic) and data[offset:offset + len(magic)] == magic
+            for magic, offset in alternatives
+        ):
+            return False
+    return True
 
 
 def _is_expired_at(value) -> bool:
@@ -107,7 +138,7 @@ class HubService:
                 func.count(),
             ).where(
                 UserFile.user_id == user_id,
-                UserFile.status == FileStatus.ACTIVE,
+                UserFile.status.in_([FileStatus.ACTIVE, FileStatus.PENDING]),
             )
         )
         used_bytes, file_count = result.one()
@@ -128,13 +159,14 @@ class HubService:
     async def get_usage(self, user_id: int) -> dict:
         """Return storage usage stats. 0 means unlimited for quota/max fields."""
         max_bytes, max_files, max_days = await self._get_user_limits(user_id)
+        # Include PENDING to match _check_quota (pending editor images count toward quota)
         result = await self._db.execute(
             select(
                 func.coalesce(func.sum(UserFile.size), 0),
                 func.count(),
             ).where(
                 UserFile.user_id == user_id,
-                UserFile.status == FileStatus.ACTIVE,
+                UserFile.status.in_([FileStatus.ACTIVE, FileStatus.PENDING]),
             )
         )
         used_bytes, file_count = result.one()
@@ -233,6 +265,7 @@ class HubService:
         base = select(UserFile).where(
             UserFile.user_id == user_id,
             UserFile.status == FileStatus.ACTIVE,
+            UserFile.source != FileSource.EDITOR_IMAGE,
         )
         if source:
             base = base.where(UserFile.source == source)
@@ -275,7 +308,8 @@ class HubService:
                 status_code=400,
             )
         try:
-            content = self._fs.get_path(uf.file_id).read_bytes().decode("utf-8")
+            raw = await asyncio.to_thread(self._fs.get_path(uf.file_id).read_bytes)
+            content = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise AppError(
                 code="INVALID_CONTENT",
@@ -316,8 +350,21 @@ class HubService:
                 status_code=400,
             )
 
-        current_updated_at = uf.updated_at.isoformat()
-        if base_updated_at != current_updated_at:
+        try:
+            base_dt = datetime.fromisoformat(base_updated_at)
+        except (ValueError, TypeError):
+            raise AppError(
+                code="INVALID_TIMESTAMP",
+                message="Invalid base_updated_at format",
+                status_code=400,
+            )
+        # Compare as naive UTC truncated to milliseconds to avoid
+        # tz-info and microsecond-precision mismatch across DB engines.
+        current_dt = uf.updated_at.replace(tzinfo=None) if uf.updated_at.tzinfo else uf.updated_at
+        base_dt = base_dt.replace(tzinfo=None) if base_dt.tzinfo else base_dt
+        current_dt = current_dt.replace(microsecond=current_dt.microsecond // 1000 * 1000)
+        base_dt = base_dt.replace(microsecond=base_dt.microsecond // 1000 * 1000)
+        if base_dt != current_dt:
             raise AppError(
                 code="CONTENT_CONFLICT",
                 message="This file was changed elsewhere",
@@ -336,10 +383,154 @@ class HubService:
         if size_delta > 0 and uf.user_id is not None:
             await self._check_quota(uf.user_id, additional_bytes=size_delta, additional_count=0)
 
-        uf.size = self._fs.overwrite_bytes(uf.file_id, data)
+        uf.size = await asyncio.to_thread(self._fs.overwrite_bytes, uf.file_id, data)
         uf.updated_at = utcnow()
         await self._db.flush()
+
+        await self._gc_editor_images(file_id, content, uf.expires_at)
+
         return uf
+
+    # ── Editor images ────────────────────────────────────────────────
+
+    async def upload_editor_image(
+        self,
+        doc_id: int,
+        user_id: int,
+        *,
+        filename: str,
+        data: bytes,
+        content_type: str,
+    ) -> tuple[str, str]:
+        """Upload an image for a markdown document. Returns (file_id, url)."""
+        parent = await self.get_file(doc_id, user_id)
+        if not _is_markdown_filename(parent.original_filename):
+            raise AppError(
+                code="NOT_MARKDOWN",
+                message="Parent file is not a Markdown document",
+                status_code=400,
+            )
+
+        if content_type not in ALLOWED_IMAGE_TYPES:
+            raise AppError(
+                code="INVALID_IMAGE_TYPE",
+                message="Only PNG, JPEG, GIF, and WebP images are supported",
+                status_code=400,
+            )
+
+        if not _validate_image_magic(data, content_type):
+            raise AppError(
+                code="INVALID_IMAGE_DATA",
+                message="File content does not match declared image type",
+                status_code=400,
+            )
+
+        max_bytes = settings.max_editor_image_mb * 1024 * 1024
+        if len(data) > max_bytes:
+            raise AppError(
+                code="IMAGE_TOO_LARGE",
+                message=f"Image exceeds {settings.max_editor_image_mb} MB limit",
+                status_code=413,
+            )
+
+        await self._check_quota(user_id, additional_bytes=len(data), additional_count=1)
+
+        stored = self._fs.save_bytes(data)
+
+        if parent.expires_at is None:
+            # Unlimited parent — pending image expires in 24h as safety net
+            expires = utcnow() + timedelta(hours=24)
+        else:
+            expires = parent.expires_at
+
+        uf = UserFile(
+            user_id=user_id,
+            file_id=stored.file_id,
+            original_filename=safe_filename(filename),
+            size=stored.size,
+            content_type=content_type,
+            source=FileSource.EDITOR_IMAGE,
+            status=FileStatus.PENDING,
+            parent_file_id=parent.id,
+            expires_at=expires,
+        )
+        self._db.add(uf)
+        await self._db.flush()
+        return stored.file_id, f"{_IMAGE_URL_PREFIX}{stored.file_id}"
+
+    async def get_editor_image(self, storage_file_id: str) -> tuple[Path, str]:
+        """Look up an editor image by storage UUID. Returns (file_path, content_type)."""
+        result = await self._db.execute(
+            select(UserFile).where(
+                UserFile.file_id == storage_file_id,
+                UserFile.source == FileSource.EDITOR_IMAGE,
+                UserFile.status.in_([FileStatus.PENDING, FileStatus.ACTIVE]),
+            )
+        )
+        uf = result.scalar_one_or_none()
+        if not uf or (uf.expires_at and _is_expired_at(uf.expires_at)):
+            raise AppError(code="NOT_FOUND", message="Image not found", status_code=404)
+
+        if uf.content_type not in ALLOWED_IMAGE_TYPES:
+            raise AppError(code="NOT_FOUND", message="Image not found", status_code=404)
+
+        path = self._fs.get_path(storage_file_id)
+        return path, uf.content_type
+
+    async def _gc_editor_images(self, doc_id: int, content: str, parent_expires_at=None) -> None:
+        """Delete unreferenced editor images, confirm referenced ones."""
+        referenced_ids = set(_IMAGE_REF_RE.findall(content))
+
+        result = await self._db.execute(
+            select(UserFile).where(
+                UserFile.parent_file_id == doc_id,
+                UserFile.source == FileSource.EDITOR_IMAGE,
+                UserFile.status.in_([FileStatus.PENDING, FileStatus.ACTIVE]),
+            )
+        )
+        images = list(result.scalars().all())
+        if not images:
+            return
+
+        for img in images:
+            if img.file_id in referenced_ids:
+                img.status = FileStatus.ACTIVE
+                img.expires_at = parent_expires_at
+            else:
+                try:
+                    self._fs.delete(img.file_id)
+                    img.status = FileStatus.DELETED
+                except Exception:
+                    logger.warning("Failed to delete orphaned editor image %s", img.file_id, exc_info=True)
+
+    async def _sync_editor_image_expiry(self, doc_id: int, new_expires_at) -> None:
+        """Update expires_at on all active editor images for a document."""
+        await self._db.execute(
+            update(UserFile)
+            .where(
+                UserFile.parent_file_id == doc_id,
+                UserFile.source == FileSource.EDITOR_IMAGE,
+                UserFile.status == FileStatus.ACTIVE,
+            )
+            .values(expires_at=new_expires_at)
+        )
+
+    async def _cascade_delete_editor_images(self, doc_id: int) -> None:
+        """Delete all editor images belonging to a parent document."""
+        result = await self._db.execute(
+            select(UserFile).where(
+                UserFile.parent_file_id == doc_id,
+                UserFile.source == FileSource.EDITOR_IMAGE,
+                UserFile.status.in_([FileStatus.PENDING, FileStatus.ACTIVE]),
+            )
+        )
+        images = list(result.scalars().all())
+        for img in images:
+            try:
+                self._fs.delete(img.file_id)
+                img.status = FileStatus.DELETED
+            except Exception:
+                logger.warning("Failed to delete editor image %s", img.file_id, exc_info=True)
 
     async def extend_file(self, file_id: int, user_id: int, days: int) -> UserFile:
         uf = await self.get_file(file_id, user_id)
@@ -366,6 +557,9 @@ class HubService:
         # Update share groups that include this file
         await self._refresh_share_group_expiry_for_file(uf.id)
 
+        # Sync editor image expiration with parent doc
+        await self._sync_editor_image_expiry(uf.id, uf.expires_at)
+
         return uf
 
     async def delete_files(self, ids: list[int], user_id: int) -> int:
@@ -387,7 +581,11 @@ class HubService:
 
         for uf in files:
             uf.status = FileStatus.DELETED
-            self._fs.delete(uf.file_id)
+            try:
+                self._fs.delete(uf.file_id)
+            except Exception:
+                logger.warning("Failed to delete physical file %s", uf.file_id, exc_info=True)
+            await self._cascade_delete_editor_images(uf.id)
 
         if files:
             file_ids = [f.id for f in files]
@@ -479,9 +677,30 @@ class HubService:
         )
         groups = list(rows.scalars().all())
 
+        # Batch-fetch stats to avoid N+1 queries
+        stats_map: dict[int, tuple[int, int]] = {}
+        sg_ids = [sg.id for sg in groups]
+        if sg_ids:
+            stats_result = await self._db.execute(
+                select(
+                    ShareGroupFile.share_group_id,
+                    func.count(),
+                    func.coalesce(func.sum(UserFile.size), 0),
+                )
+                .select_from(ShareGroupFile)
+                .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
+                .where(
+                    ShareGroupFile.share_group_id.in_(sg_ids),
+                    UserFile.status == FileStatus.ACTIVE,
+                )
+                .group_by(ShareGroupFile.share_group_id)
+            )
+            for row in stats_result.all():
+                stats_map[row[0]] = (row[1], int(row[2]))
+
         items = []
         for sg in groups:
-            file_count, total_size = await self._share_group_stats(sg.id)
+            file_count, total_size = stats_map.get(sg.id, (0, 0))
             items.append({
                 "id": sg.id,
                 "token": sg.token,
@@ -633,7 +852,8 @@ class HubService:
                 status_code=400,
             )
         try:
-            return self._fs.get_path(uf.file_id).read_bytes().decode("utf-8")
+            raw = await asyncio.to_thread(self._fs.get_path(uf.file_id).read_bytes)
+            return raw.decode("utf-8")
         except UnicodeDecodeError as exc:
             raise AppError(
                 code="INVALID_CONTENT",
@@ -656,8 +876,12 @@ class HubService:
         if sg.extract_code:
             if sg.failed_code_attempts >= 10:
                 raise AppError(code="LOCKED", message="Too many failed attempts", status_code=423)
-            if not code or code != sg.extract_code:
+            if not code:
                 raise AppError(code="CODE_REQUIRED", message="Extract code required", status_code=403)
+            if code != sg.extract_code:
+                sg.failed_code_attempts += 1
+                await self._db.flush()
+                raise AppError(code="WRONG_CODE", message="Incorrect extract code", status_code=403)
 
         file_result = await self._db.execute(
             select(UserFile)
@@ -692,8 +916,12 @@ class HubService:
         if sg.extract_code:
             if sg.failed_code_attempts >= 10:
                 raise AppError(code="LOCKED", message="Too many failed attempts", status_code=423)
-            if not code or code != sg.extract_code:
+            if not code:
                 raise AppError(code="CODE_REQUIRED", message="Extract code required", status_code=403)
+            if code != sg.extract_code:
+                sg.failed_code_attempts += 1
+                await self._db.flush()
+                raise AppError(code="WRONG_CODE", message="Incorrect extract code", status_code=403)
 
         files_result = await self._db.execute(
             select(UserFile)
@@ -719,7 +947,7 @@ class HubService:
         result = await self._db.execute(
             select(UserFile).where(
                 UserFile.expires_at < now,
-                UserFile.status == FileStatus.ACTIVE,
+                UserFile.status.in_([FileStatus.ACTIVE, FileStatus.PENDING]),
             )
         )
         files = list(result.scalars().all())
@@ -729,7 +957,10 @@ class HubService:
         expired_ids = []
         for uf in files:
             uf.status = FileStatus.EXPIRED
-            self._fs.delete(uf.file_id)
+            try:
+                self._fs.delete(uf.file_id)
+            except Exception:
+                logger.warning("Failed to delete expired file %s", uf.file_id, exc_info=True)
             expired_ids.append(uf.id)
 
         # Remove from share groups
@@ -750,6 +981,10 @@ class HubService:
         await self._db.commit()
         logger.info("Expired %d hub files", len(files))
         return len(files)
+
+    def get_file_path(self, storage_file_id: str) -> Path:
+        """Return the on-disk path for a storage UUID."""
+        return self._fs.get_path(storage_file_id)
 
     # ── Lookup by storage file_id ────────────────────────────────────
 
@@ -833,12 +1068,13 @@ class HubService:
                 )
             )
             min_exp = min_result.scalar_one()
-            if min_exp:
-                await self._db.execute(
-                    update(ShareGroup)
-                    .where(ShareGroup.id == sg_id)
-                    .values(expires_at=min_exp)
-                )
+            # min_exp is None when all files have unlimited retention;
+            # we still need to update the share group to clear any old expiry.
+            await self._db.execute(
+                update(ShareGroup)
+                .where(ShareGroup.id == sg_id)
+                .values(expires_at=min_exp)
+            )
 
 
 def share_count_query(user_file_id: int):
