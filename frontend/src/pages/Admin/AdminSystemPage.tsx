@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -70,13 +70,80 @@ function formatEventTime(timestamp: number): string {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-// -- VRAM Timeline mini chart (pure SVG, no library) --
+// -- VRAM Timeline interactive chart (wheel zoom + drag pan) --
+
+const TL_W = 600
+const TL_H = 224
+const TL_PX = 44   // left padding (Y-axis labels)
+const TL_PR = 12   // right padding
+const TL_PT = 14   // top padding
+const TL_PB = 28   // bottom padding (X-axis labels)
+const TL_CW = TL_W - TL_PX - TL_PR
+const TL_CH = TL_H - TL_PT - TL_PB
+const TL_MIN_SPAN = 30
+const TL_ZOOM_FACTOR = 1.4
+const TL_TICK_STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800, 43200, 86400]
 
 function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
   const { t } = useTranslation('console')
+  const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+  // null = default view (follow latest, last 5 min). Non-null = user-controlled.
+  const [view, setView] = useState<{ start: number; end: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
-  if (samples.length < 2) {
+  // Data bounds
+  const dataStart = samples.length > 1 ? samples[0].t : 0
+  const dataEnd = samples.length > 1 ? samples[samples.length - 1].t : 1
+  const dataRange = dataEnd - dataStart || 1
+
+  // Resolve view window
+  const defaultSpan = Math.min(300, dataRange)
+  const vEnd = view ? view.end : dataEnd
+  const vStart = view ? view.start : Math.max(dataStart, dataEnd - defaultSpan)
+  const vSpan = vEnd - vStart || 1
+
+  // Refs for non-passive event handlers (avoid stale closures)
+  const viewRef = useRef({ start: vStart, end: vEnd, span: vSpan })
+  const boundsRef = useRef({ start: dataStart, end: dataEnd, range: dataRange })
+  useEffect(() => {
+    viewRef.current = { start: vStart, end: vEnd, span: vSpan }
+    boundsRef.current = { start: dataStart, end: dataEnd, range: dataRange }
+  })
+
+  // Filter visible samples (with small margin for line continuity)
+  const visible = useMemo(() => {
+    if (samples.length < 2) return []
+    const m = vSpan * 0.02
+    return samples.filter(s => s.t >= vStart - m && s.t <= vEnd + m)
+  }, [samples, vStart, vEnd, vSpan])
+
+  // Non-passive wheel zoom
+  const hasData = samples.length >= 2
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg || !hasData) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const v = viewRef.current
+      const b = boundsRef.current
+      const rect = svg.getBoundingClientRect()
+      const svgX = ((e.clientX - rect.left) / rect.width) * TL_W
+      const frac = Math.max(0, Math.min(1, (svgX - TL_PX) / TL_CW))
+      const mouseT = v.start + frac * v.span
+      const factor = e.deltaY > 0 ? TL_ZOOM_FACTOR : 1 / TL_ZOOM_FACTOR
+      const newSpan = Math.max(TL_MIN_SPAN, Math.min(b.range, v.span * factor))
+      let s = mouseT - frac * newSpan
+      let en = s + newSpan
+      if (s < b.start) { s = b.start; en = s + newSpan }
+      if (en > b.end + 5) { en = b.end + 5; s = en - newSpan }
+      setView({ start: s, end: en })
+    }
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+  }, [hasData])
+
+  if (!hasData) {
     return (
       <div className="py-6 text-center text-sm text-muted-foreground">
         {t('system.noTimelineData')}
@@ -84,109 +151,154 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
     )
   }
 
-  const W = 600
-  const H = 200
-  const PX = 44 // left padding for Y-axis labels
-  const PR = 12 // right padding
-  const PY = 14 // top/bottom padding
-
-  const chartW = W - PX - PR
-  const chartH = H - PY * 2
-
-  const tMin = samples[0].t
-  const tMax = samples[samples.length - 1].t
-  const tRange = tMax - tMin || 1
-
-  // Adaptive Y-axis: zoom into actual data range with padding
-  const dataMin = Math.min(...samples.map((s) => s.vram_used_mb))
-  const dataMax = Math.max(...samples.map((s) => s.vram_used_mb))
-  const dataSpan = dataMax - dataMin || dataMax * 0.2 || 512
-  const margin = dataSpan * 0.25
-  const yMin = Math.max(0, Math.floor((dataMin - margin) / 128) * 128)
-  const yMax = Math.min(vramTotal, Math.ceil((dataMax + margin) / 128) * 128)
+  // Y-axis: adaptive range from visible data
+  let yDataMin = Infinity, yDataMax = -Infinity
+  for (const s of visible) {
+    if (s.vram_used_mb < yDataMin) yDataMin = s.vram_used_mb
+    if (s.vram_used_mb > yDataMax) yDataMax = s.vram_used_mb
+  }
+  if (!isFinite(yDataMin)) { yDataMin = 0; yDataMax = vramTotal }
+  const ySpan = yDataMax - yDataMin || yDataMax * 0.2 || 512
+  const ym = ySpan * 0.25
+  const yMin = Math.max(0, Math.floor((yDataMin - ym) / 128) * 128)
+  const yMax = Math.min(vramTotal, Math.ceil((yDataMax + ym) / 128) * 128)
   const yRange = yMax - yMin || 1
 
-  const toX = (tv: number) => PX + ((tv - tMin) / tRange) * chartW
-  const toY = (mb: number) => PY + chartH - ((mb - yMin) / yRange) * chartH
+  // Coordinate mapping
+  const toX = (tv: number) => TL_PX + ((tv - vStart) / vSpan) * TL_CW
+  const toY = (mb: number) => TL_PT + TL_CH - ((mb - yMin) / yRange) * TL_CH
 
-  // Build polyline points for VRAM usage
-  const vramPoints = samples.map((s) => `${toX(s.t)},${toY(s.vram_used_mb)}`).join(' ')
-
-  // Y-axis labels: bottom, middle, top
+  // Polyline + events
+  const vramPoints = visible.map(s => `${toX(s.t)},${toY(s.vram_used_mb)}`).join(' ')
+  const eventSamples = visible.filter(s => s.event)
   const yMid = Math.round((yMin + yMax) / 2)
   const yLabels = [yMin, yMid, yMax]
 
-  // Event markers (non-empty events)
-  const eventSamples = samples.filter((s) => s.event)
+  // X-axis ticks
+  const tickStep = TL_TICK_STEPS.find(s => s >= vSpan / 5) ?? 86400
+  const xTicks: number[] = []
+  for (let tv = Math.ceil(vStart / tickStep) * tickStep; tv <= vEnd; tv += tickStep) xTicks.push(tv)
 
+  // Formatters
   const fmtMb = (mb: number) => mb >= 1024 ? `${(mb / 1024).toFixed(1)}G` : `${mb}M`
-  const fmtTime = (ts: number) => {
+  const fmtTickTime = (ts: number) => {
     const d = new Date(ts * 1000)
-    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+    const p = (n: number) => String(n).padStart(2, '0')
+    if (vSpan < 600) return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    if (vSpan < 21600) return `${p(d.getHours())}:${p(d.getMinutes())}`
+    return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  }
+  const fmtTooltipTime = (ts: number) => {
+    const d = new Date(ts * 1000)
+    const p = (n: number) => String(n).padStart(2, '0')
+    const time = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+    return vSpan >= 21600 ? `${p(d.getMonth() + 1)}/${p(d.getDate())} ${time}` : time
+  }
+  const fmtSpan = (sec: number) => {
+    if (sec < 120) return `${Math.round(sec)}s`
+    if (sec < 7200) return `${Math.round(sec / 60)}m`
+    return `${(sec / 3600).toFixed(1)}h`
   }
 
+  // -- Drag pan --
+  const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    const rect = svgRef.current!.getBoundingClientRect()
+    const chartScreenW = rect.width * TL_CW / TL_W
+    const v = viewRef.current
+    const startX = e.clientX
+    setIsDragging(true)
+    setHoverIdx(null)
+
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - startX
+      const dt = (dx / chartScreenW) * v.span
+      const b = boundsRef.current
+      let s = v.start - dt
+      let en = v.end - dt
+      if (s < b.start) { s = b.start; en = s + v.span }
+      if (en > b.end + 5) { en = b.end + 5; s = en - v.span }
+      setView({ start: s, end: en })
+    }
+    const onUp = () => {
+      setIsDragging(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  // -- Hover tooltip --
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
-    const svg = e.currentTarget
-    const rect = svg.getBoundingClientRect()
-    const svgX = ((e.clientX - rect.left) / rect.width) * W
-    const t = tMin + ((svgX - PX) / chartW) * tRange
-    // Find nearest sample
-    let best = 0
-    let bestDist = Infinity
-    for (let i = 0; i < samples.length; i++) {
-      const dist = Math.abs(samples[i].t - t)
+    if (isDragging) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const svgX = ((e.clientX - rect.left) / rect.width) * TL_W
+    const tv = vStart + ((svgX - TL_PX) / TL_CW) * vSpan
+    let best = 0, bestDist = Infinity
+    for (let i = 0; i < visible.length; i++) {
+      const dist = Math.abs(visible[i].t - tv)
       if (dist < bestDist) { bestDist = dist; best = i }
     }
     setHoverIdx(best)
   }
 
-  const hovered = hoverIdx !== null ? samples[hoverIdx] : null
+  const hovered = !isDragging && hoverIdx !== null && hoverIdx < visible.length ? visible[hoverIdx] : null
 
   return (
-    <div className="relative">
+    <div className="relative select-none">
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        ref={svgRef}
+        viewBox={`0 0 ${TL_W} ${TL_H}`}
         className="w-full"
         preserveAspectRatio="xMidYMid meet"
+        style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIdx(null)}
+        onMouseLeave={() => !isDragging && setHoverIdx(null)}
+        onDoubleClick={() => setView(null)}
       >
-        {/* Y grid lines and labels */}
-        {yLabels.map((mb) => (
+        {/* Y grid + labels */}
+        {yLabels.map(mb => (
           <g key={mb}>
-            <line
-              x1={PX} y1={toY(mb)} x2={W - PR} y2={toY(mb)}
-              stroke="var(--border)" strokeOpacity={0.5} strokeDasharray="3 3"
-            />
-            <text
-              x={PX - 6} y={toY(mb) + 4}
-              textAnchor="end" fill="currentColor" fillOpacity={0.5}
-              fontSize={11} fontFamily="var(--font-mono)"
-            >
+            <line x1={TL_PX} y1={toY(mb)} x2={TL_W - TL_PR} y2={toY(mb)}
+              stroke="var(--border)" strokeOpacity={0.5} strokeDasharray="3 3" />
+            <text x={TL_PX - 6} y={toY(mb) + 4} textAnchor="end"
+              fill="currentColor" fillOpacity={0.5} fontSize={11} fontFamily="var(--font-mono)">
               {fmtMb(mb)}
             </text>
           </g>
         ))}
 
+        {/* X-axis ticks + labels */}
+        {xTicks.map(tv => (
+          <g key={tv}>
+            <line x1={toX(tv)} y1={TL_PT + TL_CH} x2={toX(tv)} y2={TL_PT + TL_CH + 4}
+              stroke="currentColor" strokeOpacity={0.3} />
+            <text x={toX(tv)} y={TL_H - 6} textAnchor="middle"
+              fill="currentColor" fillOpacity={0.4} fontSize={9} fontFamily="var(--font-mono)">
+              {fmtTickTime(tv)}
+            </text>
+          </g>
+        ))}
+
         {/* VRAM area fill */}
-        <polygon
-          points={`${toX(tMin)},${toY(yMin)} ${vramPoints} ${toX(tMax)},${toY(yMin)}`}
-          fill="var(--chart-palette-1)" fillOpacity={0.12}
-        />
+        {visible.length >= 2 && (
+          <polygon
+            points={`${toX(visible[0].t)},${toY(yMin)} ${vramPoints} ${toX(visible[visible.length - 1].t)},${toY(yMin)}`}
+            fill="var(--chart-palette-1)" fillOpacity={0.12}
+          />
+        )}
 
         {/* VRAM line */}
-        <polyline
-          points={vramPoints}
-          fill="none" stroke="var(--chart-palette-1)" strokeWidth={1.5}
-        />
+        {visible.length >= 2 && (
+          <polyline points={vramPoints} fill="none" stroke="var(--chart-palette-1)" strokeWidth={1.5} />
+        )}
 
         {/* Event markers */}
         {eventSamples.map((s, i) => (
-          <circle
-            key={i}
-            cx={toX(s.t)} cy={toY(s.vram_used_mb)}
-            r={3} fill="var(--chart-palette-3)"
-          >
+          <circle key={i} cx={toX(s.t)} cy={toY(s.vram_used_mb)} r={3} fill="var(--chart-palette-3)">
             <title>{s.event}</title>
           </circle>
         ))}
@@ -194,28 +306,30 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
         {/* Hover crosshair */}
         {hovered && (
           <>
-            <line
-              x1={toX(hovered.t)} y1={PY} x2={toX(hovered.t)} y2={H - PY}
-              stroke="currentColor" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="3,2"
-            />
-            <circle
-              cx={toX(hovered.t)} cy={toY(hovered.vram_used_mb)}
-              r={3.5} fill="var(--chart-palette-1)" stroke="var(--background)" strokeWidth={1.5}
-            />
+            <line x1={toX(hovered.t)} y1={TL_PT} x2={toX(hovered.t)} y2={TL_PT + TL_CH}
+              stroke="currentColor" strokeOpacity={0.3} strokeWidth={1} strokeDasharray="3,2" />
+            <circle cx={toX(hovered.t)} cy={toY(hovered.vram_used_mb)}
+              r={3.5} fill="var(--chart-palette-1)" stroke="var(--background)" strokeWidth={1.5} />
           </>
         )}
+
+        {/* Span indicator (top-right) */}
+        <text x={TL_W - TL_PR} y={TL_PT + 10} textAnchor="end"
+          fill="currentColor" fillOpacity={0.35} fontSize={10} fontFamily="var(--font-mono)">
+          {fmtSpan(vSpan)}
+        </text>
       </svg>
 
-      {/* Tooltip overlay */}
+      {/* Tooltip */}
       {hovered && (
         <div
           className="pointer-events-none absolute top-1 rounded-lg border bg-popover px-3 py-2 text-xs shadow-lg"
           style={{
-            left: `${(toX(hovered.t) / W) * 100}%`,
-            transform: toX(hovered.t) > W * 0.7 ? 'translateX(-100%)' : 'translateX(0)',
+            left: `${(toX(hovered.t) / TL_W) * 100}%`,
+            transform: toX(hovered.t) > TL_W * 0.7 ? 'translateX(-100%)' : 'translateX(0)',
           }}
         >
-          <div className="font-mono text-muted-foreground">{fmtTime(hovered.t)}</div>
+          <div className="font-mono text-muted-foreground">{fmtTooltipTime(hovered.t)}</div>
           <div>VRAM: <span className="font-semibold">{fmtMb(hovered.vram_used_mb)}</span> / {fmtMb(vramTotal)}</div>
           <div>RAM: {fmtMb(hovered.sys_ram_mb)}</div>
           <div>Models: {hovered.models}</div>
@@ -244,8 +358,8 @@ export function AdminSystemPage() {
 
   const { data: timeline } = useQuery({
     queryKey: ['admin', 'cortex-timeline'],
-    queryFn: () => fetchCortexTimeline(300),
-    refetchInterval: 30_000,
+    queryFn: () => fetchCortexTimeline(0),
+    refetchInterval: 60_000,
     enabled: data?.online === true && timelineExpanded,
   })
 

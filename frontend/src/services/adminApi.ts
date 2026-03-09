@@ -318,8 +318,9 @@ export type CortexGpuInfo = {
 
 export type CortexModelItem = {
   name: string
-  status: 'loaded' | 'available' | 'missing'
+  status: 'loaded' | 'available' | 'disabled' | 'missing'
   required: boolean
+  enabled: boolean
   vram_mb: number
   workspace_mb: number
   file_size_mb: number | null
@@ -350,7 +351,7 @@ export type CortexQueueInfo = {
 
 export type CortexModelEvent = {
   timestamp: number
-  event: 'loaded' | 'evicted_lru' | 'evicted_idle' | 'evicted_budget' | 'oom_retry'
+  event: 'loaded' | 'evicted_lru' | 'evicted_idle' | 'evicted_budget' | 'evicted_workspace' | 'oom_retry' | 'disabled'
   model: string
   vram_before_mb: number
   vram_after_mb: number
@@ -569,10 +570,31 @@ export async function unloadAllCortexModels() {
   return res.data
 }
 
-export async function fetchCortexTimeline(last = 300) {
+export async function fetchCortexTimeline(last = 0) {
   const res = await api.get<CortexTimelineResponse>(
     '/api/admin/system/cortex/timeline',
     { params: { last } },
+  )
+  return res.data
+}
+
+export async function unloadCortexModel(modelName: string) {
+  const res = await api.post<{ status: string; model: string; vram_freed_mb: number }>(
+    `/api/admin/system/cortex/models/${modelName}/unload`,
+  )
+  return res.data
+}
+
+export async function enableCortexModel(modelName: string) {
+  const res = await api.post<{ status: string; model: string; enabled: boolean }>(
+    `/api/admin/system/cortex/models/${modelName}/enable`,
+  )
+  return res.data
+}
+
+export async function disableCortexModel(modelName: string) {
+  const res = await api.post<{ status: string; model: string; enabled: boolean; vram_freed_mb: number }>(
+    `/api/admin/system/cortex/models/${modelName}/disable`,
   )
   return res.data
 }
