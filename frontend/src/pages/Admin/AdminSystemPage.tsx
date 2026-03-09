@@ -182,7 +182,7 @@ function VramStackedBar({
   const total = gpu.vram_total_mb
   if (total <= 0) return null
 
-  const modelsMb = summary.vram_real_mb
+  const modelsMb = summary.vram_estimated_mb
   const otherMb = Math.max(0, gpu.vram_used_mb - modelsMb)
   const freeMb = Math.max(0, total - gpu.vram_used_mb)
 
@@ -236,7 +236,7 @@ function VramStackedBar({
 
       {/* Budget line */}
       <div className="mt-1.5 text-xs text-muted-foreground">
-        {t('system.vramBudget')}: {formatMB(summary.vram_real_mb)} / {formatMB(summary.vram_budget_mb)} ({budgetPct}%)
+        {t('system.vramBudget')}: {formatMB(summary.vram_estimated_mb)} / {formatMB(summary.vram_budget_mb)} ({budgetPct}%)
         <span className="ml-2">&middot; {summary.loaded} / {summary.registered} {t('system.modelsLoaded')}</span>
       </div>
     </div>
@@ -281,7 +281,10 @@ function QueueIndicator({ queue }: { queue: CortexQueueInfo }) {
             if (filled) {
               return (
                 <circle key={i} cx={cx} cy={8} r={5} fill="var(--foreground)">
-                  <animate attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite" />
+                  <animate
+                    attributeName="opacity" values="1;0.5;1" dur="1.5s" repeatCount="indefinite"
+                    media="(prefers-reduced-motion: no-preference)"
+                  />
                 </circle>
               )
             }
@@ -407,7 +410,7 @@ const TL_MIN_SPAN = 30
 const TL_ZOOM_FACTOR = 1.4
 const TL_TICK_STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800, 43200, 86400]
 
-function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
+function VramTimelineChart({ samples, vramTotal, defaultSpanSeconds = 300 }: { samples: CortexVramSample[]; vramTotal: number; defaultSpanSeconds?: number }) {
   const { t } = useTranslation('console')
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -418,7 +421,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   const dataEnd = samples.length > 1 ? samples[samples.length - 1].t : 1
   const dataRange = dataEnd - dataStart || 1
 
-  const defaultSpan = Math.min(300, dataRange)
+  const defaultSpan = Math.min(defaultSpanSeconds, dataRange)
   const vEnd = view ? view.end : dataEnd
   const vStart = view ? view.start : Math.max(dataStart, dataEnd - defaultSpan)
   const vSpan = vEnd - vStart || 1
@@ -643,10 +646,11 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
 }
 
 // -- Time range options --
+// seconds: chart default viewport span; samples: API fetch count (~5s per sample)
 const TIME_RANGES = [
-  { key: '5m', last: 300 },
-  { key: '15m', last: 900 },
-  { key: '1h', last: 3600 },
+  { key: '5m', seconds: 300, samples: 120 },
+  { key: '15m', seconds: 900, samples: 300 },
+  { key: '1h', seconds: 3600, samples: 1000 },
 ] as const
 
 // =======================================================================
@@ -671,8 +675,8 @@ export function AdminSystemPage() {
   })
 
   const { data: timeline } = useQuery({
-    queryKey: ['admin', 'cortex-timeline', timeRange.last],
-    queryFn: () => fetchCortexTimeline(timeRange.last),
+    queryKey: ['admin', 'cortex-timeline', timeRange.samples],
+    queryFn: () => fetchCortexTimeline(timeRange.samples),
     refetchInterval: 60_000,
     enabled: data?.online === true,
   })
@@ -1072,19 +1076,6 @@ export function AdminSystemPage() {
       ),
     },
     {
-      key: 'error_rate',
-      header: t('system.errorRate'),
-      align: 'right',
-      hiddenOnMobile: true,
-      render: (row) => {
-        const rate = row.calls > 0 ? (row.errors / row.calls) * 100 : 0
-        let cls = 'text-sm'
-        if (rate > 20) cls += ' text-destructive font-medium'
-        else if (rate > 5) cls += ' text-warning font-medium'
-        return <span className={cls}>{rate.toFixed(1)}%</span>
-      },
-    },
-    {
       key: 'last_call',
       header: t('system.lastCall'),
       align: 'right',
@@ -1256,11 +1247,11 @@ export function AdminSystemPage() {
                         criticalThreshold={90}
                       />
                     )}
-                    {gpu.memory_utilization_pct != null && (
+                    {gpu.vram_total_mb > 0 && (
                       <RingGauge
-                        value={gpu.memory_utilization_pct}
+                        value={Math.round(gpu.vram_used_mb / gpu.vram_total_mb * 100)}
                         max={100}
-                        label="Mem"
+                        label="VRAM"
                         unit="%"
                         warningThreshold={70}
                         criticalThreshold={90}
@@ -1319,7 +1310,7 @@ export function AdminSystemPage() {
                 {TIME_RANGES.map(tr => (
                   <Button
                     key={tr.key}
-                    variant={timeRange.key === tr.key ? 'default' : 'outline'}
+                    variant={timeRange.seconds === tr.seconds ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => {
                       setTimeRange(tr)
@@ -1333,8 +1324,10 @@ export function AdminSystemPage() {
             </CardHeader>
             <CardContent>
               <VramTimelineChart
+                key={timeRange.key}
                 samples={timeline?.samples ?? []}
                 vramTotal={gpu.vram_total_mb}
+                defaultSpanSeconds={timeRange.seconds}
               />
             </CardContent>
           </Card>
