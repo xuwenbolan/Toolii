@@ -47,6 +47,7 @@ All specifications are organized by module. Each file covers one module or cross
 
 - [frontend-design.md](frontend-design.md) — Visual identity, interaction patterns, design tokens, page design
 - [frontend-upgrade.md](frontend-upgrade.md) — Frontend upgrade roadmap (phases 0-6)
+- [cortex-dashboard.md](cortex-dashboard.md) — Cortex dashboard visualization and management enhancement
 - [tools/](tools/) — Per-tool interaction design (one file per tool):
   - [compress.md](tools/compress.md), [mosaic.md](tools/mosaic.md), [remove-bg.md](tools/remove-bg.md), [scan-enhance.md](tools/scan-enhance.md), [format-convert.md](tools/format-convert.md), [pdf-tools.md](tools/pdf-tools.md), [id-photo.md](tools/id-photo.md), [word-counter.md](tools/word-counter.md)
   - [file-progress.md](tools/file-progress.md) -- Universal upload/download progress components
