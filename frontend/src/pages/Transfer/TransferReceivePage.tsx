@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { AlertCircle, Download, Eye, FileIcon, Lock, PackageOpen } from 'lucide-react'
 
-import { MarkdownPreview } from '@/components/editor/MarkdownPreview'
+const MilkdownPreview = lazy(() =>
+  import('@/components/editor/MilkdownPreview').then((module) => ({ default: module.MilkdownPreview })),
+)
 import { SEOHead } from '@/components/common/SEOHead'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -300,7 +302,9 @@ export function TransferReceivePage() {
                   <span>{t('receive.fileCount', { count: info.file_count })}</span>
                   <span>{t('receive.totalSize', { size: formatBytes(info.total_size) })}</span>
                   <span>{t('receive.downloads', { count: info.download_count })}</span>
-                  <span>{t('receive.expiresAt', { date: formatTime(info.expires_at, i18n.language) })}</span>
+                  {info.expires_at && (
+                    <span>{t('receive.expiresAt', { date: formatTime(info.expires_at, i18n.language) })}</span>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 rounded-lg border border-border/70 p-2">
@@ -359,7 +363,9 @@ export function TransferReceivePage() {
                         <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
                       </div>
                     </div>
-                    <MarkdownPreview content={previewContent} />
+                    <Suspense fallback={<p className="text-sm text-muted-foreground">{t('receive.loading')}</p>}>
+                      <MilkdownPreview content={previewContent} />
+                    </Suspense>
                   </div>
                 ) : null}
               </div>
@@ -385,7 +391,9 @@ export function TransferReceivePage() {
             ) : previewError ? (
               <p className="text-sm text-destructive">{previewError}</p>
             ) : previewContent ? (
-              <MarkdownPreview content={previewContent} />
+              <Suspense fallback={<p className="text-sm text-muted-foreground">{t('receive.loading')}</p>}>
+                <MilkdownPreview content={previewContent} />
+              </Suspense>
             ) : null}
           </div>
         </DialogContent>

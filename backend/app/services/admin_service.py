@@ -311,21 +311,19 @@ class AdminService:
         if user is None:
             raise NotFoundError("User not found")
 
-        old_retention = user.hub_max_retention_days
         user.hub_quota_mb = hub_quota_mb
         user.hub_max_files = hub_max_files
         user.hub_max_retention_days = hub_max_retention_days
 
-        # Sync existing active files' expires_at when retention setting changes
-        if hub_max_retention_days != old_retention:
-            await self._sync_file_expiry(user_id, hub_max_retention_days)
+        # Always sync files' expires_at to match the current retention setting
+        await self._sync_file_expiry(user_id, hub_max_retention_days)
 
         await self._db.commit()
 
     async def _sync_file_expiry(
         self, user_id: int, new_retention_days: int | None
     ) -> None:
-        """Update expires_at on all active files to match new retention setting.
+        """Update expires_at on all active files and their share groups.
 
         Convention: NULL = global default (7 days), 0 = unlimited.
         """
@@ -333,34 +331,62 @@ class AdminService:
 
         if new_retention_days == 0:
             # Unlimited — clear expiration on all active files
-            new_expires = None
+            await self._db.execute(
+                update(UserFile)
+                .where(
+                    UserFile.user_id == user_id,
+                    UserFile.status == FileStatus.ACTIVE,
+                )
+                .values(expires_at=None)
+            )
         else:
             days = new_retention_days if new_retention_days else 7
             # Recalculate from each file's created_at; cap at now so
             # already-past files don't get revived
             now = utcnow()
-            stmt = (
-                select(UserFile)
-                .where(
-                    UserFile.user_id == user_id,
-                    UserFile.status == FileStatus.ACTIVE,
-                )
+            stmt = select(UserFile).where(
+                UserFile.user_id == user_id,
+                UserFile.status == FileStatus.ACTIVE,
             )
             result = await self._db.execute(stmt)
             for uf in result.scalars():
                 new_exp = uf.created_at + timedelta(days=days)
                 uf.expires_at = new_exp if new_exp > now else uf.expires_at
-            return
 
-        # Unlimited case — bulk update
-        await self._db.execute(
-            update(UserFile)
+        # Sync share groups containing this user's files
+        await self._sync_share_group_expiry(user_id)
+
+    async def _sync_share_group_expiry(self, user_id: int) -> None:
+        """Recalculate expires_at for all active share groups containing this user's files."""
+        from sqlalchemy import update
+
+        # Find all active share groups that contain this user's files
+        sg_ids_result = await self._db.execute(
+            select(ShareGroupFile.share_group_id)
+            .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
+            .join(ShareGroup, ShareGroup.id == ShareGroupFile.share_group_id)
             .where(
                 UserFile.user_id == user_id,
-                UserFile.status == FileStatus.ACTIVE,
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
             )
-            .values(expires_at=new_expires)
+            .distinct()
         )
+        for (sg_id,) in sg_ids_result.all():
+            min_result = await self._db.execute(
+                select(func.min(UserFile.expires_at))
+                .select_from(ShareGroupFile)
+                .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
+                .where(
+                    ShareGroupFile.share_group_id == sg_id,
+                    UserFile.status == FileStatus.ACTIVE,
+                )
+            )
+            min_exp = min_result.scalar_one()
+            await self._db.execute(
+                update(ShareGroup)
+                .where(ShareGroup.id == sg_id)
+                .values(expires_at=min_exp)
+            )
 
     async def adjust_credits(
         self, user_id: int, *, amount: int, description: str

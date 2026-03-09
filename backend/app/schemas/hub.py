@@ -18,7 +18,10 @@ class UserFileListResponse(BaseModel):
     items: list[UserFileItem]
     total: int
     used_bytes: int
-    quota_bytes: int
+    quota_bytes: int  # 0 = unlimited
+    file_count: int
+    max_files: int  # 0 = unlimited
+    max_retention_days: int  # 0 = unlimited
 
 
 class UserFileDetailResponse(BaseModel):

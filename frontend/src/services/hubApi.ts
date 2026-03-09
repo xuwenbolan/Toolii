@@ -9,7 +9,7 @@ export type UserFileItem = {
   size: number
   content_type: string
   source: string
-  expires_at: string
+  expires_at: string | null
   created_at: string
   share_count: number
 }
@@ -22,7 +22,10 @@ export type UserFileListResponse = {
   items: UserFileItem[]
   total: number
   used_bytes: number
-  quota_bytes: number
+  quota_bytes: number  // 0 = unlimited
+  file_count: number
+  max_files: number  // 0 = unlimited
+  max_retention_days: number  // 0 = unlimited
 }
 
 export type ShareGroupResponse = {
@@ -33,7 +36,7 @@ export type ShareGroupResponse = {
   message: string | null
   file_count: number
   total_size: number
-  expires_at: string
+  expires_at: string | null
   created_at: string
 }
 
@@ -75,7 +78,7 @@ export type ShareInfoResponse = {
   download_count: number
   has_extract_code: boolean
   status: string
-  expires_at: string
+  expires_at: string | null
   created_at: string
   files: ShareFileItem[]
 }

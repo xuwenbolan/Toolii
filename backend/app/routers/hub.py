@@ -120,7 +120,7 @@ async def list_files(
 ) -> UserFileListResponse:
     hub = HubService(db)
     files, total = await hub.list_files(user.id, page=page, page_size=page_size, source=source)
-    used_bytes, quota_bytes = await hub.get_usage(user.id)
+    usage = await hub.get_usage(user.id)
 
     items = []
     for uf in files:
@@ -128,7 +128,7 @@ async def list_files(
         sc = sc_result.scalar_one()
         items.append(_file_to_item(uf, share_count=sc))
 
-    return UserFileListResponse(items=items, total=total, used_bytes=used_bytes, quota_bytes=quota_bytes)
+    return UserFileListResponse(items=items, total=total, **usage)
 
 
 @router.get("/files/{file_id}", response_model=UserFileDetailResponse)

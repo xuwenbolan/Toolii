@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
-  CalendarPlus,
-  Check,
-  Copy,
-  Download,
-  ExternalLink,
-  FileIcon,
+  Clock,
   FolderOpen,
-  Link2,
+  HardDrive,
+  Hash,
+  Infinity,
+  LayoutGrid,
+  List,
   Loader2,
-  PackageOpen,
-  Pencil,
-  SquarePen,
   Share2,
+  SquarePen,
   Trash2,
   UploadCloud,
 } from 'lucide-react'
@@ -25,600 +22,63 @@ import { SEOHead } from '@/components/common/SEOHead'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatBytes } from '@/lib/fileValidation'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import {
   buildFileDownloadUrl,
-  createShare,
   deleteFiles,
-  deleteShare,
-  extendFile,
   listFiles,
-  listShares,
-  renameFile,
   uploadFiles,
-  type ShareGroupListItem,
-  type ShareGroupResponse,
   type UserFileItem,
 } from '@/services/hubApi'
 
+import { ExtendDialog } from './hub/ExtendDialog'
+import { FileGridView } from './hub/FileGridView'
+import { FileListView } from './hub/FileListView'
+import { RenameDialog } from './hub/RenameDialog'
+import { ShareDialog } from './hub/ShareDialog'
+import { SharesTab } from './hub/SharesTab'
+import { UploadOverlay } from './hub/UploadOverlay'
+
 const PAGE_SIZE = 20
-
-function isMarkdownFile(name: string) {
-  return /\.md$/i.test(name)
-}
-
-function formatTime(value: string, locale: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
 const SOURCE_FILTERS = ['all', 'upload', 'tool'] as const
+type ViewMode = 'list' | 'grid'
 
-// ── Upload section ──────────────────────────────────────────
-
-function UploadSection({ onUploaded }: { onUploaded: () => void }) {
-  const { t } = useTranslation('hub')
-  const [pending, setPending] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleFiles = useCallback(async (files: File[]) => {
-    if (files.length === 0 || pending) return
-    setPending(true)
-    setError(null)
-    setProgress(0)
-    try {
-      await uploadFiles(files, 7, setProgress)
-      onUploaded()
-    } catch {
-      setError(t('uploadFailed'))
-    } finally {
-      setPending(false)
-    }
-  }, [pending, onUploaded, t])
-
-  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-    onDrop: handleFiles,
-    multiple: true,
-    maxFiles: 20,
-    noClick: true,
-    noKeyboard: true,
-    disabled: pending,
-  })
-
-  return (
-    <div className="space-y-3">
-      <div
-        {...getRootProps()}
-        className={[
-          'flex min-h-[7rem] cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors',
-          isDragActive ? 'border-primary/60 bg-accent/40' : 'border-border/60 hover:border-border hover:bg-muted/30',
-          pending ? 'pointer-events-none opacity-60' : '',
-        ].join(' ')}
-        onClick={open}
-      >
-        <input {...getInputProps()} />
-        {pending ? (
-          <>
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <p className="text-sm font-medium">{t('uploading')}</p>
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-            </div>
-          </>
-        ) : (
-          <>
-            <UploadCloud className="h-6 w-6 text-muted-foreground" />
-            <p className="text-sm font-medium">{t('uploadDrop')}</p>
-            <p className="text-xs text-muted-foreground">{t('uploadHint')}</p>
-          </>
-        )}
-      </div>
-
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-    </div>
-  )
-}
-
-// ── Rename dialog ───────────────────────────────────────────
-
-function RenameDialog({
-  item,
-  onClose,
-  onDone,
-}: {
-  item: UserFileItem | null
-  onClose: () => void
-  onDone: () => void
-}) {
-  const { t } = useTranslation('hub')
-  const [name, setName] = useState('')
-  const [pending, setPending] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (item) {
-      setName(item.file_name)
-      setTimeout(() => inputRef.current?.select(), 50)
-    }
-  }, [item])
-
-  const handleSubmit = async () => {
-    if (!item || !name.trim() || pending) return
-    setPending(true)
-    try {
-      await renameFile(item.id, name.trim())
-      onDone()
-      onClose()
-    } catch {
-      // silent
-    } finally {
-      setPending(false)
-    }
-  }
-
-  if (!item) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl bg-background p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold">{t('renameTitle')}</h3>
-        <Input
-          ref={inputRef}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
-          placeholder={t('renamePlaceholder')}
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
-          <Button size="sm" disabled={!name.trim() || pending} onClick={() => { void handleSubmit() }}>
-            {t('renameConfirm')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Extend dialog ───────────────────────────────────────────
-
-function ExtendDialog({
-  item,
-  onClose,
-  onDone,
-}: {
-  item: UserFileItem | null
-  onClose: () => void
-  onDone: () => void
-}) {
-  const { t } = useTranslation('hub')
-  const [days, setDays] = useState(3)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (item) { setDays(3); setError(null) }
-  }, [item])
-
-  const handleExtend = async () => {
-    if (!item || pending) return
-    setPending(true)
-    setError(null)
-    try {
-      await extendFile(item.id, days)
-      onDone()
-      onClose()
-    } catch {
-      setError(t('extendFailed'))
-    } finally {
-      setPending(false)
-    }
-  }
-
-  if (!item) return null
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="mx-4 w-full max-w-sm space-y-4 rounded-xl bg-background p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-base font-semibold">{t('extendTitle')}</h3>
-        <div className="flex gap-2">
-          {([1, 3, 5] as const).map((d) => (
-            <Button
-              key={d}
-              size="sm"
-              variant={days === d ? 'default' : 'outline'}
-              onClick={() => setDays(d)}
-            >
-              {t('retentionDays', { days: d })}
-            </Button>
-          ))}
-        </div>
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onClose}>{t('cancel')}</Button>
-          <Button size="sm" disabled={pending} onClick={() => { void handleExtend() }}>
-            {t('extendConfirm')}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Share popover for a single file ─────────────────────────
-
-function SharePopover({
-  item,
-  onShared,
-}: {
-  item: UserFileItem
-  onShared: () => void
-}) {
-  const { t } = useTranslation('hub')
-  const [open, setOpen] = useState(false)
-  const [useCode, setUseCode] = useState(false)
-  const [pending, setPending] = useState(false)
-  const [result, setResult] = useState<ShareGroupResponse | null>(null)
-  const [copied, setCopied] = useState(false)
-
-  const handleCreate = async () => {
-    if (pending) return
-    setPending(true)
-    try {
-      const res = await createShare({ fileIds: [item.id], useExtractCode: useCode })
-      setResult(res)
-      onShared()
-    } catch {
-      // silent
-    } finally {
-      setPending(false)
-    }
-  }
-
-  const handleCopy = async () => {
-    if (!result) return
-    const url = `${window.location.origin}${result.share_url}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // ignore
-    }
-  }
-
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next)
-    if (!next) {
-      // Reset state when closing
-      setResult(null)
-      setUseCode(false)
-      setCopied(false)
-    }
-  }
-
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
-          <Share2 className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-80"
-        align="end"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {result ? (
-          // Share created — show link
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Link2 className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">{t('shareResult')}</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                {`${window.location.origin}${result.share_url}`}
-              </span>
-              <Button size="sm" variant="outline" className="h-7 shrink-0 px-2 text-xs" onClick={() => { void handleCopy() }}>
-                {copied ? <Check className="mr-1 h-3 w-3" /> : <Copy className="mr-1 h-3 w-3" />}
-                {copied ? t('copied') : t('copyLink')}
-              </Button>
-            </div>
-            {result.extract_code ? (
-              <p className="text-xs text-muted-foreground">
-                {t('extractCode', { code: result.extract_code })}
-              </p>
-            ) : null}
-          </div>
-        ) : (
-          // Share config — before creating
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Share2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">{t('shareTitle')}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">{t('shareDesc')}</p>
-            <div className="flex items-center justify-between">
-              <label className="text-sm" htmlFor={`code-switch-${item.id}`}>
-                {t('shareExtractCode')}
-              </label>
-              <Switch
-                id={`code-switch-${item.id}`}
-                checked={useCode}
-                onCheckedChange={setUseCode}
-              />
-            </div>
-            <Button
-              size="sm"
-              className="w-full"
-              disabled={pending}
-              onClick={() => { void handleCreate() }}
-            >
-              {pending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Link2 className="mr-1.5 h-3.5 w-3.5" />}
-              {t('shareCreate')}
-            </Button>
-          </div>
-        )}
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-// ── File action buttons ─────────────────────────────────────
-
-function FileActions({
-  item,
-  onEdit,
-  onRename,
-  onExtend,
-  onDownload,
-  onShared,
-}: {
-  item: UserFileItem
-  onEdit?: () => void
-  onRename: () => void
-  onExtend: () => void
-  onDownload: () => void
-  onShared: () => void
-}) {
-  return (
-    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {onEdit ? (
-        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}>
-          <SquarePen className="h-3.5 w-3.5" />
-        </Button>
-      ) : null}
-      <SharePopover item={item} onShared={onShared} />
-      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRename}>
-        <Pencil className="h-3.5 w-3.5" />
-      </Button>
-      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onExtend}>
-        <CalendarPlus className="h-3.5 w-3.5" />
-      </Button>
-      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDownload}>
-        <Download className="h-3.5 w-3.5" />
-      </Button>
-    </div>
-  )
-}
-
-// ── Shares tab content ──────────────────────────────────────
-
-function SharesTab() {
-  const { t: tHub } = useTranslation('hub')
-  const { t, i18n } = useTranslation('transfer')
-  const [items, setItems] = useState<ShareGroupListItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [copiedToken, setCopiedToken] = useState<string | null>(null)
-  const [deleteTarget, setDeleteTarget] = useState<ShareGroupListItem | null>(null)
-
-  const fetchList = useCallback(async () => {
-    setLoading(true)
-    setLoadError(null)
-    try {
-      const res = await listShares({ page, pageSize: PAGE_SIZE })
-      setItems(res.items)
-      setTotal(res.total)
-    } catch {
-      setLoadError(t('list.loadFailed'))
-    } finally {
-      setLoading(false)
-    }
-  }, [page, t])
-
-  useEffect(() => {
-    void fetchList()
-  }, [fetchList])
-
-  const handleCopy = useCallback(async (token: string) => {
-    const url = `${window.location.origin}/t/${token}`
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopiedToken(token)
-      setTimeout(() => setCopiedToken(null), 2000)
-    } catch {
-      // clipboard not available
-    }
-  }, [])
-
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTarget) return
-    try {
-      await deleteShare(deleteTarget.id)
-      setItems((prev) => prev.filter((i) => i.id !== deleteTarget.id))
-      setTotal((prev) => prev - 1)
-    } catch {
-      // silent
-    } finally {
-      setDeleteTarget(null)
-    }
-  }, [deleteTarget])
-
-  const statusBadge = (status: string) => {
-    if (status === 'active')
-      return <Badge variant="outline" className="border-success/30 text-success">{t('list.statusActive')}</Badge>
-    if (status === 'expired')
-      return <Badge variant="outline" className="border-warning/30 text-warning">{t('list.statusExpired')}</Badge>
-    return <Badge variant="outline" className="text-muted-foreground">{t('list.statusDeleted')}</Badge>
-  }
-
-  const offset = (page - 1) * PAGE_SIZE
-
-  return (
-    <>
-      <div className="space-y-3">
-        {loading ? (
-          <p className="text-sm text-muted-foreground">{tHub('loading')}</p>
-        ) : loadError ? (
-          <p className="text-sm text-destructive">{loadError}</p>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <PackageOpen className="h-10 w-10 text-muted-foreground/50" />
-            <p className="text-sm text-muted-foreground">{t('list.empty')}</p>
-          </div>
-        ) : (
-          <>
-            {items.map((item) => (
-              <Card key={item.id} className="border-border/70 shadow-sm">
-                <CardContent className="flex flex-wrap items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {statusBadge(item.status)}
-                      <span className="text-xs text-muted-foreground">
-                        {t('list.files', { count: item.file_count })}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatBytes(item.total_size)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {t('list.downloads', { count: item.download_count })}
-                      </span>
-                      {item.extract_code ? (
-                        <span className="text-xs text-muted-foreground">
-                          {t('list.extractCode', { code: item.extract_code })}
-                        </span>
-                      ) : null}
-                    </div>
-                    {item.expires_at ? (
-                      <p className="text-xs text-muted-foreground">
-                        {t('list.expires', { date: formatTime(item.expires_at, i18n.language) })}
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {item.status === 'active' ? (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 px-2"
-                          onClick={() => { void handleCopy(item.token) }}
-                        >
-                          {copiedToken === item.token ? (
-                            <Check className="mr-1 h-3.5 w-3.5" />
-                          ) : (
-                            <Copy className="mr-1 h-3.5 w-3.5" />
-                          )}
-                          {copiedToken === item.token ? t('list.copied') : t('list.copyLink')}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 px-0"
-                          asChild
-                        >
-                          <a href={`/t/${item.token}`} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        </Button>
-                      </>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 px-0 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteTarget(item)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            {total > PAGE_SIZE ? (
-              <div className="flex items-center justify-between pt-2 text-sm">
-                <span className="text-muted-foreground">
-                  {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    {tHub('previous')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={offset + PAGE_SIZE >= total}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    {tHub('next')}
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      <ConfirmDialog
-        open={deleteTarget !== null}
-        onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}
-        title={t('list.deleteConfirmTitle')}
-        description={t('list.deleteConfirmDesc')}
-        confirmLabel={t('list.delete')}
-        cancelLabel={tHub('cancel')}
-        variant="destructive"
-        onConfirm={() => { void handleDeleteConfirm() }}
-      />
-    </>
-  )
+function getInitialViewMode(): ViewMode {
+  try {
+    const saved = localStorage.getItem('hub-view-mode')
+    if (saved === 'grid') return 'grid'
+  } catch { /* ignore */ }
+  return 'list'
 }
 
 // ── Main page ───────────────────────────────────────────────
 
 export function HubFilesPage() {
-  const { t, i18n } = useTranslation('hub')
+  const { t } = useTranslation('hub')
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') === 'shares' ? 'shares' : 'files'
+
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+  const handleViewMode = (mode: ViewMode) => {
+    setViewMode(mode)
+    try { localStorage.setItem('hub-view-mode', mode) } catch { /* ignore */ }
+  }
 
   // Files state
   const [items, setItems] = useState<UserFileItem[]>([])
   const [total, setTotal] = useState(0)
   const [usedBytes, setUsedBytes] = useState(0)
   const [quotaBytes, setQuotaBytes] = useState(0)
+  const [fileCount, setFileCount] = useState(0)
+  const [maxFiles, setMaxFiles] = useState(0)
+  const [maxRetentionDays, setMaxRetentionDays] = useState(0)
   const [page, setPage] = useState(1)
   const [sourceFilter, setSourceFilter] = useState<string>('all')
   const [loading, setLoading] = useState(true)
@@ -626,10 +86,19 @@ export function HubFilesPage() {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [deleteOpen, setDeleteOpen] = useState(false)
 
+  // Upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+
   // Action dialogs
   const [renameItem, setRenameItem] = useState<UserFileItem | null>(null)
   const [extendItem, setExtendItem] = useState<UserFileItem | null>(null)
+  const [shareFileIds, setShareFileIds] = useState<number[]>([])
+  const [shareDialogOpen, setShareDialogOpen] = useState(false)
+  const [deleteItem, setDeleteItem] = useState<UserFileItem | null>(null)
   const download = useFileDownload()
+
+  // ── Data fetching ──
 
   const openDocument = useCallback((item: UserFileItem) => {
     navigate(`/doc/edit/${item.id}`)
@@ -648,6 +117,9 @@ export function HubFilesPage() {
       setTotal(res.total)
       setUsedBytes(res.used_bytes)
       setQuotaBytes(res.quota_bytes)
+      setFileCount(res.file_count)
+      setMaxFiles(res.max_files)
+      setMaxRetentionDays(res.max_retention_days)
     } catch {
       setLoadError(t('loadFailed'))
     } finally {
@@ -658,6 +130,38 @@ export function HubFilesPage() {
   useEffect(() => {
     void fetchList()
   }, [fetchList])
+
+  // ── Upload (page-level dropzone) ──
+
+  const handleUpload = useCallback(async (files: File[]) => {
+    if (files.length === 0 || uploading) return
+    setUploading(true)
+    setUploadProgress(0)
+    try {
+      await uploadFiles(files, 7, setUploadProgress)
+      toast.success(t('uploadSuccess', { count: files.length }))
+      if (page === 1) {
+        void fetchList()
+      } else {
+        setPage(1)
+      }
+    } catch (err) {
+      toast.error(getTranslatedApiError(err, t('uploadFailed')))
+    } finally {
+      setUploading(false)
+    }
+  }, [uploading, fetchList, t])
+
+  const { getRootProps, getInputProps, isDragActive, open: openFilePicker } = useDropzone({
+    onDrop: handleUpload,
+    multiple: true,
+    maxFiles: 20,
+    noClick: true,
+    noKeyboard: true,
+    disabled: uploading,
+  })
+
+  // ── Selection ──
 
   const toggleSelect = useCallback((id: number) => {
     setSelected((prev) => {
@@ -676,22 +180,46 @@ export function HubFilesPage() {
     }
   }, [items, selected.size])
 
+  // ── Actions ──
+
   const handleDelete = useCallback(async () => {
-    if (selected.size === 0) return
+    const ids = deleteItem ? [deleteItem.id] : [...selected]
+    if (ids.length === 0) return
     try {
-      await deleteFiles([...selected])
+      await deleteFiles(ids)
       setSelected(new Set())
+      setDeleteItem(null)
       void fetchList()
     } catch {
       // silent
     } finally {
       setDeleteOpen(false)
     }
-  }, [selected, fetchList])
+  }, [selected, deleteItem, fetchList])
 
-  const handleDownload = useCallback((fileId: number, fileName: string) => {
-    void download(buildFileDownloadUrl(fileId), fileName)
+  const handleDownload = useCallback((item: UserFileItem) => {
+    void download(buildFileDownloadUrl(item.id), item.file_name)
   }, [download])
+
+  const handleShare = useCallback((item: UserFileItem) => {
+    setShareFileIds([item.id])
+    setShareDialogOpen(true)
+  }, [])
+
+  const handleBatchShare = useCallback(() => {
+    setShareFileIds([...selected])
+    setShareDialogOpen(true)
+  }, [selected])
+
+  const handleSingleDelete = useCallback((item: UserFileItem) => {
+    setDeleteItem(item)
+    setDeleteOpen(true)
+  }, [])
+
+  const handleBatchDelete = useCallback(() => {
+    setDeleteItem(null)
+    setDeleteOpen(true)
+  }, [])
 
   const handleTabChange = useCallback((value: string) => {
     setSearchParams(value === 'shares' ? { tab: 'shares' } : {}, { replace: true })
@@ -699,7 +227,7 @@ export function HubFilesPage() {
 
   const handleCreateDocument = useCallback(async () => {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
-    const file = new File([`# Untitled\n\n`], `untitled-${stamp}.md`, { type: 'text/markdown' })
+    const file = new File([''], `untitled-${stamp}.md`, { type: 'text/markdown' })
     try {
       const res = await uploadFiles([file], 7)
       const created = res.files[0]
@@ -711,42 +239,124 @@ export function HubFilesPage() {
 
   const offset = (page - 1) * PAGE_SIZE
   const usagePercent = quotaBytes > 0 ? Math.min((usedBytes / quotaBytes) * 100, 100) : 0
-
-  const sourceBadge = (source: string) => {
-    if (source === 'upload')
-      return <Badge variant="outline" className="text-xs">{t('sourceUpload')}</Badge>
-    return <Badge variant="outline" className="text-xs">{t('sourceTool')}</Badge>
-  }
+  const deleteCount = deleteItem ? 1 : selected.size
 
   return (
     <>
       <SEOHead title={t('title')} noindex />
 
-      <div className="space-y-5">
-        {/* Header + quota bar */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
+      <div {...getRootProps()} className="space-y-5">
+        <input {...getInputProps()} />
+
+        {/* Drag overlay */}
+        {isDragActive && <UploadOverlay />}
+
+        {/* Header */}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
             <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={openFilePicker} disabled={uploading}>
+                {uploading ? (
+                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <UploadCloud className="mr-1 h-3.5 w-3.5" />
+                )}
+                {t('upload')}
+              </Button>
               <Button size="sm" onClick={() => { void handleCreateDocument() }}>
                 <SquarePen className="mr-1 h-3.5 w-3.5" />
                 {t('createDoc')}
               </Button>
-              {quotaBytes > 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  {t('usage', { used: formatBytes(usedBytes), quota: formatBytes(quotaBytes) })}
-                </span>
-              ) : null}
             </div>
           </div>
-          {quotaBytes > 0 ? (
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full rounded-full transition-all ${usagePercent > 90 ? 'bg-destructive' : 'bg-primary'}`}
-                style={{ width: `${usagePercent}%` }}
-              />
+
+          {/* Upload progress */}
+          {uploading && (
+            <Progress value={uploadProgress} className="h-1.5" />
+          )}
+
+          {/* Quota stats */}
+          <div className="grid grid-cols-3 gap-3">
+            {/* Storage */}
+            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <HardDrive className="h-3.5 w-3.5" />
+                {t('quotaStorage')}
+              </div>
+              {quotaBytes > 0 ? (
+                <>
+                  <Progress
+                    value={usagePercent}
+                    className={`h-1.5 ${usagePercent > 90 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                  />
+                  <p className="text-xs tabular-nums">
+                    <span className="text-sm font-medium text-foreground">{formatBytes(usedBytes)}</span>
+                    <span className="text-muted-foreground"> / {formatBytes(quotaBytes)}</span>
+                  </p>
+                </>
+              ) : (
+                <p className="flex items-center gap-1 text-xs">
+                  <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="text-sm font-medium text-foreground">{formatBytes(usedBytes)}</span>
+                  <span className="text-muted-foreground">{t('used')}</span>
+                </p>
+              )}
             </div>
-          ) : null}
+
+            {/* File count */}
+            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Hash className="h-3.5 w-3.5" />
+                {t('quotaFiles')}
+              </div>
+              {maxFiles > 0 ? (
+                <>
+                  <Progress
+                    value={Math.min((fileCount / maxFiles) * 100, 100)}
+                    className={`h-1.5 ${fileCount / maxFiles > 0.9 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                  />
+                  <p className="text-xs tabular-nums">
+                    <span className="text-sm font-medium text-foreground">{fileCount}</span>
+                    <span className="text-muted-foreground"> / {maxFiles}</span>
+                  </p>
+                </>
+              ) : (
+                <p className="flex items-center gap-1 text-xs">
+                  <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  <span className="text-sm font-medium text-foreground">{fileCount}</span>
+                  <span className="text-muted-foreground">{t('quotaFilesUnit')}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Retention */}
+            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                {t('quotaRetention')}
+              </div>
+              <p className="flex items-center gap-1 text-xs">
+                {maxRetentionDays === 0 ? (
+                  <>
+                    <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
+                    <span className="text-sm font-medium text-foreground">{t('unlimited')}</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-medium text-foreground">
+                    {t('retentionDays', { days: maxRetentionDays })}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          {/* Storage almost full warning */}
+          {quotaBytes > 0 && usagePercent > 90 && (
+            <Badge variant="outline" className="border-destructive/30 text-destructive">
+              {t('storageAlmostFull')}
+            </Badge>
+          )}
         </div>
 
         {/* Tabs */}
@@ -759,130 +369,124 @@ export function HubFilesPage() {
           {/* ── Files tab ── */}
           <TabsContent value="files">
             <div className="space-y-4 pt-1">
-              {/* Upload area */}
-              <UploadSection onUploaded={() => { setPage(1); void fetchList() }} />
-
-              {/* Source filter */}
-              <div className="flex items-center gap-2">
-                {SOURCE_FILTERS.map((f) => (
+              {/* Filter bar + view toggle */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {SOURCE_FILTERS.map((f) => (
+                    <Button
+                      key={f}
+                      size="sm"
+                      variant={sourceFilter === f ? 'default' : 'outline'}
+                      onClick={() => { setSourceFilter(f); setPage(1); setSelected(new Set()) }}
+                    >
+                      {f === 'all' ? t('allSources') : f === 'upload' ? t('sourceUpload') : t('sourceTool')}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1">
                   <Button
-                    key={f}
-                    size="sm"
-                    variant={sourceFilter === f ? 'default' : 'outline'}
-                    onClick={() => { setSourceFilter(f); setPage(1); setSelected(new Set()) }}
+                    size="icon"
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    className="h-8 w-8"
+                    onClick={() => handleViewMode('list')}
+                    aria-label={t('viewList')}
                   >
-                    {f === 'all' ? t('allSources') : f === 'upload' ? t('sourceUpload') : t('sourceTool')}
+                    <List className="h-4 w-4" />
                   </Button>
-                ))}
+                  <Button
+                    size="icon"
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    className="h-8 w-8"
+                    onClick={() => handleViewMode('grid')}
+                    aria-label={t('viewGrid')}
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
 
               {/* Bulk actions */}
-              {selected.size > 0 ? (
+              {selected.size > 0 && (
                 <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
+                  <Checkbox
+                    checked={selected.size === items.length}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label={t('selectAll')}
+                  />
                   <span className="text-sm font-medium">{t('selected', { count: selected.size })}</span>
-                  <Button size="sm" variant="ghost" onClick={toggleSelectAll}>
-                    {selected.size === items.length ? t('deselectAll') : t('selectAll')}
+                  <div className="flex-1" />
+                  <Button size="sm" variant="outline" onClick={handleBatchShare}>
+                    <Share2 className="mr-1 h-3.5 w-3.5" />
+                    {t('share')}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setDeleteOpen(true)}
-                  >
+                  <Button size="sm" variant="destructive" onClick={handleBatchDelete}>
                     <Trash2 className="mr-1 h-3.5 w-3.5" />
                     {t('delete')}
                   </Button>
                 </div>
-              ) : null}
+              )}
 
-              {/* File list */}
+              {/* File list / grid */}
               {loading ? (
                 <p className="text-sm text-muted-foreground">{t('loading')}</p>
               ) : loadError ? (
                 <p className="text-sm text-destructive">{loadError}</p>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-12 text-center">
-                  <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                <div className="flex flex-col items-center gap-3 py-16 text-center">
+                  <FolderOpen className="h-10 w-10 text-muted-foreground/40" />
                   <p className="text-sm text-muted-foreground">{t('empty')}</p>
                   <p className="text-xs text-muted-foreground">{t('emptyHint')}</p>
                 </div>
+              ) : viewMode === 'list' ? (
+                <FileListView
+                  items={items}
+                  selected={selected}
+                  onToggleSelect={toggleSelect}
+                  onEdit={openDocument}
+                  onRename={setRenameItem}
+                  onExtend={setExtendItem}
+                  onShare={handleShare}
+                  onDownload={handleDownload}
+                  onDelete={handleSingleDelete}
+                />
               ) : (
-                <div className="space-y-2">
-                  {items.map((item) => (
-                    <Card
-                      key={item.id}
-                      className={`cursor-pointer border-border/70 shadow-sm transition ${selected.has(item.id) ? 'border-primary/50 bg-primary/5' : ''}`}
-                      onClick={() => toggleSelect(item.id)}
-                    >
-                      <CardContent className="flex items-center gap-3 px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(item.id)}
-                          onChange={() => toggleSelect(item.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-4 w-4 shrink-0 rounded border-border"
-                        />
-                        <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0 flex-1">
-                          {isMarkdownFile(item.file_name) ? (
-                            <button
-                              type="button"
-                              className="truncate text-left text-sm font-medium transition hover:text-primary"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openDocument(item)
-                              }}
-                            >
-                              {item.file_name}
-                            </button>
-                          ) : (
-                            <p className="truncate text-sm font-medium">{item.file_name}</p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            {sourceBadge(item.source)}
-                            <span>{formatBytes(item.size)}</span>
-                            <span>{t('expires', { date: formatTime(item.expires_at, i18n.language) })}</span>
-                            {item.share_count > 0 ? (
-                              <span>{t('shareCount', { count: item.share_count })}</span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <FileActions
-                          item={item}
-                          onEdit={isMarkdownFile(item.file_name) ? () => openDocument(item) : undefined}
-                          onRename={() => setRenameItem(item)}
-                          onExtend={() => setExtendItem(item)}
-                          onDownload={() => handleDownload(item.id, item.file_name)}
-                          onShared={() => { void fetchList() }}
-                        />
-                      </CardContent>
-                    </Card>
-                  ))}
+                <FileGridView
+                  items={items}
+                  selected={selected}
+                  onToggleSelect={toggleSelect}
+                  onEdit={openDocument}
+                  onRename={setRenameItem}
+                  onExtend={setExtendItem}
+                  onShare={handleShare}
+                  onDownload={handleDownload}
+                  onDelete={handleSingleDelete}
+                />
+              )}
 
-                  {total > PAGE_SIZE ? (
-                    <div className="flex items-center justify-between pt-2 text-sm">
-                      <span className="text-muted-foreground">
-                        {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-                      </span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={page <= 1}
-                          onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        >
-                          {t('previous')}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={offset + PAGE_SIZE >= total}
-                          onClick={() => setPage((p) => p + 1)}
-                        >
-                          {t('next')}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
+              {/* Pagination */}
+              {total > PAGE_SIZE && (
+                <div className="flex items-center justify-between pt-2 text-sm">
+                  <span className="text-muted-foreground">
+                    {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      {t('previous')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={offset + PAGE_SIZE >= total}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      {t('next')}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -897,30 +501,35 @@ export function HubFilesPage() {
         </Tabs>
       </div>
 
-      {/* Delete confirm */}
+      {/* Dialogs */}
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={t('deleteConfirmTitle')}
-        description={t('deleteConfirmDesc', { count: selected.size })}
+        description={t('deleteConfirmDesc', { count: deleteCount })}
         confirmLabel={t('deleteConfirm')}
         cancelLabel={t('cancel')}
         variant="destructive"
         onConfirm={() => { void handleDelete() }}
       />
 
-      {/* Rename dialog */}
       <RenameDialog
         item={renameItem}
         onClose={() => setRenameItem(null)}
         onDone={() => { void fetchList() }}
       />
 
-      {/* Extend dialog */}
       <ExtendDialog
         item={extendItem}
         onClose={() => setExtendItem(null)}
         onDone={() => { void fetchList() }}
+      />
+
+      <ShareDialog
+        open={shareDialogOpen}
+        fileIds={shareFileIds}
+        onClose={() => setShareDialogOpen(false)}
+        onShared={() => { void fetchList() }}
       />
     </>
   )

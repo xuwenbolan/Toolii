@@ -125,17 +125,26 @@ class HubService:
                 status_code=413,
             )
 
-    async def get_usage(self, user_id: int) -> tuple[int, int]:
-        """Return (used_bytes, quota_bytes) for a user. quota_bytes=0 means unlimited."""
-        max_bytes, _, _ = await self._get_user_limits(user_id)
+    async def get_usage(self, user_id: int) -> dict:
+        """Return storage usage stats. 0 means unlimited for quota/max fields."""
+        max_bytes, max_files, max_days = await self._get_user_limits(user_id)
         result = await self._db.execute(
-            select(func.coalesce(func.sum(UserFile.size), 0)).where(
+            select(
+                func.coalesce(func.sum(UserFile.size), 0),
+                func.count(),
+            ).where(
                 UserFile.user_id == user_id,
                 UserFile.status == FileStatus.ACTIVE,
             )
         )
-        used = result.scalar_one()
-        return used, max_bytes
+        used_bytes, file_count = result.one()
+        return {
+            "used_bytes": int(used_bytes),
+            "quota_bytes": max_bytes,
+            "file_count": int(file_count),
+            "max_files": max_files,
+            "max_retention_days": max_days,
+        }
 
     # ── Save files ───────────────────────────────────────────────────
 

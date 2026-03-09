@@ -312,7 +312,7 @@ export function TransferCreatePage() {
 
             <p className="text-xs text-muted-foreground">
               {t('result.expiresAt', {
-                date: new Date(result.share.expires_at).toLocaleString(i18n.language, {
+                date: new Date(result.share.expires_at ?? '').toLocaleString(i18n.language, {
                   month: '2-digit',
                   day: '2-digit',
                   hour: '2-digit',
