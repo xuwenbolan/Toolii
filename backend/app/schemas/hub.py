@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class UserFileItem(BaseModel):
@@ -19,6 +19,17 @@ class UserFileListResponse(BaseModel):
     total: int
     used_bytes: int
     quota_bytes: int
+
+
+class UserFileDetailResponse(BaseModel):
+    id: int
+    file_name: str
+    size: int
+    content_type: str
+    source: str
+    expires_at: str | None
+    created_at: str
+    updated_at: str
 
 
 class FileUploadResponse(BaseModel):
@@ -49,6 +60,23 @@ class FileDeleteRequest(BaseModel):
 
 class FileDeleteResponse(BaseModel):
     deleted: int
+
+
+class FileContentResponse(BaseModel):
+    content: str
+    updated_at: str | None = None
+
+
+class FileContentUpdateRequest(BaseModel):
+    content: str
+    base_updated_at: str = Field(
+        validation_alias=AliasChoices("base_updated_at", "expected_updated_at")
+    )
+
+
+class FileContentUpdateResponse(BaseModel):
+    size: int
+    updated_at: str
 
 
 class ShareGroupCreate(BaseModel):

@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, Download, FileIcon, Lock, PackageOpen } from 'lucide-react'
+import { AlertCircle, Download, Eye, FileIcon, Lock, PackageOpen } from 'lucide-react'
 
+import { MarkdownPreview } from '@/components/editor/MarkdownPreview'
 import { SEOHead } from '@/components/common/SEOHead'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { formatBytes } from '@/lib/fileValidation'
 import {
   buildShareDownloadUrl,
   buildShareZipUrl,
+  getShareFileContent,
   getShareInfo,
   type ShareInfoResponse,
 } from '@/services/hubApi'
@@ -56,9 +60,33 @@ export function TransferReceivePage() {
   const [codeError, setCodeError] = useState(false)
   const [codeLocked, setCodeLocked] = useState(false)
   const [codeLoading, setCodeLoading] = useState(false)
+  const [previewingId, setPreviewingId] = useState<number | null>(null)
+  const [previewName, setPreviewName] = useState<string>('')
+  const [previewContent, setPreviewContent] = useState<string | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+
+  const accessCode = codeVerified && code ? code : undefined
+  const singleMarkdownFile = useMemo(
+    () => (info?.files.length === 1 && /\.md$/i.test(info.files[0].file_name) ? info.files[0] : null),
+    [info],
+  )
 
   useEffect(() => {
     let active = true
+    setInfo(null)
+    setError(null)
+    setDownloadError(null)
+    setNeedCode(false)
+    setCode('')
+    setCodeVerified(false)
+    setCodeError(false)
+    setCodeLocked(false)
+    setCodeLoading(false)
+    setPreviewingId(null)
+    setPreviewName('')
+    setPreviewContent(null)
+    setPreviewError(null)
+    setLoadedToken(null)
     void getShareInfo(token)
       .then((data) => {
         if (!active) return
@@ -84,7 +112,7 @@ export function TransferReceivePage() {
   }, [token, t])
 
   const handleCodeSubmit = useCallback(async () => {
-    if (code.length !== 4 || codeLocked || codeLoading) return
+    if (code.length !== 6 || codeLocked || codeLoading) return
     setCodeError(false)
     setCodeLoading(true)
     try {
@@ -98,7 +126,7 @@ export function TransferReceivePage() {
       }
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status
-      if (status === 429) {
+      if (status === 423) {
         setCodeLocked(true)
       } else {
         setCodeError(true)
@@ -130,18 +158,36 @@ export function TransferReceivePage() {
 
   const handleDownloadSingle = useCallback(
     (fileId: number, filename: string) => {
-      const codeParam = codeVerified && needCode ? code : undefined
-      const url = buildShareDownloadUrl(token, fileId, codeParam)
+      const url = buildShareDownloadUrl(token, fileId, accessCode)
       void fetchAndDownload(url, filename)
     },
-    [token, code, codeVerified, needCode, fetchAndDownload],
+    [token, accessCode, fetchAndDownload],
   )
 
   const handleDownloadZip = useCallback(() => {
-    const codeParam = codeVerified && needCode ? code : undefined
-    const url = buildShareZipUrl(token, codeParam)
+    const url = buildShareZipUrl(token, accessCode)
     void fetchAndDownload(url, `share-${token}.zip`)
-  }, [token, code, codeVerified, needCode, fetchAndDownload])
+  }, [token, accessCode, fetchAndDownload])
+
+  const handlePreview = useCallback(async (fileId: number, fileName: string) => {
+    setPreviewingId(fileId)
+    setPreviewName(fileName)
+    setPreviewContent(null)
+    setPreviewError(null)
+    try {
+      const res = await getShareFileContent(token, fileId, accessCode)
+      setPreviewContent(res.content)
+    } catch (err) {
+      setPreviewError(getTranslatedApiError(err, t('receive.previewFailed')))
+    } finally {
+      setPreviewingId(null)
+    }
+  }, [accessCode, t, token])
+
+  useEffect(() => {
+    if (!singleMarkdownFile || previewContent !== null || previewError || previewingId) return
+    void handlePreview(singleMarkdownFile.id, singleMarkdownFile.file_name)
+  }, [handlePreview, previewContent, previewError, previewingId, singleMarkdownFile])
 
   const loading = loadedToken !== token
   const visibleError = loadedToken === token ? error : null
@@ -209,12 +255,12 @@ export function TransferReceivePage() {
                 <div className="flex gap-2">
                   <Input
                     type="text"
-                    inputMode="numeric"
-                    maxLength={4}
+                    inputMode="text"
+                    maxLength={6}
                     placeholder={t('receive.codePlaceholder')}
                     value={code}
                     onChange={(e) => {
-                      setCode(e.target.value.replace(/\D/g, '').slice(0, 4))
+                      setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toLowerCase())
                       setCodeError(false)
                     }}
                     onKeyDown={(e) => {
@@ -226,7 +272,7 @@ export function TransferReceivePage() {
                   <Button
                     type="button"
                     size="sm"
-                    disabled={code.length !== 4 || codeLocked || codeLoading}
+                    disabled={code.length !== 6 || codeLocked || codeLoading}
                     onClick={() => { void handleCodeSubmit() }}
                   >
                     {codeLoading ? t('receive.loading') : t('receive.codeSubmit')}
@@ -266,6 +312,18 @@ export function TransferReceivePage() {
                       <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+                      {/\.md$/i.test(file.file_name) ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => { void handlePreview(file.id, file.file_name) }}
+                        >
+                          <Eye className="mr-1 h-3.5 w-3.5" />
+                          {t('receive.preview')}
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         size="sm"
@@ -292,11 +350,46 @@ export function TransferReceivePage() {
                     {downloading ? t('receive.downloading') : t('receive.downloadAll')}
                   </Button>
                 ) : null}
+
+                {singleMarkdownFile && previewContent ? (
+                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium">{t('receive.previewTitle')}</p>
+                        <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
+                      </div>
+                    </div>
+                    <MarkdownPreview content={previewContent} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!previewName && !singleMarkdownFile} onOpenChange={(open) => {
+        if (!open) {
+          setPreviewName('')
+          setPreviewContent(null)
+          setPreviewError(null)
+        }
+      }}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-8">{previewName || t('receive.previewTitle')}</DialogTitle>
+          </DialogHeader>
+          <div className="overflow-auto">
+            {previewingId ? (
+              <p className="text-sm text-muted-foreground">{t('receive.loading')}</p>
+            ) : previewError ? (
+              <p className="text-sm text-destructive">{previewError}</p>
+            ) : previewContent ? (
+              <MarkdownPreview content={previewContent} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

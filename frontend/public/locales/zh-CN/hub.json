@@ -6,6 +6,8 @@
   "emptyHint": "上传文件或使用工具后，文件会在这里显示。",
   "loading": "加载中...",
   "loadFailed": "加载文件失败",
+  "createDoc": "新建文档",
+  "createDocFailed": "创建文档失败",
   "usage": "已用 {{used}} / {{quota}}",
   "fileCount": "{{count}} 个文件",
   "sourceUpload": "上传",

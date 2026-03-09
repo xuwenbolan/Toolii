@@ -43,6 +43,7 @@ const WordCounterPage = lazy(() => import('@/pages/TextTools/WordCounterPage').t
 const TransferCreatePage = lazy(() => import('@/pages/Transfer/TransferCreatePage').then((m) => ({ default: m.TransferCreatePage })))
 const TransferReceivePage = lazy(() => import('@/pages/Transfer/TransferReceivePage').then((m) => ({ default: m.TransferReceivePage })))
 const HubFilesPage = lazy(() => import('@/pages/Dashboard/HubFilesPage').then((m) => ({ default: m.HubFilesPage })))
+const DocEditorPage = lazy(() => import('@/pages/Docs/DocEditorPage').then((m) => ({ default: m.DocEditorPage })))
 
 const LoginPage = lazy(() => import('@/pages/Auth/LoginPage').then((m) => ({ default: m.LoginPage })))
 const RegisterPage = lazy(() => import('@/pages/Auth/RegisterPage').then((m) => ({ default: m.RegisterPage })))
@@ -86,6 +87,14 @@ export const router = createBrowserRouter([
       { path: 'share/:token', element: <ShareClaimPage /> },
       { path: 'transfer', element: <TransferCreatePage /> },
       { path: 't/:token', element: <TransferReceivePage /> },
+      {
+        path: 'doc/edit/:id',
+        element: (
+          <ProtectedRoute>
+            <DocEditorPage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: 'image-tools',
         children: [

@@ -28,6 +28,20 @@ logger = logging.getLogger(__name__)
 
 _TOKEN_CHARS = string.ascii_letters + string.digits
 _CODE_CHARS = string.ascii_lowercase + string.digits
+_MARKDOWN_MAX_BYTES = 1024 * 1024
+
+
+def _is_markdown_filename(filename: str) -> bool:
+    return filename.lower().endswith(".md")
+
+
+def _is_expired_at(value) -> bool:
+    if value is None:
+        return False
+    now = utcnow()
+    if value.tzinfo is None:
+        return value < now.replace(tzinfo=None)
+    return value < now
 
 
 def _gen_token(length: int = 8) -> str:
@@ -240,9 +254,81 @@ class HubService:
             raise AppError(code="NOT_FOUND", message="File not found", status_code=404)
         return uf
 
+    async def get_file_detail(self, file_id: int, user_id: int) -> UserFile:
+        return await self.get_file(file_id, user_id)
+
+    async def get_markdown_content(self, file_id: int, user_id: int) -> tuple[str, str]:
+        uf = await self.get_file(file_id, user_id)
+        if not _is_markdown_filename(uf.original_filename):
+            raise AppError(
+                code="NOT_MARKDOWN",
+                message="This file is not a Markdown document",
+                status_code=400,
+            )
+        try:
+            content = self._fs.get_path(uf.file_id).read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise AppError(
+                code="INVALID_CONTENT",
+                message="This file cannot be displayed as Markdown",
+                status_code=422,
+            ) from exc
+        return content, uf.updated_at.isoformat()
+
     async def rename_file(self, file_id: int, user_id: int, new_name: str) -> UserFile:
         uf = await self.get_file(file_id, user_id)
-        uf.original_filename = safe_filename(new_name)
+        safe_name = safe_filename(new_name)
+        if _is_markdown_filename(uf.original_filename):
+            if not _is_markdown_filename(safe_name):
+                if "." in safe_name:
+                    raise AppError(
+                        code="INVALID_MARKDOWN_FILENAME",
+                        message="Markdown documents must keep the .md extension",
+                        status_code=400,
+                    )
+                safe_name = f"{safe_name}.md"
+        uf.original_filename = safe_name
+        await self._db.flush()
+        return uf
+
+    async def save_markdown_content(
+        self,
+        file_id: int,
+        user_id: int,
+        *,
+        content: str,
+        base_updated_at: str,
+    ) -> UserFile:
+        uf = await self.get_file(file_id, user_id)
+        if not _is_markdown_filename(uf.original_filename):
+            raise AppError(
+                code="NOT_MARKDOWN",
+                message="This file is not a Markdown document",
+                status_code=400,
+            )
+
+        current_updated_at = uf.updated_at.isoformat()
+        if base_updated_at != current_updated_at:
+            raise AppError(
+                code="CONTENT_CONFLICT",
+                message="This file was changed elsewhere",
+                status_code=409,
+            )
+
+        data = content.encode("utf-8")
+        if len(data) > _MARKDOWN_MAX_BYTES:
+            raise AppError(
+                code="CONTENT_TOO_LARGE",
+                message="Content exceeds 1 MB limit",
+                status_code=413,
+            )
+
+        size_delta = len(data) - uf.size
+        if size_delta > 0 and uf.user_id is not None:
+            await self._check_quota(uf.user_id, additional_bytes=size_delta, additional_count=0)
+
+        uf.size = self._fs.overwrite_bytes(uf.file_id, data)
+        uf.updated_at = utcnow()
         await self._db.flush()
         return uf
 
@@ -436,7 +522,7 @@ class HubService:
             return None
 
         # Check if expired
-        if sg.expires_at < utcnow():
+        if _is_expired_at(sg.expires_at):
             sg.status = ShareGroupStatus.EXPIRED
             await self._db.flush()
             return None
@@ -478,7 +564,7 @@ class HubService:
             "file_count": len(files),
             "total_size": sum(f.size for f in files),
             "download_count": sg.download_count,
-            "expires_at": sg.expires_at.isoformat(),
+            "expires_at": sg.expires_at.isoformat() if sg.expires_at else None,
             "has_extract_code": sg.extract_code is not None,
             "status": sg.status,
             "created_at": sg.created_at.isoformat(),
@@ -493,6 +579,59 @@ class HubService:
             ],
         }
 
+    async def get_share_markdown_content(
+        self,
+        token: str,
+        file_id: int,
+        code: str | None = None,
+    ) -> str:
+        result = await self._db.execute(
+            select(ShareGroup).where(
+                ShareGroup.token == token,
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+            )
+        )
+        sg = result.scalar_one_or_none()
+        if not sg or _is_expired_at(sg.expires_at):
+            raise AppError(code="NOT_FOUND", message="File not found", status_code=404)
+
+        if sg.extract_code:
+            if sg.failed_code_attempts >= 10:
+                raise AppError(code="LOCKED", message="Too many failed attempts", status_code=423)
+            if not code:
+                raise AppError(code="CODE_REQUIRED", message="Extract code required", status_code=403)
+            if code != sg.extract_code:
+                sg.failed_code_attempts += 1
+                await self._db.flush()
+                raise AppError(code="WRONG_CODE", message="Incorrect extract code", status_code=403)
+
+        file_result = await self._db.execute(
+            select(UserFile)
+            .join(ShareGroupFile, ShareGroupFile.user_file_id == UserFile.id)
+            .where(
+                ShareGroupFile.share_group_id == sg.id,
+                UserFile.id == file_id,
+                UserFile.status == FileStatus.ACTIVE,
+            )
+        )
+        uf = file_result.scalar_one_or_none()
+        if not uf:
+            raise AppError(code="NOT_FOUND", message="File not found", status_code=404)
+        if not _is_markdown_filename(uf.original_filename):
+            raise AppError(
+                code="NOT_MARKDOWN",
+                message="This file is not a Markdown document",
+                status_code=400,
+            )
+        try:
+            return self._fs.get_path(uf.file_id).read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise AppError(
+                code="INVALID_CONTENT",
+                message="This file cannot be displayed as Markdown",
+                status_code=422,
+            ) from exc
+
     async def get_share_file(self, token: str, file_id: int, code: str | None = None) -> UserFile | None:
         """Get a file from a share group for download. Validates token and code."""
         result = await self._db.execute(
@@ -502,7 +641,7 @@ class HubService:
             )
         )
         sg = result.scalar_one_or_none()
-        if not sg or sg.expires_at < utcnow():
+        if not sg or _is_expired_at(sg.expires_at):
             return None
 
         if sg.extract_code:
@@ -538,7 +677,7 @@ class HubService:
             )
         )
         sg = result.scalar_one_or_none()
-        if not sg or sg.expires_at < utcnow():
+        if not sg or _is_expired_at(sg.expires_at):
             raise AppError(code="NOT_FOUND", message="Share not found", status_code=404)
 
         if sg.extract_code:

@@ -14,6 +14,10 @@ export type UserFileItem = {
   share_count: number
 }
 
+export type UserFileDetailResponse = UserFileItem & {
+  updated_at: string
+}
+
 export type UserFileListResponse = {
   items: UserFileItem[]
   total: number
@@ -80,6 +84,16 @@ export type ShareNeedCodeResponse = {
   need_code: true
 }
 
+export type FileContentResponse = {
+  content: string
+  updated_at: string | null
+}
+
+export type FileContentUpdateResponse = {
+  size: number
+  updated_at: string
+}
+
 // ── File management ──────────────────────────────────────
 
 export async function listFiles(opts?: {
@@ -120,8 +134,31 @@ export async function uploadFiles(
   return res.data
 }
 
-export async function renameFile(fileId: number, fileName: string): Promise<void> {
-  await api.patch(`/api/hub/files/${fileId}`, { file_name: fileName })
+export async function renameFile(fileId: number, fileName: string): Promise<{ id: number; file_name: string }> {
+  const res = await api.patch<{ id: number; file_name: string }>(`/api/hub/files/${fileId}`, { file_name: fileName })
+  return res.data
+}
+
+export async function getFileMeta(fileId: number): Promise<UserFileDetailResponse> {
+  const res = await api.get<UserFileDetailResponse>(`/api/hub/files/${fileId}`)
+  return res.data
+}
+
+export async function getFileContent(fileId: number): Promise<FileContentResponse> {
+  const res = await api.get<FileContentResponse>(`/api/hub/files/${fileId}/content`)
+  return res.data
+}
+
+export async function saveFileContent(
+  fileId: number,
+  content: string,
+  expectedUpdatedAt?: string | null,
+): Promise<FileContentUpdateResponse> {
+  const res = await api.put<FileContentUpdateResponse>(`/api/hub/files/${fileId}/content`, {
+    content,
+    base_updated_at: expectedUpdatedAt ?? '',
+  })
+  return res.data
 }
 
 export async function extendFile(fileId: number, days: number): Promise<{ expires_at: string }> {
@@ -214,6 +251,17 @@ export async function getShareInfo(
     `/api/hub/s/${token}/info`,
     { params: code ? { code } : undefined },
   )
+  return res.data
+}
+
+export async function getShareFileContent(
+  token: string,
+  fileId: number,
+  code?: string,
+): Promise<FileContentResponse> {
+  const res = await api.get<FileContentResponse>(`/api/hub/s/${token}/${fileId}/content`, {
+    params: code ? { code } : undefined,
+  })
   return res.data
 }
 

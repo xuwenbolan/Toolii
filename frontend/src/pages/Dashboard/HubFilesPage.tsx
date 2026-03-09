@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
   CalendarPlus,
@@ -14,10 +14,12 @@ import {
   Loader2,
   PackageOpen,
   Pencil,
+  SquarePen,
   Share2,
   Trash2,
   UploadCloud,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -29,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatBytes } from '@/lib/fileValidation'
+import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import {
   buildFileDownloadUrl,
@@ -46,6 +49,10 @@ import {
 } from '@/services/hubApi'
 
 const PAGE_SIZE = 20
+
+function isMarkdownFile(name: string) {
+  return /\.md$/i.test(name)
+}
 
 function formatTime(value: string, locale: string) {
   const date = new Date(value)
@@ -371,12 +378,14 @@ function SharePopover({
 
 function FileActions({
   item,
+  onEdit,
   onRename,
   onExtend,
   onDownload,
   onShared,
 }: {
   item: UserFileItem
+  onEdit?: () => void
   onRename: () => void
   onExtend: () => void
   onDownload: () => void
@@ -384,6 +393,11 @@ function FileActions({
 }) {
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      {onEdit ? (
+        <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}>
+          <SquarePen className="h-3.5 w-3.5" />
+        </Button>
+      ) : null}
       <SharePopover item={item} onShared={onShared} />
       <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onRename}>
         <Pencil className="h-3.5 w-3.5" />
@@ -596,6 +610,7 @@ function SharesTab() {
 
 export function HubFilesPage() {
   const { t, i18n } = useTranslation('hub')
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const activeTab = searchParams.get('tab') === 'shares' ? 'shares' : 'files'
 
@@ -615,6 +630,10 @@ export function HubFilesPage() {
   const [renameItem, setRenameItem] = useState<UserFileItem | null>(null)
   const [extendItem, setExtendItem] = useState<UserFileItem | null>(null)
   const download = useFileDownload()
+
+  const openDocument = useCallback((item: UserFileItem) => {
+    navigate(`/doc/edit/${item.id}`)
+  }, [navigate])
 
   const fetchList = useCallback(async () => {
     setLoading(true)
@@ -678,6 +697,18 @@ export function HubFilesPage() {
     setSearchParams(value === 'shares' ? { tab: 'shares' } : {}, { replace: true })
   }, [setSearchParams])
 
+  const handleCreateDocument = useCallback(async () => {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+    const file = new File([`# Untitled\n\n`], `untitled-${stamp}.md`, { type: 'text/markdown' })
+    try {
+      const res = await uploadFiles([file], 7)
+      const created = res.files[0]
+      if (created) navigate(`/doc/edit/${created.id}`)
+    } catch (err) {
+      toast.error(getTranslatedApiError(err, t('createDocFailed')))
+    }
+  }, [navigate, t])
+
   const offset = (page - 1) * PAGE_SIZE
   const usagePercent = quotaBytes > 0 ? Math.min((usedBytes / quotaBytes) * 100, 100) : 0
 
@@ -696,11 +727,17 @@ export function HubFilesPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
-            {quotaBytes > 0 ? (
-              <span className="text-xs text-muted-foreground">
-                {t('usage', { used: formatBytes(usedBytes), quota: formatBytes(quotaBytes) })}
-              </span>
-            ) : null}
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => { void handleCreateDocument() }}>
+                <SquarePen className="mr-1 h-3.5 w-3.5" />
+                {t('createDoc')}
+              </Button>
+              {quotaBytes > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  {t('usage', { used: formatBytes(usedBytes), quota: formatBytes(quotaBytes) })}
+                </span>
+              ) : null}
+            </div>
           </div>
           {quotaBytes > 0 ? (
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -786,7 +823,20 @@ export function HubFilesPage() {
                         />
                         <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{item.file_name}</p>
+                          {isMarkdownFile(item.file_name) ? (
+                            <button
+                              type="button"
+                              className="truncate text-left text-sm font-medium transition hover:text-primary"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                openDocument(item)
+                              }}
+                            >
+                              {item.file_name}
+                            </button>
+                          ) : (
+                            <p className="truncate text-sm font-medium">{item.file_name}</p>
+                          )}
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             {sourceBadge(item.source)}
                             <span>{formatBytes(item.size)}</span>
@@ -798,6 +848,7 @@ export function HubFilesPage() {
                         </div>
                         <FileActions
                           item={item}
+                          onEdit={isMarkdownFile(item.file_name) ? () => openDocument(item) : undefined}
                           onRename={() => setRenameItem(item)}
                           onExtend={() => setExtendItem(item)}
                           onDownload={() => handleDownload(item.id, item.file_name)}

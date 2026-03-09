@@ -65,6 +65,15 @@ class FileService:
             raise FileNotFoundError(file_id)
         return path
 
+    def overwrite_bytes(self, file_id: str, data: bytes) -> int:
+        path = self._file_path(file_id)
+        if not path.exists():
+            raise FileNotFoundError(file_id)
+        tmp = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+        return len(data)
+
     def delete(self, file_id: str) -> None:
         self._validate_file_id(file_id)
         self._file_path(file_id).unlink(missing_ok=True)

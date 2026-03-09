@@ -34,6 +34,11 @@ const TOOL_CATEGORIES = [
     to: '/transfer',
   },
   {
+    titleKey: 'home.docsEditor',
+    descKey: 'home.docsEditorDesc',
+    to: '/dashboard/hub',
+  },
+  {
     titleKey: 'home.faceMap',
     descKey: 'home.faceMapDesc',
     to: '/facemap',

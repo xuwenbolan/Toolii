@@ -16,6 +16,9 @@ from app.models.user import User
 from app.schemas.hub import (
     FileDeleteRequest,
     FileDeleteResponse,
+    FileContentResponse,
+    FileContentUpdateRequest,
+    FileContentUpdateResponse,
     FileExtendRequest,
     FileExtendResponse,
     FileRenameRequest,
@@ -27,6 +30,7 @@ from app.schemas.hub import (
     ShareGroupResponse,
     ShareInfoResponse,
     ShareNeedCodeResponse,
+    UserFileDetailResponse,
     UserFileItem,
     UserFileListResponse,
 )
@@ -45,6 +49,19 @@ def _file_to_item(uf, share_count: int = 0) -> dict:
         "expires_at": uf.expires_at.isoformat() if uf.expires_at else None,
         "created_at": uf.created_at.isoformat(),
         "share_count": share_count,
+    }
+
+
+def _file_to_detail(uf) -> dict:
+    return {
+        "id": uf.id,
+        "file_name": uf.original_filename,
+        "size": uf.size,
+        "content_type": uf.content_type,
+        "source": uf.source,
+        "expires_at": uf.expires_at.isoformat() if uf.expires_at else None,
+        "created_at": uf.created_at.isoformat(),
+        "updated_at": uf.updated_at.isoformat(),
     }
 
 
@@ -112,6 +129,52 @@ async def list_files(
         items.append(_file_to_item(uf, share_count=sc))
 
     return UserFileListResponse(items=items, total=total, used_bytes=used_bytes, quota_bytes=quota_bytes)
+
+
+@router.get("/files/{file_id}", response_model=UserFileDetailResponse)
+@limiter.limit("30/minute")
+async def get_file_detail(
+    request: Request,
+    file_id: int,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserFileDetailResponse:
+    hub = HubService(db)
+    uf = await hub.get_file_detail(file_id, user.id)
+    return UserFileDetailResponse(**_file_to_detail(uf))
+
+
+@router.get("/files/{file_id}/content", response_model=FileContentResponse)
+@limiter.limit("30/minute")
+async def get_file_content(
+    request: Request,
+    file_id: int,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> FileContentResponse:
+    hub = HubService(db)
+    content, updated_at = await hub.get_markdown_content(file_id, user.id)
+    return FileContentResponse(content=content, updated_at=updated_at)
+
+
+@router.put("/files/{file_id}/content", response_model=FileContentUpdateResponse)
+@limiter.limit("30/minute")
+async def save_file_content(
+    request: Request,
+    file_id: int,
+    body: FileContentUpdateRequest,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> FileContentUpdateResponse:
+    hub = HubService(db)
+    uf = await hub.save_markdown_content(
+        file_id,
+        user.id,
+        content=body.content,
+        base_updated_at=body.base_updated_at,
+    )
+    await db.commit()
+    return FileContentUpdateResponse(size=uf.size, updated_at=uf.updated_at.isoformat())
 
 
 @router.get("/files/{file_id}/download")
@@ -369,6 +432,20 @@ async def share_download_file(
     await db.commit()
     path = hub._fs.get_path(uf.file_id)
     return file_response(path, media_type=uf.content_type, filename=uf.original_filename)
+
+
+@router.get("/s/{token}/{file_id}/content", response_model=FileContentResponse)
+@limiter.limit("30/minute")
+async def share_get_file_content(
+    request: Request,
+    token: str,
+    file_id: int,
+    code: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> FileContentResponse:
+    hub = HubService(db)
+    content = await hub.get_share_markdown_content(token, file_id, code)
+    return FileContentResponse(content=content, updated_at=None)
 
 
 @router.get("/s/{token}/download-zip")

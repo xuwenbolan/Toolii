@@ -71,7 +71,7 @@ async def app_instance(
     import app.main as app_main
     import app.core.task_limiter as task_limiter
 
-    monkeypatch.setattr(settings, "file_storage_dir", str(tmp_path / "files"))
+    monkeypatch.setattr(settings, "hub_storage_dir", str(tmp_path / "hub"))
     monkeypatch.setattr(app_main, "SessionLocal", session_factory)
     monkeypatch.setattr(app_main, "prewarm_background_models", lambda *_a, **_k: {})
     monkeypatch.setattr(app_main, "prewarm_face_landmarker", lambda *_a, **_k: None)

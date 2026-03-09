@@ -26,6 +26,7 @@ export function RootLayout() {
     location.pathname === '/pdf-tools' ||
     location.pathname.startsWith('/pdf-tools/') ||
     location.pathname === '/text-tools/word-counter'
+  const isDocWorkspaceRoute = location.pathname.startsWith('/doc/edit/')
 
   const fetchToolConfigs = useToolStore((s) => s.fetchTools)
 
@@ -51,6 +52,17 @@ export function RootLayout() {
         <div className="text-muted-foreground text-sm" role="status" aria-live="polite">
           {t('actions.processingWait')}
         </div>
+      </div>
+    )
+  }
+
+  if (isDocWorkspaceRoute) {
+    return (
+      <div className="flex min-h-svh flex-col">
+        <Suspense fallback={<div className="px-4 py-6 text-sm text-muted-foreground">{t('actions.processingWait')}</div>}>
+          <Outlet />
+        </Suspense>
+        <CookieBanner />
       </div>
     )
   }

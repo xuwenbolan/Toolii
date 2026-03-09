@@ -6,6 +6,8 @@
   "emptyHint": "Upload files or use tools — they will appear here.",
   "loading": "Loading...",
   "loadFailed": "Failed to load files",
+  "createDoc": "New Document",
+  "createDocFailed": "Failed to create document",
   "usage": "{{used}} / {{quota}} used",
   "fileCount": "{{count}} files",
   "sourceUpload": "Upload",
