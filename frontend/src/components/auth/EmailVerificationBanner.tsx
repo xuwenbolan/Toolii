@@ -32,7 +32,7 @@ export function EmailVerificationBanner() {
 
   if (justRegistered) {
     return (
-      <div className="border-b border-info/20 bg-info-light px-4 py-3 text-center">
+      <div className="border-b border-info/20 bg-info-light px-4 py-3 text-center print:hidden">
         <p className="text-sm font-medium text-info">
           {t('emailVerification.registrationSuccess')}
         </p>
@@ -61,7 +61,7 @@ export function EmailVerificationBanner() {
   }
 
   return (
-    <div className="border-b border-warning/20 bg-warning-light px-4 py-2.5 text-center text-sm text-warning">
+    <div className="border-b border-warning/20 bg-warning-light px-4 py-2.5 text-center text-sm text-warning print:hidden">
       <span>{t('emailVerification.verifyPrompt')}</span>
       {sent ? (
         <span className="ml-2 font-medium text-success">

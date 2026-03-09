@@ -54,7 +54,20 @@
 @media (min-width: 1024px) {
   .typora-root .milkdown .ProseMirror {
     padding: 3.5rem 3rem 7rem;
+    box-shadow:
+      -1px 0 0 0 color-mix(in oklch, var(--border), transparent 60%),
+      1px 0 0 0 color-mix(in oklch, var(--border), transparent 60%);
   }
+}
+
+/* ── Scroll offset for sticky header (44px) ──────────────────── */
+.typora-root .milkdown .ProseMirror h1,
+.typora-root .milkdown .ProseMirror h2,
+.typora-root .milkdown .ProseMirror h3,
+.typora-root .milkdown .ProseMirror h4,
+.typora-root .milkdown .ProseMirror h5,
+.typora-root .milkdown .ProseMirror h6 {
+  scroll-margin-top: 60px;
 }
 
 /* ── Focus ring suppression for clean look ──────────────────── */
@@ -122,6 +135,11 @@
   color: var(--muted-foreground);
 }
 
+/* Hide Crepe's default ::before bar (we use border-left instead) */
+.typora-root .milkdown .ProseMirror blockquote::before {
+  display: none;
+}
+
 .typora-root .milkdown .ProseMirror blockquote p {
   color: inherit;
 }
@@ -147,10 +165,14 @@
 }
 
 /* ── Horizontal rule ────────────────────────────────────────── */
+/* Reset Crepe's thick background-based hr to a simple line */
 .typora-root .milkdown .ProseMirror hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 2rem 0;
+  background: none;
+  height: auto;
+  padding: 0;
 }
 
 /* ── Lists ──────────────────────────────────────────────────── */
@@ -168,6 +190,25 @@
 
 .typora-root .milkdown .ProseMirror li > p {
   margin: 0.25rem 0;
+}
+
+/* First paragraph in a list item must not push text down relative to the bullet.
+   Crepe wraps content in: .children > .content-dom > p */
+.typora-root .milkdown .milkdown-list-item-block .children p:first-child {
+  margin-top: 0;
+}
+
+/* Also collapse bottom margin of last paragraph in list item children */
+.typora-root .milkdown .milkdown-list-item-block .children p:last-child {
+  margin-bottom: 0;
+}
+
+/* Match Crepe label-wrapper height to our line-height so bullets
+   stay vertically centered on the first text line (default 32px
+   doesn't match our 1.0625rem * 1.8 ≈ 30.6px). */
+.typora-root .milkdown .milkdown-list-item-block li .label-wrapper,
+.typora-root .milkdown .milkdown-list-item-block li .label-wrapper .label {
+  height: calc(1.0625rem * 1.8);
 }
 
 /* ── Tables ─────────────────────────────────────────────────── */
@@ -225,7 +266,34 @@
 }
 
 /* ── Print styles ───────────────────────────────────────────── */
+@page {
+  size: A4;
+  margin: 20mm 18mm;
+}
+
 @media print {
+  /* Reset page-level backgrounds and layout to avoid gray bleed.
+     The editor uses flex + min-h-svh which causes flex-1 children to
+     fill remaining viewport height, painting background color beyond
+     the actual content.  We collapse all of that to content-height. */
+  html, body {
+    background: white !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Kill flex stretch on editor ancestors so nothing fills leftover space */
+  .typora-root,
+  .typora-root * {
+    flex: none !important;
+    min-height: 0 !important;
+  }
+
+  /* Restore flex-1 for list item text area (broken by the rule above) */
+  .typora-root .milkdown .milkdown-list-item-block .list-item > .children {
+    flex: 1 !important;
+  }
+
   .typora-root {
     background: white !important;
     box-shadow: none !important;
@@ -240,50 +308,189 @@
   .typora-root .milkdown .ProseMirror {
     max-width: none;
     padding: 0;
-    min-height: auto;
-    font-size: 12pt;
+    min-height: 0 !important;
+    height: auto !important;
+    font-size: 11pt;
     line-height: 1.6;
     color: #000;
+    box-shadow: none;
   }
 
-  /* Hide all editor chrome */
+  /* Hide all editor chrome and interactive elements */
   .typora-root .milkdown .milkdown-toolbar,
   .typora-root .milkdown .milkdown-slash-menu,
   .typora-root .milkdown .milkdown-block-handle,
-  .typora-root .milkdown .crepe-placeholder::before {
+  .typora-root .milkdown .milkdown-link-preview,
+  .typora-root .milkdown .milkdown-link-edit,
+  .typora-root .milkdown .milkdown-image-block-edit,
+  .typora-root .milkdown .milkdown-code-block .tools,
+  .typora-root .milkdown .milkdown-code-block .language-picker,
+  .typora-root .milkdown .crepe-placeholder::before,
+  .typora-root .milkdown .ProseMirror-gapcursor {
     display: none !important;
   }
 
+  /* Remove selection state artifacts (outlines, overlays) */
+  .typora-root .milkdown .milkdown-code-block.selected {
+    outline: none !important;
+  }
+
+  .typora-root .milkdown .milkdown-image-block.selected > .image-wrapper::before {
+    display: none !important;
+  }
+
+  /* Suppress caret in print */
+  .typora-root .milkdown .ProseMirror {
+    caret-color: transparent;
+  }
+
+  /* Headings */
   .typora-root .milkdown .ProseMirror h1 {
+    font-size: 18pt;
     border-bottom-color: #ccc;
     page-break-after: avoid;
   }
 
   .typora-root .milkdown .ProseMirror h2 {
+    font-size: 15pt;
     border-bottom-color: #ddd;
     page-break-after: avoid;
   }
 
-  .typora-root .milkdown .ProseMirror h3,
-  .typora-root .milkdown .ProseMirror h4 {
+  .typora-root .milkdown .ProseMirror h3 {
+    font-size: 13pt;
     page-break-after: avoid;
   }
 
-  .typora-root .milkdown .ProseMirror pre,
+  .typora-root .milkdown .ProseMirror h4 {
+    font-size: 11pt;
+    page-break-after: avoid;
+  }
+
+  /* Avoid page breaks inside blocks */
+  .typora-root .milkdown .milkdown-code-block,
   .typora-root .milkdown .ProseMirror table,
-  .typora-root .milkdown .ProseMirror img {
+  .typora-root .milkdown .ProseMirror img,
+  .typora-root .milkdown .ProseMirror blockquote {
     page-break-inside: avoid;
   }
 
-  .typora-root .milkdown .ProseMirror pre {
+  /* Keep headings with their following content */
+  .typora-root .milkdown .ProseMirror h1 + *,
+  .typora-root .milkdown .ProseMirror h2 + *,
+  .typora-root .milkdown .ProseMirror h3 + *,
+  .typora-root .milkdown .ProseMirror h4 + * {
+    page-break-before: avoid;
+  }
+
+  /* Code blocks: Crepe renders .milkdown-code-block + CodeMirror, not <pre> */
+  .typora-root .milkdown .milkdown-code-block {
     background: #f5f5f5 !important;
     border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 8pt 10pt !important;
+    margin: 4pt 0;
+  }
+
+  .typora-root .milkdown .milkdown-code-block .cm-editor {
+    background: transparent !important;
+  }
+
+  .typora-root .milkdown .milkdown-code-block .cm-scroller {
+    overflow: visible !important;
+  }
+
+  .typora-root .milkdown .milkdown-code-block .cm-gutters {
+    display: none !important;
+  }
+
+  .typora-root .milkdown .milkdown-code-block .cm-content {
+    white-space: pre-wrap !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .typora-root .milkdown .milkdown-code-block .cm-line {
+    font-size: 9pt;
+    line-height: 1.5;
     color: #333 !important;
+  }
+
+  /* Force CodeMirror syntax tokens to print-safe dark color */
+  .typora-root .milkdown .milkdown-code-block .cm-line span {
+    color: inherit !important;
   }
 
   .typora-root .milkdown .ProseMirror code {
     color: #333;
     background: #f0f0f0;
+    font-size: 0.9em;
+  }
+
+  /* Links: show URL after link text */
+  .typora-root .milkdown .ProseMirror a {
+    color: #000;
+    text-decoration: underline;
+  }
+
+  .typora-root .milkdown .ProseMirror a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+    word-break: break-all;
+  }
+
+  /* Tables */
+  .typora-root .milkdown .ProseMirror table {
+    font-size: 10pt;
+  }
+
+  .typora-root .milkdown .ProseMirror th {
+    background: #eee !important;
+  }
+
+  .typora-root .milkdown .ProseMirror tbody tr:nth-child(even) {
+    background: #f8f8f8 !important;
+  }
+
+  /* Blockquotes */
+  .typora-root .milkdown .ProseMirror blockquote {
+    border-left-color: #999;
+    color: #444;
+  }
+
+  /* Images: max height to prevent single image spanning multiple pages */
+  .typora-root .milkdown .ProseMirror img {
+    max-height: 400pt;
+    object-fit: contain;
+  }
+
+  /* ImageBlock: hide interactive chrome (operation buttons, resize handle, empty caption) */
+  .typora-root .milkdown .milkdown-image-block .operation,
+  .typora-root .milkdown .milkdown-image-block .image-resize-handle {
+    display: none !important;
+  }
+
+  .typora-root .milkdown .milkdown-image-block .caption-input:placeholder-shown {
+    display: none !important;
+  }
+
+  /* Horizontal rules: override dark-mode theme variable */
+  .typora-root .milkdown .ProseMirror hr {
+    border-top-color: #ccc;
+  }
+
+  /* List bullets/numbers: override Crepe's --crepe-color-outline for dark mode */
+  .typora-root .milkdown .milkdown-list-item-block .label-wrapper {
+    color: #555 !important;
+  }
+
+  .typora-root .milkdown .milkdown-list-item-block .label-wrapper svg {
+    fill: #555 !important;
+  }
+
+  /* List items: avoid splitting bullet from content across pages */
+  .typora-root .milkdown .ProseMirror li {
+    break-inside: avoid;
   }
 }
 

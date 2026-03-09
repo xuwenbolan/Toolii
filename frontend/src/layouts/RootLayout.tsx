@@ -73,7 +73,7 @@ export function RootLayout() {
       <EmailVerificationBanner />
       <main
         className={[
-          'mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8',
+          'mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 print:max-w-none print:px-0 print:py-0',
           isToolWorkspaceRoute ? 'pb-28 lg:pb-32' : null,
         ].filter(Boolean).join(' ')}
       >

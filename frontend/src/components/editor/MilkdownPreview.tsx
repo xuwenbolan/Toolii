@@ -1,8 +1,15 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
-import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/react'
+import { replaceAll } from '@milkdown/utils'
 
-import '@milkdown/crepe/theme/common/style.css'
+import '@milkdown/crepe/theme/common/prosemirror.css'
+import '@milkdown/crepe/theme/common/reset.css'
+import '@milkdown/crepe/theme/common/code-mirror.css'
+import '@milkdown/crepe/theme/common/image-block.css'
+import '@milkdown/crepe/theme/common/link-tooltip.css'
+import '@milkdown/crepe/theme/common/list-item.css'
+import '@milkdown/crepe/theme/common/table.css'
 import '@milkdown/crepe/theme/frame.css'
 import './typora-editor.css'
 
@@ -13,7 +20,14 @@ type Props = {
 
 function MilkdownPreviewInner({ content }: Props) {
   const contentRef = useRef(content)
-  contentRef.current = content
+  const [loading, getInstance] = useInstance()
+
+  useEffect(() => {
+    contentRef.current = content
+    if (loading) return
+    const editor = getInstance()
+    editor?.action(replaceAll(content))
+  }, [content, loading, getInstance])
 
   useEditor(
     (root) => {
@@ -21,7 +35,6 @@ function MilkdownPreviewInner({ content }: Props) {
         root,
         defaultValue: contentRef.current,
         features: {
-          [CrepeFeature.ImageBlock]: false,
           [CrepeFeature.Latex]: false,
           [CrepeFeature.Placeholder]: false,
           [CrepeFeature.BlockEdit]: false,
@@ -34,7 +47,7 @@ function MilkdownPreviewInner({ content }: Props) {
 
       return crepe
     },
-    [content],
+    [],
   )
 
   return (

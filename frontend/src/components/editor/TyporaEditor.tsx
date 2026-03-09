@@ -1,73 +1,122 @@
-import { useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 import { Crepe, CrepeFeature } from '@milkdown/crepe'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { callCommand } from '@milkdown/utils'
+import { undoCommand, redoCommand } from '@milkdown/plugin-history'
 
-import '@milkdown/crepe/theme/common/style.css'
+// Import Crepe component CSS individually (skip latex.css to avoid KaTeX
+// inline fonts that violate CSP font-src 'self').
+import '@milkdown/crepe/theme/common/prosemirror.css'
+import '@milkdown/crepe/theme/common/reset.css'
+import '@milkdown/crepe/theme/common/block-edit.css'
+import '@milkdown/crepe/theme/common/code-mirror.css'
+import '@milkdown/crepe/theme/common/cursor.css'
+import '@milkdown/crepe/theme/common/image-block.css'
+import '@milkdown/crepe/theme/common/link-tooltip.css'
+import '@milkdown/crepe/theme/common/list-item.css'
+import '@milkdown/crepe/theme/common/placeholder.css'
+import '@milkdown/crepe/theme/common/toolbar.css'
+import '@milkdown/crepe/theme/common/table.css'
 import '@milkdown/crepe/theme/frame.css'
 import './typora-editor.css'
+
+export type TyporaEditorHandle = {
+  undo: () => void
+  redo: () => void
+}
 
 type Props = {
   initialContent: string
   placeholder?: string
   onChange: (markdown: string) => void
   onNormalized?: (markdown: string) => void
+  onImageUpload?: (file: File) => Promise<string>
 }
 
-function TyporaEditorInner({ initialContent, placeholder, onChange, onNormalized }: Props) {
-  const onChangeRef = useRef(onChange)
-  onChangeRef.current = onChange
-  const onNormalizedRef = useRef(onNormalized)
-  onNormalizedRef.current = onNormalized
-  const initializedRef = useRef(false)
+const TyporaEditorInner = forwardRef<TyporaEditorHandle, Props>(
+  function TyporaEditorInner({ initialContent, placeholder, onChange, onNormalized, onImageUpload }, ref) {
+    const onChangeRef = useRef(onChange)
+    useEffect(() => { onChangeRef.current = onChange }, [onChange])
+    const onNormalizedRef = useRef(onNormalized)
+    useEffect(() => { onNormalizedRef.current = onNormalized }, [onNormalized])
+    const onImageUploadRef = useRef(onImageUpload)
+    useEffect(() => { onImageUploadRef.current = onImageUpload }, [onImageUpload])
+    const initializedRef = useRef(false)
+    const crepeRef = useRef<Crepe | null>(null)
 
-  useEditor(
-    (root) => {
-      initializedRef.current = false
+    // The component is keyed by fileId:editorRevision, so remounting handles
+    // reinitialization. Empty deps prevents editor recreation on parent re-renders.
+    const initialContentRef = useRef(initialContent)
 
-      const crepe = new Crepe({
-        root,
-        defaultValue: initialContent,
-        features: {
-          [CrepeFeature.ImageBlock]: false,
-          [CrepeFeature.Latex]: false,
-        },
-        featureConfigs: {
-          [CrepeFeature.Placeholder]: {
-            text: placeholder ?? '',
-            mode: 'doc',
+    useEditor(
+      (root) => {
+        initializedRef.current = false
+
+        const crepe = new Crepe({
+          root,
+          defaultValue: initialContentRef.current,
+          features: {
+            [CrepeFeature.Latex]: false,
           },
-        },
-      })
-
-      crepe.on((listener) => {
-        listener.markdownUpdated((_ctx, markdown) => {
-          if (!initializedRef.current) {
-            // First callback is the round-trip normalization from editor init.
-            // Sync both content and lastSavedContent to avoid false dirty state.
-            initializedRef.current = true
-            onNormalizedRef.current?.(markdown)
-            return
-          }
-          onChangeRef.current(markdown)
+          featureConfigs: {
+            [CrepeFeature.Placeholder]: {
+              text: placeholder ?? '',
+              mode: 'doc',
+            },
+            [CrepeFeature.ImageBlock]: {
+              onUpload: async (file: File) => onImageUploadRef.current?.(file) ?? '',
+            },
+          },
         })
-      })
 
-      return crepe
-    },
-    [initialContent],
-  )
+        crepe.on((listener) => {
+          listener.mounted(() => {
+            crepeRef.current = crepe
+            // Focus editor as soon as ProseMirror view is ready.
+            // mounted fires after EditorViewReady, so DOM is guaranteed.
+            const pm = root.querySelector('.ProseMirror') as HTMLElement | null
+            pm?.focus()
+          })
+          listener.markdownUpdated((_ctx, markdown) => {
+            if (!initializedRef.current) {
+              // First callback is the round-trip normalization from editor init.
+              // Sync both content and lastSavedContent to avoid false dirty state.
+              initializedRef.current = true
+              onNormalizedRef.current?.(markdown)
+              return
+            }
+            onChangeRef.current(markdown)
+          })
+        })
 
-  return (
-    <div className="typora-root min-h-0 flex-1">
-      <Milkdown />
-    </div>
-  )
-}
+        return crepe
+      },
+      [],
+    )
 
-export function TyporaEditor(props: Omit<Props, 'onNormalized'> & { onNormalized?: (markdown: string) => void }) {
-  return (
-    <MilkdownProvider>
-      <TyporaEditorInner {...props} />
-    </MilkdownProvider>
-  )
-}
+    useImperativeHandle(ref, () => ({
+      undo: () => {
+        try { crepeRef.current?.editor.action(callCommand(undoCommand.key)) } catch { /* not ready */ }
+      },
+      redo: () => {
+        try { crepeRef.current?.editor.action(callCommand(redoCommand.key)) } catch { /* not ready */ }
+      },
+    }))
+
+    return (
+      <div className="typora-root min-h-0 flex-1">
+        <Milkdown />
+      </div>
+    )
+  },
+)
+
+export const TyporaEditor = forwardRef<TyporaEditorHandle, Props>(
+  function TyporaEditor(props, ref) {
+    return (
+      <MilkdownProvider>
+        <TyporaEditorInner ref={ref} {...props} />
+      </MilkdownProvider>
+    )
+  },
+)

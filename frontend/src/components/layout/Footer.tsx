@@ -5,7 +5,7 @@ export function Footer() {
   const { t } = useTranslation('common')
 
   return (
-    <footer className="border-t">
+    <footer className="border-t print:hidden">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-center gap-3 px-4 py-6 text-center text-xs text-muted-foreground sm:justify-between sm:px-6 sm:text-left lg:px-8">
         <p>&copy; {new Date().getFullYear()} Toolii</p>
         <div className="flex items-center gap-3">

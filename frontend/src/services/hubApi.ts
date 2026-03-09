@@ -181,6 +181,18 @@ export function buildFileDownloadUrl(fileId: number): string {
   return `/api/hub/files/${fileId}/download`
 }
 
+// ── Editor images ────────────────────────────────────────
+
+export async function uploadEditorImage(
+  docId: number,
+  file: File,
+): Promise<{ file_id: string; url: string }> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post<{ file_id: string; url: string }>(`/api/hub/files/${docId}/images`, form)
+  return res.data
+}
+
 // ── Share groups ─────────────────────────────────────────
 
 export async function createShare(opts: {

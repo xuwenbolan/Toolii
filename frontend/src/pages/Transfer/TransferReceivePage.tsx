@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, Download, Eye, FileIcon, Lock, PackageOpen } from 'lucide-react'
+import { AlertCircle, Download, Eye, FileIcon, Lock, PackageOpen, Printer } from 'lucide-react'
 
 const MilkdownPreview = lazy(() =>
   import('@/components/editor/MilkdownPreview').then((module) => ({ default: module.MilkdownPreview })),
@@ -208,9 +208,9 @@ export function TransferReceivePage() {
     <>
       <SEOHead title={t('receive.title')} noindex />
 
-      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8">
-        <Card className="border-border/70 shadow-sm">
-          <CardHeader className="pb-3">
+      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8 print:max-w-none print:px-0 print:py-0">
+        <Card className="border-border/70 shadow-sm print:border-0 print:shadow-none">
+          <CardHeader className="pb-3 print:hidden">
             <CardTitle className="flex items-center gap-2 text-lg">
               <PackageOpen className="h-5 w-5" />
               {t('receive.title')}
@@ -223,25 +223,25 @@ export function TransferReceivePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
-              <p className="text-sm text-muted-foreground">{t('receive.loading')}</p>
+              <p className="text-sm text-muted-foreground print:hidden">{t('receive.loading')}</p>
             ) : null}
 
             {visibleError ? (
-              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 print:hidden">
                 <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
                 <p className="text-sm">{visibleError}</p>
               </div>
             ) : null}
 
             {statusMessage && info ? (
-              <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 print:hidden">
                 <AlertCircle className="h-4 w-4 shrink-0 text-warning" />
                 <p className="text-sm">{statusMessage}</p>
               </div>
             ) : null}
 
             {downloadError ? (
-              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 print:hidden">
                 <AlertCircle className="h-4 w-4 shrink-0 text-destructive" />
                 <p className="text-sm">{downloadError}</p>
               </div>
@@ -249,7 +249,7 @@ export function TransferReceivePage() {
 
             {/* Extract code gate */}
             {needCode && !codeVerified && !visibleError ? (
-              <div className="space-y-3">
+              <div className="space-y-3 print:hidden">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Lock className="h-4 w-4" />
                   <span>{t('receive.enterCode')}</span>
@@ -292,13 +292,13 @@ export function TransferReceivePage() {
             {isAvailable && codeVerified && info ? (
               <div className="space-y-4">
                 {info.message ? (
-                  <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+                  <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 print:hidden">
                     <p className="text-xs font-medium text-muted-foreground">{t('receive.message')}</p>
                     <p className="mt-1 text-sm">{info.message}</p>
                   </div>
                 ) : null}
 
-                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground print:hidden">
                   <span>{t('receive.fileCount', { count: info.file_count })}</span>
                   <span>{t('receive.totalSize', { size: formatBytes(info.total_size) })}</span>
                   <span>{t('receive.downloads', { count: info.download_count })}</span>
@@ -307,7 +307,7 @@ export function TransferReceivePage() {
                   )}
                 </div>
 
-                <div className="space-y-1.5 rounded-lg border border-border/70 p-2">
+                <div className="space-y-1.5 rounded-lg border border-border/70 p-2 print:hidden">
                   {info.files.map((file) => (
                     <div
                       key={file.id}
@@ -346,7 +346,7 @@ export function TransferReceivePage() {
                 {info.files.length > 1 ? (
                   <Button
                     type="button"
-                    className="w-full"
+                    className="w-full print:hidden"
                     disabled={downloading}
                     onClick={handleDownloadZip}
                   >
@@ -356,12 +356,21 @@ export function TransferReceivePage() {
                 ) : null}
 
                 {singleMarkdownFile && previewContent ? (
-                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                    <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4 print:rounded-none print:border-0 print:bg-transparent print:p-0">
+                    <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
                       <div>
                         <p className="text-sm font-medium">{t('receive.previewTitle')}</p>
                         <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
                       </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => window.print()}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
                     </div>
                     <Suspense fallback={<p className="text-sm text-muted-foreground">{t('receive.loading')}</p>}>
                       <MilkdownPreview content={previewContent} />

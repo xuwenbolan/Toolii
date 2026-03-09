@@ -12,7 +12,7 @@ export function Header() {
   const { t } = useTranslation('common')
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b bg-background/85 backdrop-blur print:hidden">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6 lg:px-8">
         <MobileNav />
         <Link to="/">
