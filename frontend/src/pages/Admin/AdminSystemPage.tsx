@@ -66,11 +66,8 @@ function formatRelativeTime(timestamp: number): string {
 
 function formatEventTime(timestamp: number): string {
   const d = new Date(timestamp * 1000)
-  const now = new Date()
   const pad = (n: number) => String(n).padStart(2, '0')
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-  if (d.toDateString() === now.toDateString()) return time
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 // -- VRAM Timeline mini chart (pure SVG, no library) --
@@ -88,10 +85,10 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
   }
 
   const W = 600
-  const H = 140
-  const PX = 40 // left padding for labels
-  const PR = 8  // right padding
-  const PY = 8  // top/bottom padding
+  const H = 200
+  const PX = 44 // left padding for Y-axis labels
+  const PR = 12 // right padding
+  const PY = 14 // top/bottom padding
 
   const chartW = W - PX - PR
   const chartH = H - PY * 2
@@ -150,7 +147,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setHoverIdx(null)}
       >
@@ -159,12 +156,12 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           <g key={mb}>
             <line
               x1={PX} y1={toY(mb)} x2={W - PR} y2={toY(mb)}
-              stroke="currentColor" strokeOpacity={0.1} strokeDasharray="2,2"
+              stroke="var(--border)" strokeOpacity={0.5} strokeDasharray="3 3"
             />
             <text
-              x={PX - 4} y={toY(mb) + 3}
-              textAnchor="end" fill="currentColor" fillOpacity={0.4}
-              fontSize={9} fontFamily="monospace"
+              x={PX - 6} y={toY(mb) + 4}
+              textAnchor="end" fill="currentColor" fillOpacity={0.5}
+              fontSize={11} fontFamily="var(--font-mono)"
             >
               {fmtMb(mb)}
             </text>
@@ -174,13 +171,13 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
         {/* VRAM area fill */}
         <polygon
           points={`${toX(tMin)},${toY(yMin)} ${vramPoints} ${toX(tMax)},${toY(yMin)}`}
-          fill="currentColor" fillOpacity={0.08}
+          fill="var(--chart-palette-1)" fillOpacity={0.12}
         />
 
         {/* VRAM line */}
         <polyline
           points={vramPoints}
-          fill="none" stroke="currentColor" strokeOpacity={0.5} strokeWidth={1.5}
+          fill="none" stroke="var(--chart-palette-1)" strokeWidth={1.5}
         />
 
         {/* Event markers */}
@@ -188,7 +185,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
           <circle
             key={i}
             cx={toX(s.t)} cy={toY(s.vram_used_mb)}
-            r={2.5} fill="hsl(var(--warning))"
+            r={3} fill="var(--chart-palette-3)"
           >
             <title>{s.event}</title>
           </circle>
@@ -203,7 +200,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
             />
             <circle
               cx={toX(hovered.t)} cy={toY(hovered.vram_used_mb)}
-              r={3} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={1.5}
+              r={3.5} fill="var(--chart-palette-1)" stroke="var(--background)" strokeWidth={1.5}
             />
           </>
         )}
@@ -212,7 +209,7 @@ function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]
       {/* Tooltip overlay */}
       {hovered && (
         <div
-          className="pointer-events-none absolute top-1 rounded border border-border bg-popover/95 px-2 py-1 text-xs shadow-md backdrop-blur-sm"
+          className="pointer-events-none absolute top-1 rounded-lg border bg-popover px-3 py-2 text-xs shadow-lg"
           style={{
             left: `${(toX(hovered.t) / W) * 100}%`,
             transform: toX(hovered.t) > W * 0.7 ? 'translateX(-100%)' : 'translateX(0)',
