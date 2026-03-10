@@ -375,7 +375,7 @@ export function TransferReceivePage() {
 
       {singleMarkdownFile && previewContent ? (
         <div className="pb-8 print:pb-0">
-          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 print:hidden">
+          <div className="mx-auto flex max-w-[52rem] items-center justify-between gap-3 px-4 py-3 sm:px-10 lg:px-12 print:hidden">
             <div>
               <p className="text-sm font-medium">{t('receive.previewTitle')}</p>
               <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
@@ -391,7 +391,7 @@ export function TransferReceivePage() {
               <Printer className="h-4 w-4" />
             </Button>
           </div>
-          <Suspense fallback={<p className="mx-auto max-w-2xl px-4 text-sm text-muted-foreground">{t('receive.loading')}</p>}>
+          <Suspense fallback={<p className="mx-auto max-w-[52rem] px-4 text-sm text-muted-foreground sm:px-10 lg:px-12">{t('receive.loading')}</p>}>
             <MilkdownPreview content={previewContent} />
           </Suspense>
         </div>
@@ -404,18 +404,18 @@ export function TransferReceivePage() {
           setPreviewError(null)
         }
       }}>
-        <DialogContent className="max-h-[85vh] max-w-4xl overflow-hidden">
+        <DialogContent className="flex h-[100dvh] max-w-4xl flex-col overflow-hidden p-4 sm:h-auto sm:max-h-[85vh] sm:p-6">
           <DialogHeader>
             <DialogTitle className="truncate pr-8">{previewName || t('receive.previewTitle')}</DialogTitle>
           </DialogHeader>
-          <div className="overflow-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             {previewingId ? (
               <p className="text-sm text-muted-foreground">{t('receive.loading')}</p>
             ) : previewError ? (
               <p className="text-sm text-destructive">{previewError}</p>
             ) : previewContent ? (
               <Suspense fallback={<p className="text-sm text-muted-foreground">{t('receive.loading')}</p>}>
-                <MilkdownPreview content={previewContent} />
+                <MilkdownPreview content={previewContent} className="dialog-preview" />
               </Suspense>
             ) : null}
           </div>

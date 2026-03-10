@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check, ClipboardCopy, Copy, FileIcon, Link2, Lock, Trash2 } from 'lucide-react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
@@ -16,7 +17,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { quickShare, type QuickShareResponse } from '@/services/hubApi'
+import { getTranslatedApiError } from '@/lib/apiErrors'
+import { listFiles, quickShare, type QuickShareResponse } from '@/services/hubApi'
 
 const RETENTION_OPTIONS = [1, 3, 7] as const
 
@@ -72,6 +74,31 @@ export function TransferCreatePage() {
 
   const handleCreate = async () => {
     if (!formValid) return
+
+    // Pre-upload quota validation
+    const maxFileMb = 100
+    const maxFileBytes = maxFileMb * 1024 * 1024
+    for (const f of files) {
+      if (f.size > maxFileBytes) {
+        toast.error(t('hub:uploadFileTooLarge', { name: f.name, max: maxFileMb }))
+        return
+      }
+    }
+    try {
+      const usage = await listFiles({ page: 1, pageSize: 1 })
+      const totalNew = files.reduce((sum, f) => sum + f.size, 0)
+      if (usage.quota_bytes > 0 && usage.used_bytes + totalNew > usage.quota_bytes) {
+        toast.error(t('hub:uploadQuotaExceeded'))
+        return
+      }
+      if (usage.max_files > 0 && usage.file_count + files.length > usage.max_files) {
+        toast.error(t('hub:uploadFileCountExceeded', { max: usage.max_files }))
+        return
+      }
+    } catch {
+      // If quota check fails, let the upload proceed — server will enforce
+    }
+
     setResult(null)
     setResultPanelOpen(false)
 

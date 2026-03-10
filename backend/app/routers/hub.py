@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 import zipfile
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -235,6 +236,29 @@ async def download_own_file(
     return file_response(path, media_type=uf.content_type, filename=uf.original_filename)
 
 
+@router.get("/files/{file_id}/thumb")
+@limiter.limit("200/minute")
+async def get_file_thumbnail(
+    request: Request,
+    file_id: int,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    hub = HubService(db)
+    uf = await hub.get_file(file_id, user.id)
+    if not uf.thumb_file_id:
+        raise HTTPException(status_code=404, detail="No thumbnail")
+    path = hub.get_file_path(uf.thumb_file_id)
+    return file_response(
+        path,
+        media_type="image/webp",
+        headers={
+            "Cache-Control": "public, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.patch("/files/{file_id}", response_model=FileRenameResponse)
 @limiter.limit("10/minute")
 async def rename_file(
@@ -300,7 +324,7 @@ async def serve_editor_image(
         path,
         media_type=content_type,
         headers={
-            "Cache-Control": "public, max-age=86400",
+            "Cache-Control": "public, max-age=31536000, immutable",
             "X-Content-Type-Options": "nosniff",
         },
     )
@@ -519,6 +543,18 @@ async def share_get_file_content(
     return FileContentResponse(content=content, updated_at=None)
 
 
+def _dedup_name(name: str, seen: dict[str, int]) -> str:
+    """Generate a unique archive name by appending _N on collision."""
+    if name in seen:
+        seen[name] += 1
+        stem, dot, ext = name.rpartition(".")
+        if dot:
+            return f"{stem}_{seen[name]}.{ext}"
+        return f"{name}_{seen[name]}"
+    seen[name] = 0
+    return name
+
+
 @router.get("/s/{token}/download-zip")
 @limiter.limit("10/minute")
 async def share_download_zip(
@@ -531,26 +567,118 @@ async def share_download_zip(
     files = await hub.get_share_files_for_zip(token, code)
     await db.commit()
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        seen: dict[str, int] = {}
-        for uf in files:
-            name = uf.original_filename
-            if name in seen:
-                seen[name] += 1
-                stem, dot, ext = name.rpartition(".")
-                if dot:
-                    name = f"{stem}_{seen[name]}.{ext}"
-                else:
-                    name = f"{name}_{seen[name]}"
-            else:
-                seen[name] = 0
-            path = hub.get_file_path(uf.file_id)
-            zf.write(path, name)
-    buf.seek(0)
+    # Collect (archive_name, disk_path) pairs while DB session is still alive
+    seen: dict[str, int] = {}
+    entries = []
+    for uf in files:
+        name = _dedup_name(uf.original_filename, seen)
+        entries.append((name, hub.get_file_path(uf.file_id)))
+
+    async def _stream_zip():
+        """Stream ZIP flushing after each file to bound memory usage."""
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            flushed = 0
+            for name, path in entries:
+                zf.write(path, name)
+                # Yield bytes written since last flush
+                pos = buf.seek(0, 2)
+                if pos > flushed:
+                    buf.seek(flushed)
+                    yield buf.read(pos - flushed)
+                    flushed = pos
+        # Yield remaining bytes (central directory + EOCD)
+        pos = buf.seek(0, 2)
+        if pos > flushed:
+            buf.seek(flushed)
+            yield buf.read(pos - flushed)
 
     return StreamingResponse(
-        buf,
+        _stream_zip(),
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="files.zip"'},
     )
+
+
+# ── OG meta tags for social media crawlers ─────────────────────────────
+
+hub_og_router = APIRouter(tags=["hub-og"])
+
+
+def _og_escape(s: str) -> str:
+    return s.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _build_hub_share_html(
+    *,
+    title: str,
+    description: str,
+    spa_url: str,
+) -> str:
+    t = _og_escape(title)
+    d = _og_escape(description[:200])
+    og_image = f"{settings.frontend_base_url}/og-image.png"
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{t}</title>
+<meta name="description" content="{d}"/>
+<meta property="og:type" content="article"/>
+<meta property="og:title" content="{t}"/>
+<meta property="og:description" content="{d}"/>
+<meta property="og:image" content="{_og_escape(og_image)}"/>
+<meta property="og:url" content="{_og_escape(spa_url)}"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="{t}"/>
+<meta name="twitter:description" content="{d}"/>
+<meta name="twitter:image" content="{_og_escape(og_image)}"/>
+<meta http-equiv="refresh" content="0;url={_og_escape(spa_url)}"/>
+<script>location.replace({json.dumps(spa_url)})</script>
+</head>
+<body></body>
+</html>"""
+
+
+@hub_og_router.get("/t/{token}", response_class=HTMLResponse)
+@limiter.limit("30/minute")
+async def hub_share_og_page(
+    token: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Serve HTML with OG tags for social media previews, then redirect to SPA."""
+    spa_url = f"{settings.frontend_base_url}/t/{token}"
+    hub = HubService(db)
+    meta = await hub.get_share_og_meta(token)
+
+    if not meta:
+        return HTMLResponse(
+            f'<html><head><meta http-equiv="refresh" content="0;url={_og_escape(spa_url)}"/>'
+            f"<script>location.replace({json.dumps(spa_url)})</script>"
+            f"</head><body></body></html>"
+        )
+
+    file_count = meta["file_count"]
+    file_names: list[str] = meta["file_names"]
+    message: str | None = meta["message"]
+
+    if message:
+        title = message[:60]
+    elif file_count == 1:
+        title = file_names[0]
+    else:
+        title = f"{file_count} files shared"
+
+    title = f"{title} | Toolii"
+
+    if message:
+        desc = f"{file_count} files: {', '.join(file_names[:5])}"
+    else:
+        desc = ", ".join(file_names[:5])
+        if file_count > 5:
+            desc += f" ... ({file_count} files)"
+
+    html = _build_hub_share_html(title=title, description=desc, spa_url=spa_url)
+    return HTMLResponse(html, headers={"Cache-Control": "public, max-age=300"})

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { api } from '@/services/api'
-import { buildFileDownloadUrl } from '@/services/hubApi'
 
 /**
- * Fetches a file blob via authenticated API and returns an object URL
- * for use as an <img> src. Only activates for image content types.
+ * Fetches a lightweight WebP thumbnail via the /thumb endpoint.
+ * Falls back silently on 404 (no thumbnail available).
  * Cleans up the object URL on unmount.
  */
 export function useFileThumbnail(
@@ -25,7 +24,7 @@ export function useFileThumbnail(
     setLoading(true)
 
     api
-      .get(buildFileDownloadUrl(fileId), { responseType: 'blob' })
+      .get(`/api/hub/files/${fileId}/thumb`, { responseType: 'blob' })
       .then((res) => {
         if (cancelled) return
         const objectUrl = URL.createObjectURL(res.data)

@@ -135,6 +135,28 @@ export function HubFilesPage() {
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (files.length === 0 || uploading) return
+
+    // Pre-upload quota validation using cached usage data
+    const maxFileMb = 100
+    const maxFileBytes = maxFileMb * 1024 * 1024
+    for (const f of files) {
+      if (f.size > maxFileBytes) {
+        toast.error(t('uploadFileTooLarge', { name: f.name, max: maxFileMb }))
+        return
+      }
+    }
+    if (quotaBytes > 0) {
+      const totalNew = files.reduce((sum, f) => sum + f.size, 0)
+      if (usedBytes + totalNew > quotaBytes) {
+        toast.error(t('uploadQuotaExceeded'))
+        return
+      }
+    }
+    if (maxFiles > 0 && fileCount + files.length > maxFiles) {
+      toast.error(t('uploadFileCountExceeded', { max: maxFiles }))
+      return
+    }
+
     setUploading(true)
     setUploadProgress(0)
     try {
@@ -150,7 +172,7 @@ export function HubFilesPage() {
     } finally {
       setUploading(false)
     }
-  }, [uploading, fetchList, t])
+  }, [uploading, fetchList, t, quotaBytes, usedBytes, maxFiles, fileCount])
 
   const { getRootProps, getInputProps, isDragActive, open: openFilePicker } = useDropzone({
     onDrop: handleUpload,

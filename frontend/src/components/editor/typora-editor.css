@@ -71,6 +71,17 @@
   padding-bottom: 2rem;
 }
 
+/* ── Dialog preview: reduce padding since dialog already has its own ── */
+.dialog-preview .typora-root .milkdown .ProseMirror {
+  padding: 0.5rem 0;
+}
+
+@media (min-width: 640px) {
+  .dialog-preview .typora-root .milkdown .ProseMirror {
+    padding: 0.75rem 0.5rem;
+  }
+}
+
 /* ── Scroll offset for sticky header (44px) ──────────────────── */
 .typora-root .milkdown .ProseMirror h1,
 .typora-root .milkdown .ProseMirror h2,

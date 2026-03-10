@@ -63,5 +63,8 @@
   "quotaFilesUnit": "files",
   "quotaRetention": "Retention",
   "unlimited": "Unlimited",
-  "used": "used"
+  "used": "used",
+  "uploadFileTooLarge": "File {{name}} exceeds the {{max}} MB size limit",
+  "uploadQuotaExceeded": "Storage quota exceeded, please delete some files first",
+  "uploadFileCountExceeded": "File count limit exceeded (max {{max}} files)"
 }

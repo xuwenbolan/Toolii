@@ -209,6 +209,11 @@ class HubService:
             days = min(max(retention_days, 1), max_days)
             expires = utcnow() + timedelta(days=days)
 
+        # Generate thumbnail for image files
+        thumb = await asyncio.to_thread(
+            self._fs.generate_thumbnail, data, content_type
+        )
+
         uf = UserFile(
             user_id=user_id,
             file_id=stored.file_id,
@@ -217,6 +222,7 @@ class HubService:
             content_type=content_type,
             source=FileSource.UPLOAD,
             expires_at=expires,
+            thumb_file_id=thumb.file_id if thumb else None,
         )
         self._db.add(uf)
         await self._db.flush()
@@ -238,6 +244,19 @@ class HubService:
         else:
             ttl = timedelta(hours=1)
 
+        # Generate thumbnail for image tool results
+        thumb_file_id = None
+        try:
+            path = self._fs.get_path(file_id)
+            data = await asyncio.to_thread(path.read_bytes)
+            thumb = await asyncio.to_thread(
+                self._fs.generate_thumbnail, data, content_type
+            )
+            if thumb:
+                thumb_file_id = thumb.file_id
+        except Exception:
+            pass
+
         uf = UserFile(
             user_id=user_id,
             file_id=file_id,
@@ -247,6 +266,7 @@ class HubService:
             source=FileSource.TOOL_RESULT,
             expires_at=utcnow() + ttl,
             meta=json.dumps(meta) if meta else None,
+            thumb_file_id=thumb_file_id,
         )
         self._db.add(uf)
         await self._db.flush()
@@ -585,6 +605,11 @@ class HubService:
                 self._fs.delete(uf.file_id)
             except Exception:
                 logger.warning("Failed to delete physical file %s", uf.file_id, exc_info=True)
+            if uf.thumb_file_id:
+                try:
+                    self._fs.delete(uf.thumb_file_id)
+                except Exception:
+                    logger.warning("Failed to delete thumbnail %s", uf.thumb_file_id, exc_info=True)
             await self._cascade_delete_editor_images(uf.id)
 
         if files:
@@ -807,6 +832,29 @@ class HubService:
             ],
         }
 
+    async def get_share_og_meta(self, token: str) -> dict | None:
+        """Return minimal share info for OG tags (no auth/code check)."""
+        result = await self._db.execute(
+            select(ShareGroup).where(ShareGroup.token == token)
+        )
+        sg = result.scalar_one_or_none()
+        if not sg:
+            return None
+
+        files_result = await self._db.execute(
+            select(UserFile.original_filename)
+            .join(ShareGroupFile, ShareGroupFile.user_file_id == UserFile.id)
+            .where(ShareGroupFile.share_group_id == sg.id)
+        )
+        file_names = [row[0] for row in files_result.all()]
+
+        return {
+            "message": sg.message,
+            "file_count": len(file_names),
+            "file_names": file_names,
+            "has_extract_code": sg.extract_code is not None,
+        }
+
     async def get_share_markdown_content(
         self,
         token: str,
@@ -961,6 +1009,11 @@ class HubService:
                 self._fs.delete(uf.file_id)
             except Exception:
                 logger.warning("Failed to delete expired file %s", uf.file_id, exc_info=True)
+            if uf.thumb_file_id:
+                try:
+                    self._fs.delete(uf.thumb_file_id)
+                except Exception:
+                    logger.warning("Failed to delete expired thumbnail %s", uf.thumb_file_id, exc_info=True)
             expired_ids.append(uf.id)
 
         # Remove from share groups

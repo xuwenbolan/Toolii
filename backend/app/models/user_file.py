@@ -59,6 +59,11 @@ class UserFile(TimestampMixin, Base):
         Integer, nullable=True, index=True
     )
 
+    # Thumbnail storage UUID (32-char hex) for image files
+    thumb_file_id: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+
 
 class ShareGroupStatus:
     ACTIVE = "active"

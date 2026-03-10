@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import logging
 import os
 import re
 import time
@@ -12,7 +14,14 @@ from app.core.config import settings
 from app.core.security import sign_download
 from app.utils.file_utils import ensure_dir
 
+logger = logging.getLogger(__name__)
+
 _FILE_ID_RE = re.compile(r"^[a-f0-9]{32}$")
+
+# Thumbnail config
+THUMB_MAX_SIZE = (400, 300)
+THUMB_QUALITY = 80
+_THUMBABLE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 
 @dataclass(frozen=True)
@@ -77,6 +86,24 @@ class FileService:
     def delete(self, file_id: str) -> None:
         self._validate_file_id(file_id)
         self._file_path(file_id).unlink(missing_ok=True)
+
+    def generate_thumbnail(self, data: bytes, content_type: str) -> StoredFile | None:
+        """Generate a WebP thumbnail for an image. Returns None on failure or non-image."""
+        if content_type not in _THUMBABLE_TYPES:
+            return None
+        try:
+            from PIL import Image
+
+            img = Image.open(io.BytesIO(data))
+            img.thumbnail(THUMB_MAX_SIZE, Image.LANCZOS)
+            if img.mode not in ("RGB", "RGBA"):
+                img = img.convert("RGBA" if content_type == "image/png" else "RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="WEBP", quality=THUMB_QUALITY)
+            return self.save_bytes(buf.getvalue())
+        except Exception:
+            logger.debug("Thumbnail generation failed", exc_info=True)
+            return None
 
 
 def build_download_url(*, file_id: str, filename: str, ttl_seconds: int = 86400) -> str:
