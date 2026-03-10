@@ -142,6 +142,7 @@ export function AdminFilesPage() {
                 className="h-7 w-7"
                 onClick={() => handlePreview(i)}
                 title={t('files.preview')}
+                aria-label={t('files.preview')}
               >
                 <Eye className="h-3.5 w-3.5" />
               </Button>
@@ -153,6 +154,7 @@ export function AdminFilesPage() {
               disabled={downloading === i.file_id}
               onClick={() => handleDownload(i)}
               title={t('files.download')}
+              aria-label={t('files.download')}
             >
               <Download className="h-3.5 w-3.5" />
             </Button>
@@ -185,7 +187,7 @@ export function AdminFilesPage() {
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
-          <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleSearch}>
+          <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleSearch} aria-label={t('files.searchPlaceholder')}>
             <Search className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -215,11 +217,11 @@ export function AdminFilesPage() {
               <span className="text-[11px] text-muted-foreground">{formatTimestamp(i.created_at)}</span>
               <div className="flex gap-1">
                 {i.previewable && (
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreview(i)}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handlePreview(i)} aria-label={t('files.preview')}>
                     <Eye className="h-3 w-3" />
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownload(i)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDownload(i)} aria-label={t('files.download')}>
                   <Download className="h-3 w-3" />
                 </Button>
               </div>

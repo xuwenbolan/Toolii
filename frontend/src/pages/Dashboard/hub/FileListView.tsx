@@ -33,7 +33,7 @@ export function FileListView({
   const { t, i18n } = useTranslation('hub')
 
   return (
-    <div className="divide-y divide-border/70 rounded-lg border border-border/70">
+    <div className="divide-y divide-border/50">
       {items.map((item) => {
         const Icon = getFileTypeIcon(item.content_type)
         const isSelected = selected.has(item.id)
@@ -43,8 +43,9 @@ export function FileListView({
           <div
             key={item.id}
             className={[
-              'flex items-center gap-3 px-3 py-2.5 transition-colors',
-              'hover:bg-muted/30',
+              'flex items-center gap-3 px-3 py-3',
+              'transition-colors duration-[var(--duration-fast)]',
+              'hover:bg-muted/40',
               isSelected ? 'bg-muted/40' : '',
             ].join(' ')}
           >
@@ -53,7 +54,9 @@ export function FileListView({
               onCheckedChange={() => onToggleSelect(item.id)}
               aria-label={item.file_name}
             />
-            <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
+              <Icon className="h-4 w-4 text-muted-foreground" />
+            </div>
             <div className="min-w-0 flex-1">
               {isMd ? (
                 <button
@@ -66,18 +69,18 @@ export function FileListView({
               ) : (
                 <p className="truncate text-sm font-medium">{item.file_name}</p>
               )}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                 <Badge variant="outline" className="text-xs">
                   {item.source === 'upload' ? t('sourceUpload') : t('sourceTool')}
                 </Badge>
                 <span>{formatBytes(item.size)}</span>
                 {item.expires_at && (
-                  <span>{t('expires', { date: formatTime(item.expires_at, i18n.language) })}</span>
+                  <span>&middot; {t('expires', { date: formatTime(item.expires_at, i18n.language) })}</span>
                 )}
                 {item.share_count > 0 && (
-                  <span>{t('shareCount', { count: item.share_count })}</span>
+                  <span>&middot; {t('shareCount', { count: item.share_count })}</span>
                 )}
-              </div>
+              </p>
             </div>
             <FileRowActions
               isMarkdown={isMd}

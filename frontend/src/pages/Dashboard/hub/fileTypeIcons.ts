@@ -30,3 +30,9 @@ export function getFileTypeIcon(contentType: string): LucideIcon {
 export function isImageType(contentType: string): boolean {
   return contentType.startsWith('image/')
 }
+
+export function getFileExtension(filename: string): string {
+  const dot = filename.lastIndexOf('.')
+  if (dot === -1 || dot === filename.length - 1) return ''
+  return filename.slice(dot + 1).toUpperCase()
+}

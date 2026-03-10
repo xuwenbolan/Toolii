@@ -5,7 +5,7 @@ import { formatBytes } from '@/lib/fileValidation'
 import type { UserFileItem } from '@/services/hubApi'
 
 import { FileRowActions } from './FileRowActions'
-import { getFileTypeIcon, isImageType } from './fileTypeIcons'
+import { getFileExtension, getFileTypeIcon, isImageType } from './fileTypeIcons'
 import { useFileThumbnail } from './useFileThumbnail'
 import { formatTime, isMarkdownFile } from './utils'
 
@@ -35,16 +35,20 @@ function GridCard({
   const { url: thumbUrl } = useFileThumbnail(item.id, item.content_type, isImage)
   const Icon = getFileTypeIcon(item.content_type)
   const isMd = isMarkdownFile(item.file_name)
+  const ext = getFileExtension(item.file_name)
 
   return (
     <div
       className={[
-        'group relative flex flex-col overflow-hidden rounded-lg border transition-colors',
-        isSelected ? 'border-foreground/30 bg-muted/40' : 'border-border/70 hover:border-border',
+        'group relative flex flex-col overflow-hidden rounded-xl border',
+        'transition-[border-color,box-shadow] duration-[var(--duration-fast)]',
+        isSelected
+          ? 'border-foreground/30 bg-muted/40'
+          : 'border-border/70 hover:border-border hover:shadow-md',
       ].join(' ')}
     >
       {/* Thumbnail / icon area */}
-      <div className="relative flex aspect-square items-center justify-center bg-muted/30">
+      <div className="relative flex aspect-[4/3] items-center justify-center bg-muted/30">
         {isImage && thumbUrl ? (
           <img
             src={thumbUrl}
@@ -53,11 +57,18 @@ function GridCard({
             draggable={false}
           />
         ) : (
-          <Icon className="h-10 w-10 text-muted-foreground/50" />
+          <div className="flex flex-col items-center gap-2">
+            <Icon className="h-12 w-12 text-muted-foreground/40" />
+            {ext && (
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+                {ext}
+              </span>
+            )}
+          </div>
         )}
         {/* Checkbox overlay */}
         <div className={[
-          'absolute left-2 top-2 transition-opacity',
+          'absolute left-2 top-2 transition-opacity duration-[var(--duration-fast)]',
           isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
         ].join(' ')}>
           <Checkbox
@@ -68,7 +79,7 @@ function GridCard({
           />
         </div>
         {/* Actions overlay */}
-        <div className="absolute right-1 top-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="absolute right-1 top-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
           <FileRowActions
             isMarkdown={isMd}
             onEdit={onEdit}
@@ -82,7 +93,7 @@ function GridCard({
       </div>
 
       {/* Info area */}
-      <div className="space-y-0.5 px-2.5 py-2">
+      <div className="space-y-1 px-3 py-2.5">
         {isMd ? (
           <button
             type="button"

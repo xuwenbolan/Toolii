@@ -81,7 +81,9 @@
     "processingWait": "处理中，请稍候…",
     "close": "关闭",
     "viewResult": "查看结果",
-    "creditCost": "消耗 {{count}} 积分"
+    "creditCost": "消耗 {{count}} 积分",
+    "print": "打印",
+    "moreActions": "更多操作"
   },
   "upload": {
     "dropHere": "拖拽文件到这里",

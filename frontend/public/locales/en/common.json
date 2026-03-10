@@ -82,7 +82,9 @@
     "close": "Close",
     "viewResult": "View Result",
     "creditCost_one": "{{count}} credit",
-    "creditCost_other": "{{count}} credits"
+    "creditCost_other": "{{count}} credits",
+    "print": "Print",
+    "moreActions": "More actions"
   },
   "upload": {
     "dropHere": "Drop files here",
