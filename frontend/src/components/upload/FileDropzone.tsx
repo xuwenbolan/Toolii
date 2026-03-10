@@ -49,7 +49,7 @@ export function FileDropzone({
       <Card
         {...getRootProps()}
         className={[
-          'min-h-[8.5rem] border-dashed p-4 transition-colors duration-200 motion-reduce:transition-none',
+          'min-h-[8.5rem] border-dashed p-4 transition-colors duration-[var(--duration-fast)] motion-reduce:transition-none',
           isDragActive ? 'border-primary/60 bg-accent/40' : 'border-border/70 bg-card',
         ].join(' ')}
       >

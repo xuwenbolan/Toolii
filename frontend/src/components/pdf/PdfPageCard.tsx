@@ -83,7 +83,7 @@ export function PdfPageCard({
           <img
             src={thumbnailUrl}
             alt={`Page ${pageIndex + 1}`}
-            className="h-full w-full rounded object-contain transition-transform duration-200"
+            className="h-full w-full rounded object-contain transition-transform duration-[var(--duration-fast)]"
             style={{ transform: rotation ? `rotate(${rotation}deg)` : undefined }}
             loading="lazy"
             draggable={false}

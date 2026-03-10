@@ -56,7 +56,7 @@ export function ToolWorkspaceDropzone({
     <div
       {...getRootProps()}
       className={cn(
-        'flex min-h-[14rem] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-[color,background-color,border-color,transform] duration-200',
+        'flex min-h-[14rem] flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-[color,background-color,border-color,transform] duration-[var(--duration-fast)]',
         '[background-image:radial-gradient(circle,rgb(0_0_0/0.05)_1px,transparent_1px)] [background-size:24px_24px]',
         visualState === 'idle' && 'border-border/40 bg-muted/[0.02]',
         visualState === 'active' && 'border-primary/50 bg-primary/[0.04] motion-safe:scale-[1.01]',
