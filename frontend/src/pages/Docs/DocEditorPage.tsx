@@ -236,10 +236,17 @@ export function DocEditorPage() {
     }
   }, [])
 
+  const triggerSaveFlash = useCallback(() => {
+    setSaveFlash(true)
+    window.clearTimeout(saveFlashTimerRef.current)
+    saveFlashTimerRef.current = window.setTimeout(() => setSaveFlash(false), 1500)
+  }, [])
+
   // Reads the latest content from ref (not stale state) and saves it.
   // Uses savingGuardRef to prevent concurrent saves without depending on
   // the saving state (which would cause unnecessary useCallback recreation).
-  const handleSave = useCallback(async () => {
+  // manual: true when triggered by Ctrl+S or Save button (shows toast feedback)
+  const handleSave = useCallback(async (manual = false) => {
     if (savingGuardRef.current || loading) return
 
     // Wait for in-progress image uploads (up to 10s); abort save if still pending
@@ -262,8 +269,14 @@ export function DocEditorPage() {
     }
 
     const latestContent = contentRef.current
-    if (latestContent === lastSavedContentRef.current) return
-    if (byteLength(latestContent) > MAX_BYTES) return
+    if (latestContent === lastSavedContentRef.current) {
+      if (manual) triggerSaveFlash()
+      return
+    }
+    if (byteLength(latestContent) > MAX_BYTES) {
+      // isOversize state is already shown in EditorStatusBar
+      return
+    }
 
     // Flush pending debounce so UI reflects the content we're saving
     window.clearTimeout(debounceSyncRef.current)
@@ -279,9 +292,7 @@ export function DocEditorPage() {
       setMeta((prev) => (prev ? { ...prev, size: result.size, updated_at: result.updated_at } : prev))
       saveRetryCountRef.current = 0
       window.clearTimeout(saveRetryTimerRef.current)
-      setSaveFlash(true)
-      window.clearTimeout(saveFlashTimerRef.current)
-      saveFlashTimerRef.current = window.setTimeout(() => setSaveFlash(false), 1500)
+      triggerSaveFlash()
       if (pendingLeaveRef.current) {
         const leave = pendingLeaveRef.current
         pendingLeaveRef.current = null
@@ -310,14 +321,15 @@ export function DocEditorPage() {
             void handleSave()
           }, SAVE_RETRY_DELAYS[retryIdx])
         } else {
-          toast.error(tRef.current('saveRetriesExhausted'))
+          // saveError is already displayed in EditorStatusBar
+          setSaveError(tRef.current('saveRetriesExhausted'))
         }
       }
     } finally {
       savingGuardRef.current = false
       setSaving(false)
     }
-  }, [fileId, loading])
+  }, [fileId, loading, triggerSaveFlash])
 
   // Auto-save: starts when debounced content makes isDirty true
   useEffect(() => {
@@ -447,7 +459,7 @@ export function DocEditorPage() {
         window.clearTimeout(retryTimerRef.current)
         window.clearTimeout(saveRetryTimerRef.current)
         saveRetryCountRef.current = 0
-        void handleSave()
+        void handleSave(true)
       } else if (mod && e.key === 'p') {
         e.preventDefault()
         handlePrint()
@@ -468,7 +480,7 @@ export function DocEditorPage() {
         <div className="flex min-h-svh flex-col bg-background text-foreground print:min-h-0 print:bg-white">
           {/* -- Header -- */}
           <header className={[
-            'sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur-sm transition-shadow duration-200 print:hidden',
+            'sticky top-0 z-30 border-b border-border/40 bg-background/80 backdrop-blur-sm transition-shadow duration-[var(--duration-fast)] print:hidden',
             scrolled ? 'shadow-sm' : '',
           ].join(' ')}>
             <div className="mx-auto flex h-11 max-w-[1600px] items-center gap-1 px-2 sm:px-3 lg:px-4">
@@ -632,7 +644,7 @@ export function DocEditorPage() {
                     type="button"
                     size="sm"
                     disabled={(!isDirty || isOversize || saving || loading) && !saveFlash}
-                    onClick={() => { void handleSave() }}
+                    onClick={() => { void handleSave(true) }}
                     className={[
                       'h-7 gap-1 px-2.5 text-xs transition-colors duration-300',
                       saveFlash ? '!bg-success/20 !text-success !opacity-100' : '',
@@ -652,7 +664,7 @@ export function DocEditorPage() {
               {/* Mobile-only: overflow menu for export, print, reload */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 sm:hidden">
+                  <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 sm:hidden" aria-label={t('common:actions.moreActions')}>
                     <EllipsisVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>

@@ -21,11 +21,16 @@
   --crepe-color-inline-code: var(--foreground);
   --crepe-color-error: var(--destructive);
   --crepe-color-hover: var(--accent);
-  --crepe-color-selected: var(--accent);
+  --crepe-color-selected: color-mix(in oklch, var(--info), transparent 70%);
   --crepe-color-inline-area: var(--muted);
 
   --crepe-shadow-1: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
   --crepe-shadow-2: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* ── Text selection ─────────────────────────────────────────── */
+.typora-root .milkdown .ProseMirror ::selection {
+  background: color-mix(in oklch, var(--info), transparent 70%);
 }
 
 /* ── Editor writing area ────────────────────────────────────── */
@@ -58,6 +63,12 @@
       -1px 0 0 0 color-mix(in oklch, var(--border), transparent 60%),
       1px 0 0 0 color-mix(in oklch, var(--border), transparent 60%);
   }
+}
+
+/* ── Readonly preview: no full-viewport height, less bottom padding ── */
+.typora-root[data-readonly] .milkdown .ProseMirror {
+  min-height: 0;
+  padding-bottom: 2rem;
 }
 
 /* ── Scroll offset for sticky header (44px) ──────────────────── */

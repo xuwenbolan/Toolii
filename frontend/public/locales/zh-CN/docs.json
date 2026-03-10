@@ -51,5 +51,6 @@
   "saveRetriesExhausted": "自动保存多次重试失败，请手动保存。",
   "copyContent": "复制内容",
   "copiedToClipboard": "内容已复制到剪贴板",
-  "copyFailed": "复制失败"
+  "copyFailed": "复制失败",
+  "contentTooLarge": "内容超过 1 MB 限制，无法保存"
 }

@@ -53,5 +53,6 @@
   "saveRetriesExhausted": "Auto-save failed after multiple retries. Please save manually.",
   "copyContent": "Copy content",
   "copiedToClipboard": "Content copied to clipboard",
-  "copyFailed": "Failed to copy content"
+  "copyFailed": "Failed to copy content",
+  "contentTooLarge": "Content exceeds 1 MB limit"
 }

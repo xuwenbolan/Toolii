@@ -148,7 +148,7 @@ export function EditorOutline({ content, open }: Props) {
   return (
     <aside
       className={[
-        'sticky top-[44px] hidden h-[calc(100svh-44px-28px)] self-start shrink-0 overflow-hidden border-border/40 bg-background transition-[width,border-width] duration-200 ease-in-out md:block print:hidden',
+        'sticky top-[44px] hidden h-[calc(100svh-44px-28px)] self-start shrink-0 overflow-hidden border-border/40 bg-background transition-[width,border-width] duration-[var(--duration-normal)] ease-[var(--ease-out)] md:block print:hidden',
         open ? 'w-[220px] border-r' : 'w-0 border-r-0',
       ].join(' ')}
     >
