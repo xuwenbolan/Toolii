@@ -6,9 +6,11 @@ import {
   Copy,
   ExternalLink,
   PackageOpen,
+  Plus,
   Trash2,
 } from 'lucide-react'
 
+import { SimplePagination } from '@/components/common/SimplePagination'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -91,7 +93,7 @@ function ShareItem({
               className="h-7 w-7 shrink-0"
               aria-label="Toggle details"
             >
-              <ChevronDown className="h-4 w-4 transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+              <ChevronDown className="h-4 w-4 transition-transform duration-[var(--duration-fast)] [[data-state=open]_&]:rotate-180" />
             </Button>
           </CollapsibleTrigger>
 
@@ -239,8 +241,6 @@ export function SharesTab() {
     }
   }, [deleteTarget])
 
-  const offset = (page - 1) * PAGE_SIZE
-
   return (
     <>
       <div className="space-y-3">
@@ -256,6 +256,12 @@ export function SharesTab() {
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <PackageOpen className="h-10 w-10 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">{t('list.empty')}</p>
+            <Button size="sm" variant="outline" asChild>
+              <a href="/transfer">
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                {t('list.createFirst')}
+              </a>
+            </Button>
           </div>
         ) : (
           <>
@@ -267,31 +273,7 @@ export function SharesTab() {
               />
             ))}
 
-            {total > PAGE_SIZE && (
-              <div className="flex items-center justify-between pt-2 text-sm">
-                <span className="text-muted-foreground">
-                  {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    {tHub('previous')}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={offset + PAGE_SIZE >= total}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    {tHub('next')}
-                  </Button>
-                </div>
-              </div>
-            )}
+            <SimplePagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
           </>
         )}
       </div>

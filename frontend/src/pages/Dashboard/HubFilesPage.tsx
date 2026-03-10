@@ -3,11 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
-  Clock,
+  ChevronDown,
   FolderOpen,
-  HardDrive,
-  Hash,
-  Infinity,
   LayoutGrid,
   List,
   Loader2,
@@ -23,7 +20,9 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatBytes } from '@/lib/fileValidation'
 import { getTranslatedApiError } from '@/lib/apiErrors'
@@ -36,6 +35,7 @@ import {
   type UserFileItem,
 } from '@/services/hubApi'
 
+import { SimplePagination } from '@/components/common/SimplePagination'
 import { ExtendDialog } from './hub/ExtendDialog'
 import { FileGridView } from './hub/FileGridView'
 import { FileListView } from './hub/FileListView'
@@ -198,7 +198,7 @@ export function HubFilesPage() {
   }, [selected, deleteItem, fetchList])
 
   const handleDownload = useCallback((item: UserFileItem) => {
-    void download(buildFileDownloadUrl(item.id), item.file_name)
+    return download(buildFileDownloadUrl(item.id), item.file_name)
   }, [download])
 
   const handleShare = useCallback((item: UserFileItem) => {
@@ -237,7 +237,6 @@ export function HubFilesPage() {
     }
   }, [navigate, t])
 
-  const offset = (page - 1) * PAGE_SIZE
   const usagePercent = quotaBytes > 0 ? Math.min((usedBytes / quotaBytes) * 100, 100) : 0
   const deleteCount = deleteItem ? 1 : selected.size
 
@@ -254,7 +253,68 @@ export function HubFilesPage() {
         {/* Header */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
+              <Collapsible>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm tabular-nums text-muted-foreground">
+                    {quotaBytes > 0
+                      ? `${formatBytes(usedBytes)} / ${formatBytes(quotaBytes)}`
+                      : `${formatBytes(usedBytes)} ${t('used')}`}
+                  </span>
+                  {quotaBytes > 0 && usagePercent > 90 && (
+                    <Badge variant="outline" className="border-destructive/30 text-destructive text-xs">
+                      {t('storageAlmostFull')}
+                    </Badge>
+                  )}
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                      <ChevronDown className="h-3.5 w-3.5 transition-transform duration-[var(--duration-fast)] [[data-state=open]_&]:rotate-180" />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+                <CollapsibleContent>
+                  <div className="mt-3 grid grid-cols-3 divide-x divide-border/60 rounded-lg border border-border/70">
+                    <div className="space-y-1.5 px-3 py-2.5">
+                      <p className="tabular-nums">
+                        <span className="text-base font-semibold text-foreground">{formatBytes(usedBytes)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {quotaBytes > 0 ? ` / ${formatBytes(quotaBytes)}` : ` ${t('used')}`}
+                        </span>
+                      </p>
+                      {quotaBytes > 0 && (
+                        <Progress
+                          value={usagePercent}
+                          className={`h-1 ${usagePercent > 90 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">{t('quotaStorage')}</p>
+                    </div>
+                    <div className="space-y-1.5 px-3 py-2.5">
+                      <p className="tabular-nums">
+                        <span className="text-base font-semibold text-foreground">{fileCount}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {maxFiles > 0 ? ` / ${maxFiles}` : ` ${t('quotaFilesUnit')}`}
+                        </span>
+                      </p>
+                      {maxFiles > 0 && (
+                        <Progress
+                          value={Math.min((fileCount / maxFiles) * 100, 100)}
+                          className={`h-1 ${fileCount / maxFiles > 0.9 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">{t('quotaFiles')}</p>
+                    </div>
+                    <div className="space-y-1.5 px-3 py-2.5">
+                      <p className="text-base font-semibold text-foreground">
+                        {maxRetentionDays === 0 ? t('unlimited') : t('retentionDays', { days: maxRetentionDays })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{t('quotaRetention')}</p>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={openFilePicker} disabled={uploading}>
                 {uploading ? (
@@ -274,88 +334,6 @@ export function HubFilesPage() {
           {/* Upload progress */}
           {uploading && (
             <Progress value={uploadProgress} className="h-1.5" />
-          )}
-
-          {/* Quota stats */}
-          <div className="grid grid-cols-3 gap-3">
-            {/* Storage */}
-            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <HardDrive className="h-3.5 w-3.5" />
-                {t('quotaStorage')}
-              </div>
-              {quotaBytes > 0 ? (
-                <>
-                  <Progress
-                    value={usagePercent}
-                    className={`h-1.5 ${usagePercent > 90 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
-                  />
-                  <p className="text-xs tabular-nums">
-                    <span className="text-sm font-medium text-foreground">{formatBytes(usedBytes)}</span>
-                    <span className="text-muted-foreground"> / {formatBytes(quotaBytes)}</span>
-                  </p>
-                </>
-              ) : (
-                <p className="flex items-center gap-1 text-xs">
-                  <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <span className="text-sm font-medium text-foreground">{formatBytes(usedBytes)}</span>
-                  <span className="text-muted-foreground">{t('used')}</span>
-                </p>
-              )}
-            </div>
-
-            {/* File count */}
-            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Hash className="h-3.5 w-3.5" />
-                {t('quotaFiles')}
-              </div>
-              {maxFiles > 0 ? (
-                <>
-                  <Progress
-                    value={Math.min((fileCount / maxFiles) * 100, 100)}
-                    className={`h-1.5 ${fileCount / maxFiles > 0.9 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
-                  />
-                  <p className="text-xs tabular-nums">
-                    <span className="text-sm font-medium text-foreground">{fileCount}</span>
-                    <span className="text-muted-foreground"> / {maxFiles}</span>
-                  </p>
-                </>
-              ) : (
-                <p className="flex items-center gap-1 text-xs">
-                  <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
-                  <span className="text-sm font-medium text-foreground">{fileCount}</span>
-                  <span className="text-muted-foreground">{t('quotaFilesUnit')}</span>
-                </p>
-              )}
-            </div>
-
-            {/* Retention */}
-            <div className="space-y-2 rounded-lg border border-border/70 px-3 py-2.5">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" />
-                {t('quotaRetention')}
-              </div>
-              <p className="flex items-center gap-1 text-xs">
-                {maxRetentionDays === 0 ? (
-                  <>
-                    <Infinity className="h-3.5 w-3.5 text-muted-foreground/60" />
-                    <span className="text-sm font-medium text-foreground">{t('unlimited')}</span>
-                  </>
-                ) : (
-                  <span className="text-sm font-medium text-foreground">
-                    {t('retentionDays', { days: maxRetentionDays })}
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Storage almost full warning */}
-          {quotaBytes > 0 && usagePercent > 90 && (
-            <Badge variant="outline" className="border-destructive/30 text-destructive">
-              {t('storageAlmostFull')}
-            </Badge>
           )}
         </div>
 
@@ -383,11 +361,11 @@ export function HubFilesPage() {
                     </Button>
                   ))}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center rounded-md border border-border/70">
                   <Button
                     size="icon"
-                    variant={viewMode === 'list' ? 'default' : 'ghost'}
-                    className="h-8 w-8"
+                    variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                    className="h-8 w-8 rounded-r-none"
                     onClick={() => handleViewMode('list')}
                     aria-label={t('viewList')}
                   >
@@ -395,8 +373,8 @@ export function HubFilesPage() {
                   </Button>
                   <Button
                     size="icon"
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                    className="h-8 w-8"
+                    variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                    className="h-8 w-8 rounded-l-none"
                     onClick={() => handleViewMode('grid')}
                     aria-label={t('viewGrid')}
                   >
@@ -405,37 +383,36 @@ export function HubFilesPage() {
                 </div>
               </div>
 
-              {/* Bulk actions */}
-              {selected.size > 0 && (
-                <div className="flex items-center gap-3 rounded-lg border border-border/70 bg-muted/30 px-3 py-2">
-                  <Checkbox
-                    checked={selected.size === items.length}
-                    onCheckedChange={toggleSelectAll}
-                    aria-label={t('selectAll')}
-                  />
-                  <span className="text-sm font-medium">{t('selected', { count: selected.size })}</span>
-                  <div className="flex-1" />
-                  <Button size="sm" variant="outline" onClick={handleBatchShare}>
-                    <Share2 className="mr-1 h-3.5 w-3.5" />
-                    {t('share')}
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={handleBatchDelete}>
-                    <Trash2 className="mr-1 h-3.5 w-3.5" />
-                    {t('delete')}
-                  </Button>
-                </div>
-              )}
+              {/* Bulk actions (rendered outside flow, at page bottom) */}
 
               {/* File list / grid */}
               {loading ? (
-                <p className="text-sm text-muted-foreground">{t('loading')}</p>
+                viewMode === 'list' ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-[4/3] w-full rounded-xl" />
+                    ))}
+                  </div>
+                )
               ) : loadError ? (
                 <p className="text-sm text-destructive">{loadError}</p>
               ) : items.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-16 text-center">
-                  <FolderOpen className="h-10 w-10 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">{t('empty')}</p>
-                  <p className="text-xs text-muted-foreground">{t('emptyHint')}</p>
+                <div className="flex flex-col items-center gap-4 py-16 text-center">
+                  <FolderOpen className="h-12 w-12 text-muted-foreground/40" />
+                  <div className="space-y-1">
+                    <p className="text-base font-medium text-muted-foreground">{t('empty')}</p>
+                    <p className="text-xs text-muted-foreground">{t('emptyHint')}</p>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={openFilePicker}>
+                    <UploadCloud className="mr-1 h-3.5 w-3.5" />
+                    {t('upload')}
+                  </Button>
                 </div>
               ) : viewMode === 'list' ? (
                 <FileListView
@@ -463,32 +440,7 @@ export function HubFilesPage() {
                 />
               )}
 
-              {/* Pagination */}
-              {total > PAGE_SIZE && (
-                <div className="flex items-center justify-between pt-2 text-sm">
-                  <span className="text-muted-foreground">
-                    {offset + 1}-{Math.min(offset + PAGE_SIZE, total)} / {total}
-                  </span>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      {t('previous')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={offset + PAGE_SIZE >= total}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      {t('next')}
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <SimplePagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />
             </div>
           </TabsContent>
 
@@ -500,6 +452,26 @@ export function HubFilesPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Floating bulk action bar */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-xl border bg-background/95 px-4 py-2.5 shadow-lg backdrop-blur-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-[var(--duration-normal)]">
+          <Checkbox
+            checked={selected.size === items.length}
+            onCheckedChange={toggleSelectAll}
+            aria-label={t('selectAll')}
+          />
+          <span className="text-sm font-medium">{t('selected', { count: selected.size })}</span>
+          <Button size="sm" variant="outline" onClick={handleBatchShare}>
+            <Share2 className="mr-1 h-3.5 w-3.5" />
+            {t('share')}
+          </Button>
+          <Button size="sm" variant="destructive" onClick={handleBatchDelete}>
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            {t('delete')}
+          </Button>
+        </div>
+      )}
 
       {/* Dialogs */}
       <ConfirmDialog

@@ -24,11 +24,13 @@ export function RenameDialog({
   const { t } = useTranslation('hub')
   const [name, setName] = useState('')
   const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (item) {
       setName(item.file_name)
+      setError(null)
       setTimeout(() => inputRef.current?.select(), 50)
     }
   }, [item])
@@ -36,12 +38,13 @@ export function RenameDialog({
   const handleSubmit = async () => {
     if (!item || !name.trim() || pending) return
     setPending(true)
+    setError(null)
     try {
       await renameFile(item.id, name.trim())
       onDone()
       onClose()
     } catch {
-      // silent
+      setError(t('renameFailed'))
     } finally {
       setPending(false)
     }
@@ -60,6 +63,7 @@ export function RenameDialog({
           onKeyDown={(e) => { if (e.key === 'Enter') void handleSubmit() }}
           placeholder={t('renamePlaceholder')}
         />
+        {error && <p className="text-xs text-destructive">{error}</p>}
         <DialogFooter>
           <Button variant="outline" size="sm" onClick={onClose}>
             {t('cancel')}

@@ -40,6 +40,7 @@
   "shareCreate": "Create share link",
   "renameTitle": "Rename file",
   "renamePlaceholder": "New file name",
+  "renameFailed": "Rename failed",
   "renameConfirm": "Rename",
   "extendTitle": "Extend expiry",
   "extendConfirm": "Extend",

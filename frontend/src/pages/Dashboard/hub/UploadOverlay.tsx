@@ -5,11 +5,11 @@ export function UploadOverlay() {
   const { t } = useTranslation('hub')
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-foreground/20 px-12 py-10">
-        <UploadCloud className="h-10 w-10 text-muted-foreground" />
-        <p className="text-sm font-medium">{t('dropToUpload')}</p>
-        <p className="text-xs text-muted-foreground">{t('uploadHint')}</p>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/85 backdrop-blur-md">
+      <div className="flex flex-col items-center gap-4 rounded-2xl border-2 border-dashed border-foreground/30 bg-background/80 px-16 py-14 shadow-lg animate-in fade-in-0 slide-in-from-bottom-4 duration-[var(--duration-normal)]">
+        <UploadCloud className="h-12 w-12 text-muted-foreground" />
+        <p className="text-base font-semibold">{t('dropToUpload')}</p>
+        <p className="text-sm text-muted-foreground">{t('uploadHint')}</p>
       </div>
     </div>
   )

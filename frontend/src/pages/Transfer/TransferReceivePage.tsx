@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
-import { AlertCircle, Download, Eye, FileIcon, Lock, PackageOpen, Printer } from 'lucide-react'
+import { AlertCircle, Download, Eye, Loader2, Lock, PackageOpen, Printer } from 'lucide-react'
 
 const MilkdownPreview = lazy(() =>
   import('@/components/editor/MilkdownPreview').then((module) => ({ default: module.MilkdownPreview })),
@@ -21,6 +21,7 @@ import {
   getShareInfo,
   type ShareInfoResponse,
 } from '@/services/hubApi'
+import { getFileTypeIcon } from '@/pages/Dashboard/hub/fileTypeIcons'
 
 function formatTime(value: string, locale: string) {
   const date = new Date(value)
@@ -53,7 +54,7 @@ export function TransferReceivePage() {
   const [loadedToken, setLoadedToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [downloadError, setDownloadError] = useState<string | null>(null)
-  const [downloading, setDownloading] = useState(false)
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(new Set())
 
   // Extract code gate
   const [needCode, setNeedCode] = useState(false)
@@ -138,10 +139,10 @@ export function TransferReceivePage() {
     }
   }, [code, token, codeLocked, codeLoading])
 
-  const fetchAndDownload = useCallback(async (url: string, fallbackName: string) => {
-    if (downloading) return
+  const fetchAndDownload = useCallback(async (key: string, url: string, fallbackName: string) => {
+    if (downloadingIds.has(key)) return
     setDownloadError(null)
-    setDownloading(true)
+    setDownloadingIds((prev) => new Set(prev).add(key))
     try {
       const res = await fetch(url)
       if (!res.ok) {
@@ -154,21 +155,21 @@ export function TransferReceivePage() {
     } catch {
       setDownloadError(t('receive.downloadFailed'))
     } finally {
-      setDownloading(false)
+      setDownloadingIds((prev) => { const next = new Set(prev); next.delete(key); return next })
     }
-  }, [downloading, t])
+  }, [downloadingIds, t])
 
   const handleDownloadSingle = useCallback(
     (fileId: number, filename: string) => {
       const url = buildShareDownloadUrl(token, fileId, accessCode)
-      void fetchAndDownload(url, filename)
+      void fetchAndDownload(`file-${fileId}`, url, filename)
     },
     [token, accessCode, fetchAndDownload],
   )
 
   const handleDownloadZip = useCallback(() => {
     const url = buildShareZipUrl(token, accessCode)
-    void fetchAndDownload(url, `share-${token}.zip`)
+    void fetchAndDownload('zip', url, `share-${token}.zip`)
   }, [token, accessCode, fetchAndDownload])
 
   const handlePreview = useCallback(async (fileId: number, fileName: string) => {
@@ -208,7 +209,7 @@ export function TransferReceivePage() {
     <>
       <SEOHead title={t('receive.title')} noindex />
 
-      <div className="mx-auto w-full max-w-2xl space-y-4 px-4 py-8 print:max-w-none print:px-0 print:py-0">
+      <div className={`mx-auto w-full max-w-2xl space-y-4 px-4 py-8${singleMarkdownFile && previewContent ? ' print:hidden' : ''}`}>
         <Card className="border-border/70 shadow-sm print:border-0 print:shadow-none">
           <CardHeader className="pb-3 print:hidden">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -308,80 +309,93 @@ export function TransferReceivePage() {
                 </div>
 
                 <div className="space-y-1.5 rounded-lg border border-border/70 p-2 print:hidden">
-                  {info.files.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40"
-                    >
-                      <FileIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
-                      {/\.md$/i.test(file.file_name) ? (
+                  {info.files.map((file) => {
+                    const Icon = getFileTypeIcon(file.content_type)
+                    const isFileDl = downloadingIds.has(`file-${file.id}`)
+                    return (
+                      <div
+                        key={file.id}
+                        className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40"
+                      >
+                        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate">{file.file_name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{formatBytes(file.size)}</span>
+                        {/\.md$/i.test(file.file_name) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2"
+                            onClick={() => { void handlePreview(file.id, file.file_name) }}
+                          >
+                            <Eye className="mr-1 h-3.5 w-3.5" />
+                            {t('receive.preview')}
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           size="sm"
                           variant="ghost"
                           className="h-7 px-2"
-                          onClick={() => { void handlePreview(file.id, file.file_name) }}
+                          disabled={isFileDl}
+                          onClick={() => handleDownloadSingle(file.id, file.file_name)}
                         >
-                          <Eye className="mr-1 h-3.5 w-3.5" />
-                          {t('receive.preview')}
+                          {isFileDl ? (
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Download className="mr-1 h-3.5 w-3.5" />
+                          )}
+                          {isFileDl ? t('receive.downloading') : t('receive.download')}
                         </Button>
-                      ) : null}
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 px-2"
-                        disabled={downloading}
-                        onClick={() => handleDownloadSingle(file.id, file.file_name)}
-                      >
-                        <Download className="mr-1 h-3.5 w-3.5" />
-                        {downloading ? t('receive.downloading') : t('receive.download')}
-                      </Button>
-                    </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {info.files.length > 1 ? (
                   <Button
                     type="button"
                     className="w-full print:hidden"
-                    disabled={downloading}
+                    disabled={downloadingIds.has('zip')}
                     onClick={handleDownloadZip}
                   >
-                    <Download className="mr-2 h-4 w-4" />
-                    {downloading ? t('receive.downloading') : t('receive.downloadAll')}
+                    {downloadingIds.has('zip') ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    {downloadingIds.has('zip') ? t('receive.downloading') : t('receive.downloadAll')}
                   </Button>
-                ) : null}
-
-                {singleMarkdownFile && previewContent ? (
-                  <div className="rounded-2xl border border-border/70 bg-background/80 p-4 print:rounded-none print:border-0 print:bg-transparent print:p-0">
-                    <div className="mb-4 flex items-center justify-between gap-3 print:hidden">
-                      <div>
-                        <p className="text-sm font-medium">{t('receive.previewTitle')}</p>
-                        <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        onClick={() => window.print()}
-                      >
-                        <Printer className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Suspense fallback={<p className="text-sm text-muted-foreground">{t('receive.loading')}</p>}>
-                      <MilkdownPreview content={previewContent} />
-                    </Suspense>
-                  </div>
                 ) : null}
               </div>
             ) : null}
           </CardContent>
         </Card>
       </div>
+
+      {singleMarkdownFile && previewContent ? (
+        <div className="pb-8 print:pb-0">
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3 print:hidden">
+            <div>
+              <p className="text-sm font-medium">{t('receive.previewTitle')}</p>
+              <p className="text-xs text-muted-foreground">{singleMarkdownFile.file_name}</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0"
+              onClick={() => window.print()}
+              aria-label={t('common:actions.print')}
+            >
+              <Printer className="h-4 w-4" />
+            </Button>
+          </div>
+          <Suspense fallback={<p className="mx-auto max-w-2xl px-4 text-sm text-muted-foreground">{t('receive.loading')}</p>}>
+            <MilkdownPreview content={previewContent} />
+          </Suspense>
+        </div>
+      ) : null}
 
       <Dialog open={!!previewName && !singleMarkdownFile} onOpenChange={(open) => {
         if (!open) {

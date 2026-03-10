@@ -40,6 +40,7 @@
   "shareCreate": "创建分享链接",
   "renameTitle": "重命名文件",
   "renamePlaceholder": "新文件名",
+  "renameFailed": "重命名失败",
   "renameConfirm": "重命名",
   "extendTitle": "延长有效期",
   "extendConfirm": "延长",

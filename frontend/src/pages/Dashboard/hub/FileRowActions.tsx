@@ -1,7 +1,10 @@
+import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   CalendarPlus,
+  Check,
   Download,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Share2,
@@ -18,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+type DownloadPhase = 'idle' | 'loading' | 'done'
+
 export function FileRowActions({
   isMarkdown,
   onEdit,
@@ -32,10 +37,29 @@ export function FileRowActions({
   onRename: () => void
   onExtend: () => void
   onShare: () => void
-  onDownload: () => void
+  onDownload: () => Promise<void> | void
   onDelete: () => void
 }) {
   const { t } = useTranslation('hub')
+  const [dlPhase, setDlPhase] = useState<DownloadPhase>('idle')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleDownload = useCallback(async () => {
+    if (dlPhase !== 'idle') return
+    setDlPhase('loading')
+    try {
+      await onDownload()
+      setDlPhase('done')
+      timerRef.current = setTimeout(() => setDlPhase('idle'), 1500)
+    } catch {
+      setDlPhase('idle')
+    }
+  }, [dlPhase, onDownload])
+
+  const dlIcon =
+    dlPhase === 'loading' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> :
+    dlPhase === 'done' ? <Check className="h-3.5 w-3.5 text-success" /> :
+    <Download className="h-3.5 w-3.5" />
 
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -44,10 +68,11 @@ export function FileRowActions({
         size="icon"
         variant="ghost"
         className="h-7 w-7"
-        onClick={onDownload}
+        disabled={dlPhase === 'loading'}
+        onClick={() => { void handleDownload() }}
         aria-label={t('download')}
       >
-        <Download className="h-3.5 w-3.5" />
+        {dlIcon}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
