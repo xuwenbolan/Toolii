@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
+import { cssVar } from '@/lib/canvasColors'
 
 const RADIUS = 52
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 const SIZE = 140
 
 function scoreColor(score: number): string {
-  if (score >= 80) return 'oklch(0.72 0.19 145)'
-  if (score >= 60) return 'oklch(0.75 0.18 85)'
-  if (score >= 40) return 'oklch(0.70 0.20 55)'
-  return 'oklch(0.65 0.22 25)'
+  if (score >= 80) return cssVar('canvas-score-high')
+  if (score >= 60) return cssVar('canvas-score-mid')
+  if (score >= 40) return cssVar('canvas-score-low')
+  return cssVar('canvas-score-poor')
 }
 
 export function OverallScoreRing({ score }: { score: number }) {

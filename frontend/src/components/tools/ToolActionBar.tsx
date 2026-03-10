@@ -107,7 +107,7 @@ export function ToolActionBar({
               )}
             >
               <div
-                className="h-full bg-primary transition-[width] duration-[var(--duration-normal)] ease-out"
+                className="h-full bg-primary transition-[width] duration-[var(--duration-fast)] ease-linear"
                 style={{ width: `${clampedProgress}%` }}
               />
             </div>

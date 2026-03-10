@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { canvasColor } from '@/lib/canvasColors'
 
 export type Region = { x: number; y: number; w: number; h: number }
 
@@ -52,17 +53,17 @@ export function RegionSelector({ imageUrl, regions, onChange }: Props) {
       const rw = r.w * canvas.width
       const rh = r.h * canvas.height
 
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.2)'
+      ctx.fillStyle = canvasColor('canvas-primary', 0.2)
       ctx.fillRect(rx, ry, rw, rh)
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'
+      ctx.strokeStyle = canvasColor('canvas-primary', 0.8)
       ctx.lineWidth = 2
       ctx.strokeRect(rx, ry, rw, rh)
 
       // Region number label
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.9)'
+      ctx.fillStyle = canvasColor('canvas-primary', 0.9)
       const labelSize = 20
       ctx.fillRect(rx, ry, labelSize, labelSize)
-      ctx.fillStyle = '#fff'
+      ctx.fillStyle = '#ffffff'
       ctx.font = '12px sans-serif'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -72,9 +73,9 @@ export function RegionSelector({ imageUrl, regions, onChange }: Props) {
       const btnSize = isCoarsePointer ? 26 : 18
       const btnX = rx + rw - btnSize
       const btnY = ry
-      ctx.fillStyle = 'rgba(239, 68, 68, 0.9)'
+      ctx.fillStyle = canvasColor('canvas-score-poor', 0.9)
       ctx.fillRect(btnX, btnY, btnSize, btnSize)
-      ctx.fillStyle = '#fff'
+      ctx.fillStyle = '#ffffff'
       ctx.font = `${isCoarsePointer ? 18 : 13}px sans-serif`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
@@ -88,9 +89,9 @@ export function RegionSelector({ imageUrl, regions, onChange }: Props) {
       const sw = Math.abs(current.x - start.x) * canvas.width
       const sh = Math.abs(current.y - start.y) * canvas.height
 
-      ctx.fillStyle = 'rgba(34, 197, 94, 0.15)'
+      ctx.fillStyle = canvasColor('canvas-score-high', 0.15)
       ctx.fillRect(sx, sy, sw, sh)
-      ctx.strokeStyle = 'rgba(34, 197, 94, 0.8)'
+      ctx.strokeStyle = canvasColor('canvas-score-high', 0.8)
       ctx.lineWidth = 2
       ctx.setLineDash([5, 3])
       ctx.strokeRect(sx, sy, sw, sh)

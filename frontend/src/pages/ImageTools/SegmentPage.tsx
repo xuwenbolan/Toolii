@@ -21,8 +21,8 @@ type PromptPoint = { x: number; y: number; label: PointLabel }
 const MAX_CANVAS_WIDTH = 1080
 const MAX_CANVAS_HEIGHT = 700
 const MASK_ALPHA = 0.4
-const FG_COLOR = 'rgba(34,197,94,0.9)' // green
-const BG_COLOR = 'rgba(239,68,68,0.9)' // red
+const FG_COLOR = 'oklch(0.55 0.20 145 / 0.9)' // --canvas-mask-fg
+const BG_COLOR = 'oklch(0.55 0.22 25 / 0.9)' // --canvas-mask-bg
 const POINT_RADIUS = 6
 
 function clamp(v: number, min: number, max: number) {

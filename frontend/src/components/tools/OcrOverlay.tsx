@@ -53,8 +53,8 @@ export function OcrOverlay({ imageUrl, lines, activeIndex, onHoverIndex }: Props
                 key={i}
                 points={points}
                 className="pointer-events-auto cursor-pointer"
-                fill={isActive ? 'rgba(59,130,246,0.2)' : 'transparent'}
-                stroke={isActive ? 'rgba(59,130,246,0.9)' : 'rgba(59,130,246,0.4)'}
+                fill={isActive ? 'var(--canvas-primary-fill)' : 'transparent'}
+                stroke={isActive ? 'var(--canvas-primary-stroke)' : 'var(--canvas-primary-stroke-dim)'}
                 strokeWidth={isActive ? 2.5 : 1.5}
                 onPointerEnter={() => onHoverIndex(i)}
                 onPointerLeave={() => onHoverIndex(null)}

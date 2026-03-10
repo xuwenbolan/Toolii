@@ -41,6 +41,13 @@ const COURT_TOOLTIP_KEYS = [
   'annotation.tooltip.lowerCourt',
 ] as const
 
+// Annotation color helpers - base values match CSS variables in index.css
+const c = (alpha: number) => `oklch(0.59 0.20 264 / ${alpha})`  // --canvas-primary
+const stone = (alpha: number) => `oklch(0.55 0.02 75 / ${alpha})`  // neutral stone
+const blush = (alpha: number) => `oklch(0.65 0.16 25 / ${alpha})`  // warm blush
+const amber = (alpha: number) => `oklch(0.78 0.15 85 / ${alpha})`  // amber hint
+const slate = (alpha: number) => `oklch(0.20 0.02 260 / ${alpha})` // dark label bg
+
 export function FaceAnnotation({
   viz,
   imgW: w,
@@ -53,10 +60,10 @@ export function FaceAnnotation({
   const { t } = useTranslation('faceMap')
   const { three_courts, five_eyes, center_x, face_contour } = viz
 
-  const lineColor = 'rgba(var(--primary-rgb, 59 130 246), 0.6)'
-  const textColor = 'rgba(var(--primary-rgb, 59 130 246), 0.8)'
-  const contourColor = 'rgba(var(--primary-rgb, 59 130 246), 0.25)'
-  const highlightColor = 'rgba(var(--primary-rgb, 59 130 246), 0.9)'
+  const lineColor = c(0.6)
+  const textColor = c(0.8)
+  const contourColor = c(0.25)
+  const highlightColor = c(0.9)
 
   // Face contour path
   const contourPath = face_contour.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0] * w},${p[1] * h}`).join(' ') + ' Z'
@@ -254,8 +261,8 @@ function FeatureHotspots({
       {facePath && (
         <path
           d={facePath}
-          fill={highlightedFeature === 'face_shape' ? 'rgba(59,130,246,0.12)' : 'transparent'}
-          stroke={highlightedFeature === 'face_shape' ? 'rgba(59,130,246,0.55)' : 'rgba(59,130,246,0.14)'}
+          fill={highlightedFeature === 'face_shape' ? c(0.12) : 'transparent'}
+          stroke={highlightedFeature === 'face_shape' ? c(0.55) : c(0.14)}
           strokeWidth={highlightedFeature === 'face_shape' ? 2 : 1}
           strokeDasharray={highlightedFeature === 'face_shape' ? undefined : '5 4'}
           style={{ cursor: 'pointer' }}
@@ -268,7 +275,7 @@ function FeatureHotspots({
       {foreheadPath && (
         <path
           d={foreheadPath}
-          fill={highlightedFeature === 'forehead' ? 'rgba(59,130,246,0.18)' : 'rgba(59,130,246,0.01)'}
+          fill={highlightedFeature === 'forehead' ? c(0.18) : c(0.01)}
           stroke="transparent"
           strokeWidth={2}
           style={{ cursor: 'pointer' }}
@@ -287,7 +294,7 @@ function FeatureHotspots({
               <path
                 d={leftBrowPath}
                 fill="none"
-                stroke={highlightedFeature === 'eyebrows' ? 'rgba(59,130,246,0.45)' : 'rgba(59,130,246,0.14)'}
+                stroke={highlightedFeature === 'eyebrows' ? c(0.45) : c(0.14)}
                 strokeWidth={highlightedFeature === 'eyebrows' ? 2.5 : 1.2}
               />
             </>
@@ -298,7 +305,7 @@ function FeatureHotspots({
               <path
                 d={rightBrowPath}
                 fill="none"
-                stroke={highlightedFeature === 'eyebrows' ? 'rgba(59,130,246,0.45)' : 'rgba(59,130,246,0.14)'}
+                stroke={highlightedFeature === 'eyebrows' ? c(0.45) : c(0.14)}
                 strokeWidth={highlightedFeature === 'eyebrows' ? 2.5 : 1.2}
               />
             </>
@@ -314,8 +321,8 @@ function FeatureHotspots({
             cy={eyeCy * h}
             rx={Math.max(12, w * 0.035)}
             ry={Math.max(9, h * 0.022)}
-            fill={highlightedFeature === 'eyes' ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.02)'}
-            stroke={highlightedFeature === 'eyes' ? 'rgba(59,130,246,0.52)' : 'rgba(59,130,246,0.12)'}
+            fill={highlightedFeature === 'eyes' ? c(0.2) : c(0.02)}
+            stroke={highlightedFeature === 'eyes' ? c(0.52) : c(0.12)}
             strokeWidth={highlightedFeature === 'eyes' ? 2 : 1}
           />
           <ellipse
@@ -323,8 +330,8 @@ function FeatureHotspots({
             cy={eyeCy * h}
             rx={Math.max(12, w * 0.035)}
             ry={Math.max(9, h * 0.022)}
-            fill={highlightedFeature === 'eyes' ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.02)'}
-            stroke={highlightedFeature === 'eyes' ? 'rgba(59,130,246,0.52)' : 'rgba(59,130,246,0.12)'}
+            fill={highlightedFeature === 'eyes' ? c(0.2) : c(0.02)}
+            stroke={highlightedFeature === 'eyes' ? c(0.52) : c(0.12)}
             strokeWidth={highlightedFeature === 'eyes' ? 2 : 1}
           />
         </g>
@@ -337,7 +344,7 @@ function FeatureHotspots({
           <path
             d={nosePath}
             fill="none"
-            stroke={highlightedFeature === 'nose' ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.14)'}
+            stroke={highlightedFeature === 'nose' ? c(0.5) : c(0.14)}
             strokeWidth={highlightedFeature === 'nose' ? 2.4 : 1.2}
             strokeLinecap="round"
           />
@@ -346,7 +353,7 @@ function FeatureHotspots({
               cx={nose[0] * w}
               cy={nose[1] * h}
               r={Math.max(8, w * 0.014)}
-              fill={highlightedFeature === 'nose' ? 'rgba(59,130,246,0.22)' : 'rgba(59,130,246,0.04)'}
+              fill={highlightedFeature === 'nose' ? c(0.22) : c(0.04)}
               stroke="transparent"
             />
           )}
@@ -358,8 +365,8 @@ function FeatureHotspots({
           <title>{`${t('features.mouth')} · ${t('annotation.clickToView')}`}</title>
           <path
             d={mouthPath}
-            fill={highlightedFeature === 'mouth' ? 'rgba(59,130,246,0.18)' : 'rgba(59,130,246,0.03)'}
-            stroke={highlightedFeature === 'mouth' ? 'rgba(59,130,246,0.46)' : 'rgba(59,130,246,0.12)'}
+            fill={highlightedFeature === 'mouth' ? c(0.18) : c(0.03)}
+            stroke={highlightedFeature === 'mouth' ? c(0.46) : c(0.12)}
             strokeWidth={highlightedFeature === 'mouth' ? 2 : 1}
           />
           {mouth && (
@@ -367,7 +374,7 @@ function FeatureHotspots({
               cx={mouth[0] * w}
               cy={mouth[1] * h}
               r={Math.max(8, w * 0.014)}
-              fill={highlightedFeature === 'mouth' ? 'rgba(59,130,246,0.2)' : 'transparent'}
+              fill={highlightedFeature === 'mouth' ? c(0.2) : 'transparent'}
               stroke="transparent"
             />
           )}
@@ -381,7 +388,7 @@ function FeatureHotspots({
           <path
             d={jawPath}
             fill="none"
-            stroke={highlightedFeature === 'jawline' ? 'rgba(59,130,246,0.5)' : 'rgba(59,130,246,0.14)'}
+            stroke={highlightedFeature === 'jawline' ? c(0.5) : c(0.14)}
             strokeWidth={highlightedFeature === 'jawline' ? 2.5 : 1.2}
             strokeLinecap="round"
           />
@@ -501,7 +508,7 @@ function LockedPaidOverlay({
           <path
             d={jawPath}
             fill="none"
-            stroke="rgba(120, 113, 108, 0.45)"
+            stroke={stone(0.45)}
             strokeWidth={Math.max(8, w * 0.012)}
             strokeLinecap="round"
           />
@@ -510,7 +517,7 @@ function LockedPaidOverlay({
           <path
             d={nosePath}
             fill="none"
-            stroke="rgba(120, 113, 108, 0.4)"
+            stroke={stone(0.4)}
             strokeWidth={Math.max(6, w * 0.008)}
             strokeLinecap="round"
           />
@@ -523,7 +530,7 @@ function LockedPaidOverlay({
             cy={leftCheek[1] * h}
             rx={Math.max(18, w * 0.045)}
             ry={Math.max(12, h * 0.028)}
-            fill="rgba(232, 121, 117, 0.35)"
+            fill={blush(0.35)}
           />
         )}
         {rightCheek && (
@@ -532,7 +539,7 @@ function LockedPaidOverlay({
             cy={rightCheek[1] * h}
             rx={Math.max(18, w * 0.045)}
             ry={Math.max(12, h * 0.028)}
-            fill="rgba(232, 121, 117, 0.35)"
+            fill={blush(0.35)}
           />
         )}
 
@@ -541,7 +548,7 @@ function LockedPaidOverlay({
           <path
             d={browLeft}
             fill="none"
-            stroke="rgba(255, 183, 77, 0.55)"
+            stroke={amber(0.55)}
             strokeWidth={Math.max(4, w * 0.006)}
             strokeDasharray="6 5"
             strokeLinecap="round"
@@ -551,7 +558,7 @@ function LockedPaidOverlay({
           <path
             d={browRight}
             fill="none"
-            stroke="rgba(255, 183, 77, 0.55)"
+            stroke={amber(0.55)}
             strokeWidth={Math.max(4, w * 0.006)}
             strokeDasharray="6 5"
             strokeLinecap="round"
@@ -574,12 +581,12 @@ function LockedPaidOverlay({
               ry={radius}
               width={badgeW}
               height={badgeH}
-              fill="rgba(15, 23, 42, 0.56)"
+              fill={slate(0.56)}
             />
             <text
               x={0}
               y={0}
-              fill="rgba(255,255,255,0.9)"
+              fill="oklch(1 0 0 / 0.9)"
               fontSize={fontSize}
               textAnchor="middle"
               dominantBaseline="central"

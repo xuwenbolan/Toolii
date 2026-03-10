@@ -27,7 +27,7 @@ type Point = { x: number; y: number }
 const MAX_CANVAS_WIDTH = 1080
 const MAX_CANVAS_HEIGHT = 700
 const MASK_OVERLAY_ALPHA = 0.45
-const MASK_COLOR = 'rgba(255,60,60,0.85)'
+const MASK_COLOR = 'oklch(0.55 0.24 27 / 0.85)' // --canvas-mask-inpaint
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value))

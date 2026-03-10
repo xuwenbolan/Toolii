@@ -49,7 +49,7 @@ export function ToolResultPanel({ open, title, onClose, className, children }: P
       <section
         className={cn(
           'w-full max-w-3xl rounded-2xl border border-border/70 bg-background shadow-2xl',
-          'transition-[opacity,transform] duration-[var(--duration-slow)] ease-[var(--ease-out)]',
+          'transition-[opacity,transform] duration-[var(--duration-normal)] ease-[var(--ease-out)]',
           visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
           className,
         )}

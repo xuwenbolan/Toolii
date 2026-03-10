@@ -32,9 +32,9 @@ export function ScoreRing({ score, size = 100 }: { score: number; size?: number 
       <svg viewBox={`0 0 ${size} ${size}`} className="w-20 h-20 sm:w-[100px] sm:h-[100px] -rotate-90">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="oklch(0.65 0.20 264)" />
-            <stop offset="60%" stopColor="oklch(0.55 0.22 290)" />
-            <stop offset="100%" stopColor="oklch(0.58 0.18 320)" />
+            <stop offset="0%" stopColor="var(--canvas-primary)" />
+            <stop offset="60%" stopColor="var(--canvas-accent)" />
+            <stop offset="100%" stopColor="var(--canvas-accent-end)" />
           </linearGradient>
         </defs>
         <circle

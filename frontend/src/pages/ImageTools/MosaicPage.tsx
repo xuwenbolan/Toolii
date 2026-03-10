@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { formatBytes } from '@/lib/fileValidation'
+import { canvasColor } from '@/lib/canvasColors'
 import { cn } from '@/lib/utils'
 
 type MosaicTool = 'rect' | 'brush' | 'eraser'
@@ -165,8 +166,8 @@ export function MosaicPage() {
       previewCtx.save()
       previewCtx.setLineDash([7, 4])
       previewCtx.lineWidth = 2
-      previewCtx.strokeStyle = 'rgba(79,70,229,0.95)'
-      previewCtx.fillStyle = 'rgba(79,70,229,0.12)'
+      previewCtx.strokeStyle = canvasColor('canvas-primary', 0.95)
+      previewCtx.fillStyle = canvasColor('canvas-primary', 0.12)
       previewCtx.fillRect(x, y, w, h)
       previewCtx.strokeRect(x, y, w, h)
       previewCtx.restore()
