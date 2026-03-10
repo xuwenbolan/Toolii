@@ -147,7 +147,7 @@ async def cortex_disable_model(
 
 @router.get("/cortex/timeline")
 async def cortex_timeline(
-    last: int = Query(default=300, ge=1, le=3600),
+    last: int = Query(default=0, ge=0, le=10000),
     admin: User = Depends(get_admin_user),  # noqa: ARG001
 ) -> dict[str, Any]:
     """Fetch recent VRAM timeline samples from Cortex."""

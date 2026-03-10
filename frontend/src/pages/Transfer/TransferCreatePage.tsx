@@ -17,7 +17,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useToolRunState } from '@/hooks/useToolRunState'
 import { formatBytes } from '@/lib/fileValidation'
-import { getTranslatedApiError } from '@/lib/apiErrors'
 import { listFiles, quickShare, type QuickShareResponse } from '@/services/hubApi'
 
 const RETENTION_OPTIONS = [1, 3, 7] as const

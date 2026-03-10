@@ -66,5 +66,22 @@
   "used": "used",
   "uploadFileTooLarge": "File {{name}} exceeds the {{max}} MB size limit",
   "uploadQuotaExceeded": "Storage quota exceeded, please delete some files first",
-  "uploadFileCountExceeded": "File count limit exceeded (max {{max}} files)"
+  "uploadFileCountExceeded": "File count limit exceeded (max {{max}} files)",
+  "addFiles": "Add files",
+  "addFilesTitle": "Add files to share",
+  "addFilesDesc": "Select files from your file list to add.",
+  "addFilesConfirm": "Add",
+  "addFilesSuccess": "{{count}} file(s) added",
+  "addFilesFailed": "Failed to add files",
+  "removeFromShare": "Remove",
+  "removeFromShareConfirmTitle": "Remove file",
+  "removeFromShareConfirmDesc": "Remove this file from the share? The share link remains unchanged.",
+  "removeFromShareFailed": "Remove failed",
+  "noFilesAvailable": "No files available to add",
+  "shareEmpty": "No files in this share",
+  "shareEmptyHint": "Click \"Add files\" to select files to share.",
+  "openShareLink": "Open share link",
+  "deleteShare": "Delete share",
+  "deleteShareFailed": "Failed to delete share",
+  "removeFileFailed": "Failed to remove file"
 }

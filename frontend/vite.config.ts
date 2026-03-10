@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import viteCompression from 'vite-plugin-compression'
 import path from 'node:path'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
@@ -254,7 +255,21 @@ function seoPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), cspNoncePlugin(), seoPlugin()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    cspNoncePlugin(),
+    seoPlugin(),
+    viteCompression({
+      algorithm: 'gzip',
+      threshold: 1024,
+      ext: '.gz',
+      filter: (file) =>
+        !file.endsWith('.html') &&
+        !file.includes('/tokenizers/') &&
+        /\.(js|mjs|css|json|svg|xml)$/.test(file),
+    }),
+  ],
   build: {
     sourcemap: false,
     rollupOptions: {

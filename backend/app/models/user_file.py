@@ -108,6 +108,12 @@ class ShareGroup(TimestampMixin, Base):
         String(20), nullable=False, server_default="active"
     )
 
+    # Set when the last file is removed; cleared when a file is added back.
+    # Share groups with emptied_at older than 7 days are auto-deleted.
+    emptied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
 
 class ShareGroupFile(Base):
     __tablename__ = "share_group_files"

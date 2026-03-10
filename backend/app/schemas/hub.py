@@ -93,6 +93,10 @@ class ShareGroupCreate(BaseModel):
     message: str | None = Field(None, max_length=500)
 
 
+class ShareGroupFilesRequest(BaseModel):
+    file_ids: list[int] = Field(min_length=1, max_length=50)
+
+
 class ShareGroupResponse(BaseModel):
     id: int
     token: str

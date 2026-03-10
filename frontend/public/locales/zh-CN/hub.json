@@ -66,5 +66,22 @@
   "used": "已用",
   "uploadFileTooLarge": "文件 {{name}} 超过 {{max}} MB 大小限制",
   "uploadQuotaExceeded": "存储空间不足，请删除部分文件后重试",
-  "uploadFileCountExceeded": "文件数量超出上限（最多 {{max}} 个）"
+  "uploadFileCountExceeded": "文件数量超出上限（最多 {{max}} 个）",
+  "addFiles": "添加文件",
+  "addFilesTitle": "添加文件到分享",
+  "addFilesDesc": "从文件列表中选择要添加的文件。",
+  "addFilesConfirm": "添加",
+  "addFilesSuccess": "已添加 {{count}} 个文件",
+  "addFilesFailed": "添加文件失败",
+  "removeFromShare": "移除",
+  "removeFromShareConfirmTitle": "移除文件",
+  "removeFromShareConfirmDesc": "确认从分享中移除此文件？分享链接不变。",
+  "removeFromShareFailed": "移除失败",
+  "noFilesAvailable": "没有可添加的文件",
+  "shareEmpty": "分享中暂无文件",
+  "shareEmptyHint": "点击「添加文件」来选择要分享的文件。",
+  "openShareLink": "打开分享链接",
+  "deleteShare": "删除分享",
+  "deleteShareFailed": "删除分享失败",
+  "removeFileFailed": "移除文件失败"
 }

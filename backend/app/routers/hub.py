@@ -29,6 +29,7 @@ from app.schemas.hub import (
     FileUploadResponse,
     QuickShareResponse,
     ShareGroupCreate,
+    ShareGroupFilesRequest,
     ShareGroupListResponse,
     ShareGroupResponse,
     ShareInfoResponse,
@@ -390,6 +391,58 @@ async def delete_share(
     return {"ok": True}
 
 
+@router.post("/shares/{share_id}/files", response_model=ShareGroupResponse)
+@limiter.limit("10/minute")
+async def add_files_to_share(
+    request: Request,
+    share_id: int,
+    body: ShareGroupFilesRequest,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShareGroupResponse:
+    hub = HubService(db)
+    sg = await hub.add_files_to_share(share_id, user.id, body.file_ids)
+    file_count, total_size = await hub._share_group_stats(sg.id)
+    await db.commit()
+    return ShareGroupResponse(
+        id=sg.id,
+        token=sg.token,
+        share_url=f"/t/{sg.token}",
+        extract_code=sg.extract_code,
+        message=sg.message,
+        file_count=file_count,
+        total_size=total_size,
+        expires_at=sg.expires_at.isoformat() if sg.expires_at else None,
+        created_at=sg.created_at.isoformat(),
+    )
+
+
+@router.delete("/shares/{share_id}/files", response_model=ShareGroupResponse)
+@limiter.limit("10/minute")
+async def remove_files_from_share(
+    request: Request,
+    share_id: int,
+    body: ShareGroupFilesRequest,
+    user: User = Depends(get_verified_user),
+    db: AsyncSession = Depends(get_db),
+) -> ShareGroupResponse:
+    hub = HubService(db)
+    sg = await hub.remove_files_from_share(share_id, user.id, body.file_ids)
+    file_count, total_size = await hub._share_group_stats(sg.id)
+    await db.commit()
+    return ShareGroupResponse(
+        id=sg.id,
+        token=sg.token,
+        share_url=f"/t/{sg.token}",
+        extract_code=sg.extract_code,
+        message=sg.message,
+        file_count=file_count,
+        total_size=total_size,
+        expires_at=sg.expires_at.isoformat() if sg.expires_at else None,
+        created_at=sg.created_at.isoformat(),
+    )
+
+
 # ── Quick Share ──────────────────────────────────────────────────────
 
 @router.post("/quick-share", response_model=QuickShareResponse)
@@ -649,7 +702,7 @@ async def hub_share_og_page(
     db: AsyncSession = Depends(get_db),
 ) -> HTMLResponse:
     """Serve HTML with OG tags for social media previews, then redirect to SPA."""
-    spa_url = f"{settings.frontend_base_url}/t/{token}"
+    spa_url = f"{settings.frontend_base_url}/f/{token}"
     hub = HubService(db)
     meta = await hub.get_share_og_meta(token)
 

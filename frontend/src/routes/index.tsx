@@ -86,7 +86,7 @@ export const router = createBrowserRouter([
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'share/:token', element: <ShareClaimPage /> },
       { path: 'transfer', element: <TransferCreatePage /> },
-      { path: 't/:token', element: <TransferReceivePage /> },
+      { path: 'f/:token', element: <TransferReceivePage /> },
       {
         path: 'doc/edit/:id',
         element: (

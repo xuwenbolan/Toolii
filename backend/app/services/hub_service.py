@@ -758,6 +758,121 @@ class HubService:
         )
         await self._db.flush()
 
+    async def add_files_to_share(
+        self,
+        share_id: int,
+        user_id: int,
+        file_ids: list[int],
+    ) -> ShareGroup:
+        """Add files to an existing share group. Returns updated ShareGroup."""
+        if not file_ids:
+            raise AppError(code="EMPTY_FILES", message="No files specified", status_code=400)
+
+        result = await self._db.execute(
+            select(ShareGroup).where(
+                ShareGroup.id == share_id,
+                ShareGroup.user_id == user_id,
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+            )
+        )
+        sg = result.scalar_one_or_none()
+        if not sg:
+            raise AppError(code="NOT_FOUND", message="Share group not found", status_code=404)
+
+        # Count existing files
+        existing_count_result = await self._db.execute(
+            select(func.count()).where(ShareGroupFile.share_group_id == sg.id)
+        )
+        existing_count = existing_count_result.scalar_one()
+
+        if existing_count + len(file_ids) > settings.max_hub_share_files:
+            raise AppError(
+                code="TOO_MANY_FILES",
+                message=f"Maximum {settings.max_hub_share_files} files per share",
+                status_code=400,
+            )
+
+        # Validate file ownership and status
+        files_result = await self._db.execute(
+            select(UserFile).where(
+                UserFile.id.in_(file_ids),
+                UserFile.user_id == user_id,
+                UserFile.status == FileStatus.ACTIVE,
+            )
+        )
+        files = list(files_result.scalars().all())
+        if len(files) != len(file_ids):
+            raise AppError(
+                code="FILES_NOT_FOUND",
+                message="Some files not found or not owned by you",
+                status_code=400,
+            )
+
+        # Skip files already in the share group
+        existing_result = await self._db.execute(
+            select(ShareGroupFile.user_file_id).where(
+                ShareGroupFile.share_group_id == sg.id,
+                ShareGroupFile.user_file_id.in_(file_ids),
+            )
+        )
+        existing_file_ids = {row[0] for row in existing_result.all()}
+        new_files = [f for f in files if f.id not in existing_file_ids]
+
+        for uf in new_files:
+            self._db.add(ShareGroupFile(share_group_id=sg.id, user_file_id=uf.id))
+
+        # Clear emptied_at since the group now has files
+        if new_files:
+            sg.emptied_at = None
+
+        # Recalculate expiry
+        await self._refresh_share_group_expiry(sg.id)
+        await self._db.flush()
+        return sg
+
+    async def remove_files_from_share(
+        self,
+        share_id: int,
+        user_id: int,
+        file_ids: list[int],
+    ) -> ShareGroup:
+        """Remove files from a share group. Sets emptied_at if group becomes empty."""
+        if not file_ids:
+            raise AppError(code="EMPTY_FILES", message="No files specified", status_code=400)
+
+        result = await self._db.execute(
+            select(ShareGroup).where(
+                ShareGroup.id == share_id,
+                ShareGroup.user_id == user_id,
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+            )
+        )
+        sg = result.scalar_one_or_none()
+        if not sg:
+            raise AppError(code="NOT_FOUND", message="Share group not found", status_code=404)
+
+        await self._db.execute(
+            delete(ShareGroupFile).where(
+                ShareGroupFile.share_group_id == sg.id,
+                ShareGroupFile.user_file_id.in_(file_ids),
+            )
+        )
+
+        # Check if the group is now empty
+        remaining_result = await self._db.execute(
+            select(func.count()).where(ShareGroupFile.share_group_id == sg.id)
+        )
+        remaining = remaining_result.scalar_one()
+        if remaining == 0:
+            sg.emptied_at = utcnow()
+        else:
+            sg.emptied_at = None
+
+        # Recalculate expiry
+        await self._refresh_share_group_expiry(sg.id)
+        await self._db.flush()
+        return sg
+
     # ── Public share access ──────────────────────────────────────────
 
     async def get_share_info(self, token: str, code: str | None = None) -> dict | None:
@@ -1022,8 +1137,12 @@ class HubService:
                 delete(ShareGroupFile).where(ShareGroupFile.user_file_id.in_(expired_ids))
             )
 
-        # Expire empty share groups
+        # Mark newly-empty share groups with emptied_at
         await self._expire_empty_share_groups()
+        # Delete share groups that have been empty for 7+ days
+        stale = await self._delete_stale_empty_share_groups()
+        if stale:
+            logger.info("Deleted %d stale empty share groups", stale)
         # Expire share groups past their expiry
         await self._db.execute(
             update(ShareGroup)
@@ -1066,12 +1185,14 @@ class HubService:
         return result.one()
 
     async def _cleanup_empty_share_groups(self, user_id: int) -> None:
+        """Mark newly-empty share groups with emptied_at (instead of deleting)."""
         subq = (
             select(ShareGroup.id)
             .outerjoin(ShareGroupFile, ShareGroupFile.share_group_id == ShareGroup.id)
             .where(
                 ShareGroup.user_id == user_id,
                 ShareGroup.status == ShareGroupStatus.ACTIVE,
+                ShareGroup.emptied_at.is_(None),
             )
             .group_by(ShareGroup.id)
             .having(func.count(ShareGroupFile.id) == 0)
@@ -1082,14 +1203,18 @@ class HubService:
             await self._db.execute(
                 update(ShareGroup)
                 .where(ShareGroup.id.in_(empty_ids))
-                .values(status=ShareGroupStatus.DELETED)
+                .values(emptied_at=utcnow())
             )
 
     async def _expire_empty_share_groups(self) -> None:
+        """Mark newly-empty share groups with emptied_at (instead of expiring)."""
         subq = (
             select(ShareGroup.id)
             .outerjoin(ShareGroupFile, ShareGroupFile.share_group_id == ShareGroup.id)
-            .where(ShareGroup.status == ShareGroupStatus.ACTIVE)
+            .where(
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+                ShareGroup.emptied_at.is_(None),
+            )
             .group_by(ShareGroup.id)
             .having(func.count(ShareGroupFile.id) == 0)
         )
@@ -1099,8 +1224,40 @@ class HubService:
             await self._db.execute(
                 update(ShareGroup)
                 .where(ShareGroup.id.in_(empty_ids))
-                .values(status=ShareGroupStatus.EXPIRED)
+                .values(emptied_at=utcnow())
             )
+
+    async def _delete_stale_empty_share_groups(self) -> int:
+        """Delete share groups that have been empty for more than 7 days."""
+        cutoff = utcnow() - timedelta(days=7)
+        result = await self._db.execute(
+            update(ShareGroup)
+            .where(
+                ShareGroup.status == ShareGroupStatus.ACTIVE,
+                ShareGroup.emptied_at.isnot(None),
+                ShareGroup.emptied_at < cutoff,
+            )
+            .values(status=ShareGroupStatus.DELETED)
+        )
+        return result.rowcount  # type: ignore[return-value]
+
+    async def _refresh_share_group_expiry(self, sg_id: int) -> None:
+        """Recalculate expires_at for a single share group."""
+        min_result = await self._db.execute(
+            select(func.min(UserFile.expires_at))
+            .select_from(ShareGroupFile)
+            .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
+            .where(
+                ShareGroupFile.share_group_id == sg_id,
+                UserFile.status == FileStatus.ACTIVE,
+            )
+        )
+        min_exp = min_result.scalar_one()
+        await self._db.execute(
+            update(ShareGroup)
+            .where(ShareGroup.id == sg_id)
+            .values(expires_at=min_exp)
+        )
 
     async def _refresh_share_group_expiry_for_file(self, user_file_id: int) -> None:
         """Update expires_at of all share groups containing this file."""
@@ -1111,23 +1268,7 @@ class HubService:
         )
         sg_ids = [row[0] for row in sg_ids_result.all()]
         for sg_id in sg_ids:
-            min_result = await self._db.execute(
-                select(func.min(UserFile.expires_at))
-                .select_from(ShareGroupFile)
-                .join(UserFile, ShareGroupFile.user_file_id == UserFile.id)
-                .where(
-                    ShareGroupFile.share_group_id == sg_id,
-                    UserFile.status == FileStatus.ACTIVE,
-                )
-            )
-            min_exp = min_result.scalar_one()
-            # min_exp is None when all files have unlimited retention;
-            # we still need to update the share group to clear any old expiry.
-            await self._db.execute(
-                update(ShareGroup)
-                .where(ShareGroup.id == sg_id)
-                .values(expires_at=min_exp)
-            )
+            await self._refresh_share_group_expiry(sg_id)
 
 
 def share_count_query(user_file_id: int):

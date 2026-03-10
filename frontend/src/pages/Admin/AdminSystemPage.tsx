@@ -410,7 +410,7 @@ const TL_MIN_SPAN = 30
 const TL_ZOOM_FACTOR = 1.4
 const TL_TICK_STEPS = [5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800, 43200, 86400]
 
-function VramTimelineChart({ samples, vramTotal, defaultSpanSeconds = 300 }: { samples: CortexVramSample[]; vramTotal: number; defaultSpanSeconds?: number }) {
+function VramTimelineChart({ samples, vramTotal }: { samples: CortexVramSample[]; vramTotal: number }) {
   const { t } = useTranslation('console')
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
@@ -421,7 +421,7 @@ function VramTimelineChart({ samples, vramTotal, defaultSpanSeconds = 300 }: { s
   const dataEnd = samples.length > 1 ? samples[samples.length - 1].t : 1
   const dataRange = dataEnd - dataStart || 1
 
-  const defaultSpan = Math.min(defaultSpanSeconds, dataRange)
+  const defaultSpan = Math.min(300, dataRange)
   const vEnd = view ? view.end : dataEnd
   const vStart = view ? view.start : Math.max(dataStart, dataEnd - defaultSpan)
   const vSpan = vEnd - vStart || 1
@@ -645,13 +645,6 @@ function VramTimelineChart({ samples, vramTotal, defaultSpanSeconds = 300 }: { s
   )
 }
 
-// -- Time range options --
-// seconds: chart default viewport span; samples: API fetch count (~5s per sample)
-const TIME_RANGES = [
-  { key: '5m', seconds: 300, samples: 120 },
-  { key: '15m', seconds: 900, samples: 300 },
-  { key: '1h', seconds: 3600, samples: 1000 },
-] as const
 
 // =======================================================================
 // Main Page
@@ -666,8 +659,6 @@ export function AdminSystemPage() {
   const [unloadingModel, setUnloadingModel] = useState<string | null>(null)
   const [togglingModel, setTogglingModel] = useState<string | null>(null)
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set())
-  const [timeRange, setTimeRange] = useState<(typeof TIME_RANGES)[number]>(TIME_RANGES[0])
-
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['admin', 'cortex-status'],
     queryFn: fetchCortexStatus,
@@ -675,8 +666,8 @@ export function AdminSystemPage() {
   })
 
   const { data: timeline } = useQuery({
-    queryKey: ['admin', 'cortex-timeline', timeRange.samples],
-    queryFn: () => fetchCortexTimeline(timeRange.samples),
+    queryKey: ['admin', 'cortex-timeline'],
+    queryFn: () => fetchCortexTimeline(0),
     refetchInterval: 60_000,
     enabled: data?.online === true,
   })
@@ -686,8 +677,8 @@ export function AdminSystemPage() {
   const models = data?.models
   const gpu = models?.gpu
   const summary = models?.summary
-  const modelList = models?.models ?? []
-  const events = models?.events ?? []
+  const modelList = useMemo(() => models?.models ?? [], [models?.models])
+  const events = useMemo(() => models?.events ?? [], [models?.events])
   const inferenceStats = models?.inference_stats ?? {}
   const queue = health?.queue
   const sharedMemoryWarning = health?.shared_memory_warning ?? false
@@ -1302,32 +1293,15 @@ export function AdminSystemPage() {
             </Card>
           </div>
 
-          {/* VRAM Timeline (always on) */}
+          {/* VRAM Timeline (wheel zoom + drag pan) */}
           <Card>
-            <CardHeader className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardHeader>
               <CardTitle>{t('system.vramTimeline')}</CardTitle>
-              <div className="flex items-center gap-1">
-                {TIME_RANGES.map(tr => (
-                  <Button
-                    key={tr.key}
-                    variant={timeRange.seconds === tr.seconds ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => {
-                      setTimeRange(tr)
-                      queryClient.invalidateQueries({ queryKey: ['admin', 'cortex-timeline'] })
-                    }}
-                  >
-                    {t(`system.timeRange${tr.key}`)}
-                  </Button>
-                ))}
-              </div>
             </CardHeader>
             <CardContent>
               <VramTimelineChart
-                key={timeRange.key}
                 samples={timeline?.samples ?? []}
                 vramTotal={gpu.vram_total_mb}
-                defaultSpanSeconds={timeRange.seconds}
               />
             </CardContent>
           </Card>

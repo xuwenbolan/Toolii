@@ -225,6 +225,16 @@ export async function deleteShare(shareId: number): Promise<void> {
   await api.delete(`/api/hub/shares/${shareId}`)
 }
 
+export async function addFilesToShare(shareId: number, fileIds: number[]): Promise<ShareGroupResponse> {
+  const res = await api.post<ShareGroupResponse>(`/api/hub/shares/${shareId}/files`, { file_ids: fileIds })
+  return res.data
+}
+
+export async function removeFilesFromShare(shareId: number, fileIds: number[]): Promise<ShareGroupResponse> {
+  const res = await api.delete<ShareGroupResponse>(`/api/hub/shares/${shareId}/files`, { data: { file_ids: fileIds } })
+  return res.data
+}
+
 // ── Quick Share ──────────────────────────────────────────
 
 export async function quickShare(
