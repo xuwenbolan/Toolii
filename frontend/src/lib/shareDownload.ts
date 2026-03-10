@@ -1,15 +1,22 @@
+function isMobileDevice(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
 /**
- * Share-first download: try Web Share API, fall back to blob download.
+ * Download a blob as a file.
+ * On mobile devices, prefer Web Share API (better UX for saving / sharing).
+ * On desktop, always use blob + <a download> for a direct download.
  */
 export async function shareOrDownloadBlob(
   blob: Blob,
   filename: string,
 ): Promise<'shared' | 'downloaded'> {
-  const file = new File([blob], filename, { type: blob.type })
-
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    await navigator.share({ files: [file] })
-    return 'shared'
+  if (isMobileDevice()) {
+    const file = new File([blob], filename, { type: blob.type })
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] })
+      return 'shared'
+    }
   }
 
   const url = URL.createObjectURL(blob)
