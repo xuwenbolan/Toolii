@@ -67,7 +67,7 @@ export function FileRowActions({
         type="button"
         size="icon"
         variant="ghost"
-        className="h-7 w-7"
+        className="h-7 w-7 transition-[background-color,transform] duration-[var(--duration-fast)] hover:bg-accent active:scale-90"
         disabled={dlPhase === 'loading'}
         onClick={() => { void handleDownload() }}
         aria-label={t('download')}
@@ -80,7 +80,7 @@ export function FileRowActions({
             type="button"
             size="icon"
             variant="ghost"
-            className="h-7 w-7"
+            className="h-7 w-7 transition-[background-color,transform] duration-[var(--duration-fast)] hover:bg-accent active:scale-90"
             aria-label={t('moreActions')}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />

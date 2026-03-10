@@ -251,69 +251,27 @@ export function HubFilesPage() {
         {isDragActive && <UploadOverlay />}
 
         {/* Header */}
-        <div className="space-y-3">
+        <Collapsible className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
-              <Collapsible>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm tabular-nums text-muted-foreground">
-                    {quotaBytes > 0
-                      ? `${formatBytes(usedBytes)} / ${formatBytes(quotaBytes)}`
-                      : `${formatBytes(usedBytes)} ${t('used')}`}
-                  </span>
-                  {quotaBytes > 0 && usagePercent > 90 && (
-                    <Badge variant="outline" className="border-destructive/30 text-destructive text-xs">
-                      {t('storageAlmostFull')}
-                    </Badge>
-                  )}
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <ChevronDown className="h-3.5 w-3.5 transition-transform duration-[var(--duration-fast)] [[data-state=open]_&]:rotate-180" />
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-                <CollapsibleContent>
-                  <div className="mt-3 grid grid-cols-3 divide-x divide-border/60 rounded-lg border border-border/70">
-                    <div className="space-y-1.5 px-3 py-2.5">
-                      <p className="tabular-nums">
-                        <span className="text-base font-semibold text-foreground">{formatBytes(usedBytes)}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {quotaBytes > 0 ? ` / ${formatBytes(quotaBytes)}` : ` ${t('used')}`}
-                        </span>
-                      </p>
-                      {quotaBytes > 0 && (
-                        <Progress
-                          value={usagePercent}
-                          className={`h-1 ${usagePercent > 90 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">{t('quotaStorage')}</p>
-                    </div>
-                    <div className="space-y-1.5 px-3 py-2.5">
-                      <p className="tabular-nums">
-                        <span className="text-base font-semibold text-foreground">{fileCount}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {maxFiles > 0 ? ` / ${maxFiles}` : ` ${t('quotaFilesUnit')}`}
-                        </span>
-                      </p>
-                      {maxFiles > 0 && (
-                        <Progress
-                          value={Math.min((fileCount / maxFiles) * 100, 100)}
-                          className={`h-1 ${fileCount / maxFiles > 0.9 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
-                        />
-                      )}
-                      <p className="text-xs text-muted-foreground">{t('quotaFiles')}</p>
-                    </div>
-                    <div className="space-y-1.5 px-3 py-2.5">
-                      <p className="text-base font-semibold text-foreground">
-                        {maxRetentionDays === 0 ? t('unlimited') : t('retentionDays', { days: maxRetentionDays })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{t('quotaRetention')}</p>
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm tabular-nums text-muted-foreground">
+                  {quotaBytes > 0
+                    ? `${formatBytes(usedBytes)} / ${formatBytes(quotaBytes)}`
+                    : `${formatBytes(usedBytes)} ${t('used')}`}
+                </span>
+                {quotaBytes > 0 && usagePercent > 90 && (
+                  <Badge variant="outline" className="border-destructive/30 text-destructive text-xs">
+                    {t('storageAlmostFull')}
+                  </Badge>
+                )}
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                    <ChevronDown className="h-3.5 w-3.5 transition-transform duration-[var(--duration-fast)] [[data-state=open]_&]:rotate-180" />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={openFilePicker} disabled={uploading}>
@@ -331,11 +289,52 @@ export function HubFilesPage() {
             </div>
           </div>
 
+          <CollapsibleContent>
+            <div className="grid grid-cols-3 divide-x divide-border/60 rounded-lg border border-border/70">
+              <div className="space-y-1.5 px-3 py-2.5">
+                <p className="tabular-nums">
+                  <span className="text-base font-semibold text-foreground">{formatBytes(usedBytes)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {quotaBytes > 0 ? ` / ${formatBytes(quotaBytes)}` : ` ${t('used')}`}
+                  </span>
+                </p>
+                {quotaBytes > 0 && (
+                  <Progress
+                    value={usagePercent}
+                    className={`h-1 ${usagePercent > 90 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">{t('quotaStorage')}</p>
+              </div>
+              <div className="space-y-1.5 px-3 py-2.5">
+                <p className="tabular-nums">
+                  <span className="text-base font-semibold text-foreground">{fileCount}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {maxFiles > 0 ? ` / ${maxFiles}` : ` ${t('quotaFilesUnit')}`}
+                  </span>
+                </p>
+                {maxFiles > 0 && (
+                  <Progress
+                    value={Math.min((fileCount / maxFiles) * 100, 100)}
+                    className={`h-1 ${fileCount / maxFiles > 0.9 ? '[&>[data-slot=indicator]]:bg-destructive' : ''}`}
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">{t('quotaFiles')}</p>
+              </div>
+              <div className="space-y-1.5 px-3 py-2.5">
+                <p className="text-base font-semibold text-foreground">
+                  {maxRetentionDays === 0 ? t('unlimited') : t('retentionDays', { days: maxRetentionDays })}
+                </p>
+                <p className="text-xs text-muted-foreground">{t('quotaRetention')}</p>
+              </div>
+            </div>
+          </CollapsibleContent>
+
           {/* Upload progress */}
           {uploading && (
             <Progress value={uploadProgress} className="h-1.5" />
           )}
-        </div>
+        </Collapsible>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
