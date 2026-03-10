@@ -27,6 +27,18 @@
 - **DO NOT** debug or run programs inside Docker containers - always use local environment for development and testing
 - Docker is for production deployment only
 
+**Frontend Rules:**
+- All frontend code MUST follow `docs/spec/frontend-design.md` — read it before making UI changes
+- Use shadcn/ui (new-york) components only — do not introduce other component libraries
+- Use `variant`/`size` props, not ad-hoc className overrides on shadcn primitives
+- Extend by wrapping — do not modify `ui/` source files
+- Use lucide-react icons only — no other icon libraries
+- All colors via CSS variables (oklch) — never hard-code color values in components
+- All user-facing text via i18next — no hard-coded strings
+- i18n: no string concatenation — use full sentence keys with interpolation
+- i18n: key pattern `{feature}.{component}.{element}`, fallback chain zh-CN → en
+- Follow the interaction pattern assigned to each tool (Section 3)
+
 **Documentation:**
 - Specs live in `docs/spec/` — each file has `Status: draft|final|outdated | Updated: YYYY-MM-DD` after the title
 - Reference data lives in `docs/references/`

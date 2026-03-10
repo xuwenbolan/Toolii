@@ -444,8 +444,10 @@ In `TransferReceivePage` (`/t/{token}`):
 
 **Single `.md` file:**
 - Auto-fetch content via `GET /api/hub/s/{token}/{file_id}/content`
-- Render readonly preview using `MilkdownPreview` (Crepe readonly mode) — same renderer as editor
-- Show download button (`.md`) and "Export PDF" button below preview
+- File info card (metadata + download) stays inside `max-w-2xl` container
+- Markdown preview renders **outside** the card container — `MilkdownPreview` (Crepe readonly mode) manages its own `max-width: 52rem` centering via ProseMirror CSS, matching the editor's reading width
+- Preview header (title + print button) aligns with the card via its own `max-w-2xl` constraint
+- Card section is `print:hidden` when preview is shown; only the rendered document prints
 
 **Multiple files (with some `.md`):**
 - Keep existing file list UI

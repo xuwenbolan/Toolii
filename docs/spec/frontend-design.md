@@ -1,78 +1,47 @@
 # Toolii Frontend Design Specification
 
-Status: final | Updated: 2026-03-03
+Status: final | Updated: 2026-03-10
 
 > Visual identity, interaction patterns, and per-tool design for the Toolii frontend.
 
 ---
 
-## 1. Brand Identity
+## 1. Design Philosophy
 
-### 1.1 Brand Personality
+### 1.1 Quiet Surface, Crafted Touch
 
-**Keywords:** Efficient, Trustworthy, Approachable, Modern
+The interface is calm -- generous whitespace, neutral tones, content at the center. But every interaction point is polished: hovers have transitions, entries have rhythm, state changes breathe. Restraint is not austerity; it is concentrating the attention budget on where the user's hands reach.
 
-- **Competence** -- tools that work, no fluff
-- **Clarity** -- zero learning curve, the interface explains itself
-- **Warmth** -- not cold or corporate, but not childish either
+**Three principles:**
 
-```
-Cold/Corporate ──────────────●──── Playful/Casual
-                        Toolii sits here
-                   "Friendly professional"
-```
-
-**Design philosophy:** Content-first neutrality. The user's images, PDFs, and text are the visual center -- the UI chrome stays out of the way.
+- **Whitespace is structure** -- organize with space, not lines or color blocks
+- **Motion is feedback** -- every state change should be felt, but never waited for
+- **Restraint is quality** -- one fewer element means one more detail polished
 
 ### 1.2 Color Strategy
 
-**Decision: Monochrome foundation, color only for meaning**
+Neutral foundation, color carries meaning.
 
-The UI is black/white/gray. Color appears only in two cases:
-1. **Logo** -- brand indigo `#4F46E5` (hardcoded in SVG, not a design token)
-2. **Semantic status** -- red/green/amber/blue for errors, success, warnings, info
+- **Base palette** -- black/white/gray, driven by CSS variables
+- **Brand** -- indigo `#4F46E5` (logo only, not a design token)
+- **Semantic** -- red/green/amber/blue for status (error, success, warning, info)
+- Color should not compete with the user's content (images, documents, text)
 
-Color does NOT appear for:
-- Buttons (primary buttons are black/dark in light mode, white in dark mode)
-- Links (foreground color + underline)
-- Focus rings (neutral gray `--ring`)
-- Tool categories (no category accent colors)
-- Page backgrounds, cards, headers, borders
+Semantic color is a signal, not an alarm. It appears as a tinted background with a low-saturation icon -- like an indicator light that catches attention without startling. Full-saturation solid color is reserved for moments that demand immediate action (destructive confirmation, critical errors).
 
 ### 1.3 Visual Tone
 
 - Light mode as default and primary design target
-- Dark mode: basic support via CSS variables
-- Neutral gray foundation -- the UI is monochrome
-- Content-first -- the user's files and images are the visual center
-- Progressive disclosure -- show controls as needed, not all at once
-- Personality comes from **typography, spacing, and layout** -- not from color
+- Dark mode: supported via CSS variables
+- Content-first -- the user's files are the visual center; UI chrome stays quiet
+- Progressive disclosure -- reveal controls as needed, not all at once
+- Personality comes from **typography, spacing, motion** -- not from color
 
-### 1.4 UI Foundation -- shadcn/ui (new-york)
+### 1.4 UI Foundation
 
-**All UI components MUST use [shadcn/ui](https://ui.shadcn.com/) with the `new-york` style variant.**
+[shadcn/ui](https://ui.shadcn.com/) (new-york style) as the component layer: unstyled primitives that take direction from our design tokens, not the other way around.
 
-Do not introduce alternative component libraries (Ant Design, MUI, Chakra, Headless UI, etc.) or hand-roll equivalents of components that shadcn/ui already provides.
-
-**Configuration (see `components.json`):**
-```
-style:      new-york
-baseColor:  neutral
-icons:      lucide-react
-css:        Tailwind CSS v4 + CSS variables (oklch)
-```
-
-**Component usage rules:**
-1. **Use shadcn/ui primitives first** -- Button, Card, Dialog, Sheet, Select, Input, Tabs, Badge, Skeleton, etc.
-2. **Follow the variant API** -- use `variant` and `size` props rather than ad-hoc className overrides
-3. **Extend, don't replace** -- wrap in thin project components (e.g., `ToolActionButton` wrapping `Button`) rather than modifying `ui/` source
-4. **Theme via CSS variables** -- all color customization flows through `index.css`. Never hard-code color values in component code
-5. **Icon consistency** -- use `lucide-react` exclusively
-
-**Adding new shadcn components:**
-```bash
-pnpm dlx shadcn@latest add <component-name>
-```
+Extend components by wrapping, not by modifying `ui/` source. All visual customization flows through CSS variables in `index.css`.
 
 ---
 
@@ -149,17 +118,38 @@ Level 2: shadow-md (floating panels, dropdowns)
 Level 3: shadow-lg + backdrop-blur (modals, overlays)
 ```
 
-### 2.5 Timing & Easing
+### 2.5 Motion & Timing
+
+**Philosophy:** Motion is feedback, not decoration. Every transition should feel intentional -- quick enough to never block, smooth enough to feel crafted.
 
 ```
---duration-fast:    150ms    hover states, color changes
---duration-normal:  250ms    panel transitions, element enter/exit
---ease-out:         cubic-bezier(0.22, 1, 0.36, 1)
+--duration-fast:    150ms    hover, color, opacity changes
+--duration-normal:  250ms    panel enter/exit, layout shifts
+--ease-out:         cubic-bezier(0.22, 1, 0.36, 1)   natural deceleration
 ```
 
-Only one animation keyframe is defined globally: `fade-in` (opacity + translateY). All other transitions use Tailwind's built-in `transition-*` utilities.
+**Guidelines:**
+- Hover/focus transitions: always present, always fast (150ms)
+- Element enter/exit: fade + subtle translate, ease-out
+- Layout changes: smooth reflow, no hard jumps
+- Loading states: skeleton shimmer or subtle pulse, not spinners
+- Drag interactions: element locks to cursor/finger position, no trailing delay, no elastic catch-up
+- Respect `prefers-reduced-motion`: degrade to instant state change
 
-Respect `prefers-reduced-motion`: all animations degrade to instant state change.
+**Motion lookup table:**
+
+| Element | Property | Values | Duration | Easing |
+|---------|----------|--------|----------|--------|
+| ToolResultPanel enter | translateY | 100% → 0 | 250ms | ease-out |
+| ToolResultPanel exit | translateY | 0 → 100% | 200ms | ease-in |
+| Dropdown / Popover | scaleY + opacity | 0.95/0 → 1/1 | 150ms | ease-out |
+| Card hover | background-color | neutral shift | 150ms | linear |
+| ToolWorkspaceDropzone idle | scale (icon) | breathing pulse | 2s loop | ease-in-out |
+| ToolWorkspaceDropzone active | scale + border | 1→1.05, primary border | 150ms | ease-out |
+| ToolWorkspaceDropzone reject | translateX | shake ±4px | 300ms | ease-out |
+| ToolErrorBanner enter | translateX | shake ±4px | 300ms | ease-out |
+| Page transition | opacity + translateY | 0/8px → 1/0 | 250ms | ease-out |
+| Progress bar fill | width | 0% → n% | 150ms | linear |
 
 ---
 
@@ -177,29 +167,17 @@ Every tool maps to one of five interaction patterns:
 | **D** | Instant Convert | Drop and done, zero-config | Progress and status feedback |
 | **E** | Live Editor | Type and see results update in real-time | Text area + live stats panel |
 
-### 3.2 Tool -> Pattern Mapping
+### 3.2 Run Modes
 
-| Tool | Pattern | Run Mode | Key Interaction |
-|------|---------|----------|----------------|
-| Image Compress | **B** Live Compare | manual | Comparison slider + quality slider |
-| Mosaic | **A** Canvas | none | Paint/draw mosaic regions (client-only) |
-| Remove Background | **B** variant | auto | Auto-process, checkerboard transparency |
-| Scan Enhance | **B** Live Compare | auto | Auto-enhance, side-by-side |
-| HEIC -> JPG | **D** Instant | auto | Drop -> auto convert -> batch progress |
-| Format Convert | **D** Instant | auto | Select format -> drop -> auto convert |
-| PDF Tools | **C** Thumbnail Grid | manual | Unified workspace, reorder/rotate/delete |
-| ID Photo | **A** Canvas | manual | Compliance guide overlay, drag-to-position |
-| Word Counter | **E** Live Editor | none | Text area left, live stats right |
+Each tool operates in one of three run modes, which determines its action bar behavior:
 
-### 3.3 Run Mode Definitions
+| Run Mode | Action Bar Behavior |
+|----------|-------------------|
+| **auto** | No "Process" button. Processing starts on upload. |
+| **manual** | "Process" button visible. User configures then submits. |
+| **none** | No action bar. Tool is entirely client-side. |
 
-| Run Mode | Action Bar Behavior | Tools |
-|----------|-------------------|-------|
-| **auto** | No "Process" button. Processing starts on upload. | Remove BG, Scan Enhance, HEIC->JPG, Format Convert |
-| **manual** | "Process" button visible. User configures then submits. | Image Compress, PDF Tools, ID Photo |
-| **none** | No action bar. Tool is entirely client-side. | Mosaic, Word Counter |
-
-### 3.4 Drag-and-Drop File Interaction
+### 3.3 Drag-and-Drop File Interaction
 
 All file-accepting tools share a consistent drag-and-drop behavior:
 
@@ -231,54 +209,177 @@ All file-accepting tools share a consistent drag-and-drop behavior:
 
 ## 4. Per-Tool Interaction Design
 
-Individual tool designs are maintained in separate files:
+Individual tool designs are maintained in `docs/spec/tools/`. Tools without a dedicated spec file follow the generic pattern assigned by their interaction pattern (Section 3.1) and run mode (Section 3.2).
 
-| Tool | File |
-|------|------|
-| Image Compress | [docs/spec/tools/compress.md](tools/compress.md) |
-| Mosaic | [docs/spec/tools/mosaic.md](tools/mosaic.md) |
-| Remove Background | [docs/spec/tools/remove-bg.md](tools/remove-bg.md) |
-| Scan Enhance | [docs/spec/tools/scan-enhance.md](tools/scan-enhance.md) |
-| HEIC->JPG / Format Convert | [docs/spec/tools/format-convert.md](tools/format-convert.md) |
-| PDF Tools | [docs/spec/tools/pdf-tools.md](tools/pdf-tools.md) |
-| ID Photo | [docs/spec/tools/id-photo.md](tools/id-photo.md) |
-| Word Counter | [docs/spec/tools/word-counter.md](tools/word-counter.md) |
+### 4.1 Code Skeletons
+
+Every tool page follows the same structural formula. Below are two reference skeletons covering the most common combinations. New tools should copy the matching skeleton and fill in tool-specific logic.
+
+**Pattern D (Instant Convert) + auto mode — simplest case:**
+
+```tsx
+export function HeicConvertPage() {
+  const { t } = useTranslation(['tools', 'common'])
+  const [files, setFiles] = useState<File[]>([])
+  const [results, setResults] = useState<FileResult[]>([])
+  const [resultPanelOpen, setResultPanelOpen] = useState(false)
+  const { pending, progress, error, errorMeta, reset, run } = useFileUpload()
+
+  const runState = useToolRunState({
+    mode: 'auto',
+    hasInput: files.length > 0,
+    hasResult: results.length > 0,
+    pending,
+    error,
+    texts: { /* status strings */ },
+  })
+
+  // auto mode: trigger processing on file drop
+  const handleFiles = async (incoming: File[]) => {
+    reset()
+    setFiles(incoming)
+    const res = await run('/api/tools/image/heic-convert', incoming)
+    setResults(res)
+    setResultPanelOpen(true)
+  }
+
+  return (
+    <>
+      <ToolPageShell
+        title={t('heicConvert.title')}
+        description={t('heicConvert.description')}
+        toolName="image/heic-convert"
+        layout="compact"
+      >
+        <ToolWorkspaceDropzone
+          accept={{ 'image/heic': ['.heic', '.heif'] }}
+          multiple
+          onFiles={handleFiles}
+        />
+        <ToolErrorBanner error={error} errorMeta={errorMeta} />
+      </ToolPageShell>
+
+      <ToolActionBar
+        mode="auto"
+        status={runState.statusText}
+        pending={pending}
+        progress={progress}
+        error={error}
+        done={runState.phase === 'done'}
+        onViewResult={results.length ? () => setResultPanelOpen(true) : undefined}
+      />
+
+      <ToolResultPanel
+        open={resultPanelOpen}
+        title={t('common:actions.downloadResult')}
+        onClose={() => setResultPanelOpen(false)}
+      >
+        {/* Download list */}
+      </ToolResultPanel>
+    </>
+  )
+}
+```
+
+**Pattern B (Live Compare) + manual mode — with sidebar controls:**
+
+```tsx
+export function CompressPage() {
+  const { t } = useTranslation(['tools', 'common'])
+  const [file, setFile] = useState<File | null>(null)
+  const [quality, setQuality] = useState(80)
+  const [result, setResult] = useState<FileResult | null>(null)
+  const [resultPanelOpen, setResultPanelOpen] = useState(false)
+  const { pending, progress, error, errorMeta, reset, run } = useFileUpload()
+
+  const runState = useToolRunState({
+    mode: 'manual',
+    hasInput: Boolean(file),
+    hasResult: Boolean(result),
+    pending,
+    error,
+    texts: { /* status strings */ },
+  })
+
+  const handleCompress = async () => {
+    if (!file) return
+    const res = await run('/api/tools/image/compress', [file], { quality })
+    setResult(res)
+    setResultPanelOpen(true)
+  }
+
+  return (
+    <>
+      <ToolPageShell
+        title={t('compress.title')}
+        description={t('compress.description')}
+        toolName="image/compress"
+        layout="workspace"
+        width="wide"
+        sidebar={
+          <div className="space-y-4">
+            <Slider value={[quality]} onValueChange={([v]) => setQuality(v)} />
+          </div>
+        }
+      >
+        <ToolWorkspaceDropzone
+          accept={{ 'image/*': [] }}
+          onFiles={(f) => { reset(); setFile(f[0] ?? null) }}
+        />
+        <ToolErrorBanner error={error} errorMeta={errorMeta} onRetry={handleCompress} />
+        {file && result && <ImageCompareSlider before={file} after={result} />}
+      </ToolPageShell>
+
+      <ToolActionBar
+        mode="manual"
+        status={runState.statusText}
+        pending={pending}
+        progress={progress}
+        error={error}
+        done={runState.phase === 'done'}
+        toolName="image/compress"
+        ctaLabel={t('compress.startCompress')}
+        ctaDisabled={!file || pending}
+        onCta={handleCompress}
+        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
+      />
+
+      <ToolResultPanel
+        open={Boolean(result && resultPanelOpen)}
+        title={t('common:actions.downloadResult')}
+        onClose={() => setResultPanelOpen(false)}
+      >
+        {/* Before/after comparison, download button */}
+      </ToolResultPanel>
+    </>
+  )
+}
+```
+
+**Skeleton checklist (applies to all patterns):**
+
+1. State: `file(s)`, `result(s)`, `resultPanelOpen` — always these three
+2. Hooks: `useFileUpload()` for upload state, `useToolRunState()` for status text
+3. Structure: `<ToolPageShell>` → `<ToolActionBar>` → `<ToolResultPanel>` — always this order, siblings at top level
+4. Error: `<ToolErrorBanner>` inside the shell, near the action that caused it
+5. i18n: keys from `tools` namespace for tool-specific text, `common` for shared actions
 
 ---
 
 ## 5. Visual Differentiation
 
-### 5.1 Tool Icons
+### 5.1 Icons
 
-Each tool has a unique icon from the Lucide icon set:
-
-| Tool | Icon | Rationale |
-|------|------|-----------|
-| Image Compress | `Minimize2` | Visually represents shrinking |
-| Mosaic | `Grid3x3` | Pixelated grid effect |
-| Remove BG | `Eraser` | Removing/erasing background |
-| Scan Enhance | `ScanLine` | "Scan" concept |
-| HEIC -> JPG | `FileImage` | Image file output |
-| Format Convert | `ArrowRightLeft` | Conversion between formats |
-| PDF Tools | `Layers` | Working with pages/layers |
-| ID Photo | `Camera` | Photo capture |
-| Word Counter | `Type` | Text/typing input |
+All icons come from `lucide-react`. Each tool's icon is configured in the backend `tools` table -- the database is the source of truth.
 
 ### 5.2 Empty States
 
-Each tool's empty state:
-```
-+-------------------------------------------+
-|                                           |
-|    Drag image here or click to upload     |
-|    Supports JPG, PNG, WebP up to 20MB     |
-|                                           |
-|         [ Browse files ]                  |
-+-------------------------------------------+
-```
+Empty state is an invitation, not a blank.
 
-- Simple icon + description text, no complex illustrations
-- Mobile: prominent "Browse files" button
+- Minimal: one icon, one line of guidance, one action
+- Tone: helpful, not urgent -- "drop a file here" rather than "you must upload"
+- The drop zone IS the empty state -- no separate upload widget
+- Mobile: prominent touch-friendly "Browse files" button
 
 ---
 
@@ -295,9 +396,11 @@ Home page directly shows ALL tools grouped by category. Users click a tool and g
 - Brand name + one-line value proposition
 - Optional trust indicators ("Files processed locally", "No sign-up needed")
 
-**Tool cards:**
-- Tool name (semibold) + one-line description (muted)
-- Hover: subtle background color change (`hover:bg-muted/50`)
+**Tool category cards:**
+- Responsive grid: 2 columns on small screens, 4 on wide screens
+- Card: category name (semibold) + one-line description (muted)
+- Hover: subtle background shift -- felt but not flashy
+- Visibility: controlled by backend `toolStore`
 
 **Navigation:**
 - "Back" button on tool pages links back to home `/`
@@ -350,7 +453,7 @@ workspace:  60/40 split on xl+
 - Overlays the action bar when processing completes
 - Shows: result preview, file info, download button
 - "Process another" to dismiss and return
-- Panel height adapts to content, max ~40vh
+- Panel height adapts to content, max ~70vh
 
 ### 6.4 Responsive Behavior
 
@@ -359,6 +462,25 @@ workspace:  60/40 split on xl+
 | < 640px (mobile) | Single column, full-width workspace, bottom-fixed action bar |
 | 640-1024px (tablet) | Single column or compact split |
 | 1024px+ (desktop) | Full split/workspace layout |
+
+**Per-pattern mobile adaptations:**
+
+| Pattern | Desktop | Mobile (< 640px) |
+|---------|---------|-------------------|
+| **A** Canvas | Direct manipulation with mouse/trackpad | Pinch-to-zoom + pan; toolbar moves to bottom sheet |
+| **B** Live Compare | Side-by-side split view | Stacked vertically; swipe or toggle to switch before/after |
+| **C** Thumbnail Grid | Multi-column grid with hover actions | 2-column grid; long-press for selection mode |
+| **D** Instant Convert | Single column, already compact | No change needed; dropzone shows prominent "Browse" button |
+| **E** Live Editor | Side-by-side editor + stats panel | Stacked; stats panel collapses to summary bar, tap to expand |
+
+### 6.5 In-Progress Navigation Guard
+
+When the user has an active file or unsaved result and attempts to navigate away (browser back, clicking another tool, closing tab):
+
+- **During processing**: block navigation with a confirmation dialog ("Processing in progress. Leave anyway?")
+- **Result available but not downloaded**: show a soft warning ("You have an undownloaded result. Leave anyway?")
+- **No active state**: navigate freely, no prompt
+- Implementation: `beforeunload` event for tab close, route-level `useBlocker` for in-app navigation
 
 ---
 
@@ -378,154 +500,37 @@ workspace:  60/40 split on xl+
 
 ---
 
-## 8. Error & Exception States
+## 8. Error States
 
-### 8.1 Error State Matrix
+**Principles:**
+- Errors appear **in context** (near the action that caused them), not as global toasts
+- Messages are **specific and actionable** -- tell the user what went wrong and what to do next
+- Error state never destroys user work
+- Prefer recoverable flows (retry, choose another file) over dead ends
 
-| Trigger | Message Pattern | CTA | Recoverable? |
-|---------|----------------|-----|-------------|
-| File too large | "File exceeds {max}MB limit" | "Choose a smaller file" | Yes |
-| Unsupported format | "Format not supported. Use {formats}" | "Choose another file" | Yes |
-| Upload failed (network) | "Upload failed. Check your connection." | [Retry] | Yes |
-| Processing failed | "Processing failed. Please try again." | [Retry] | Yes |
-| Processing timeout | "Processing timed out." | [Retry] | Maybe |
-| Batch partial failure | "3 of 5 files failed" | [Retry failed] [Download successful] | Yes |
-| Auth required | "Sign in to use this tool" | [Sign in] [Register] | Yes |
-| Insufficient credits | "Not enough credits" | [Buy credits] | Yes |
-| Rate limited | "Too many requests. Wait a moment." | Auto-dismiss | Yes |
-| File corrupt | "File could not be read" | [Upload a different file] | Yes |
-
-### 8.2 Error Visual Design
-
+**Visual treatment:**
 - Background: `--destructive-light`
 - Border: `--destructive` at 20% opacity
 - Icon: `XCircle` or `AlertTriangle` in `--destructive`
-- Errors appear **in context** (near the action that caused them)
-- Error messages are **specific and actionable**
-- Error state never destroys user work
 
 ---
 
-## 9. Internationalization (i18n)
+## 9. Text & Localization
 
-### 9.1 Translation Key Conventions
+Text length must accommodate both EN and ZH without breaking layout:
 
-```
-Namespace structure:
-  common.json    shared UI (nav, actions, preview labels)
-  tools.json     image tools + PDF tools
-  textTools.json text tool specific
-  idPhoto.json   ID photo specific
-
-Key naming pattern:
-  {feature}.{component}.{element}
-```
-
-### 9.2 Text Length Constraints
-
-| Element | Max chars (EN) | Max chars (ZH) |
-|---------|---------------|----------------|
+| Element | Max EN | Max ZH |
+|---------|--------|--------|
 | Button label | 20 | 8 |
 | Tool card title | 25 | 10 |
 | Tool card description | 80 | 40 |
 | Action bar status | 50 | 25 |
 | Page title (h1) | 40 | 16 |
 
-### 9.3 Localization Rules
-
-- Numbers: `Intl.NumberFormat` for locale-aware formatting
-- File sizes: `formatBytes()` utility (KB/MB)
-- Dates: `Intl.DateTimeFormat` with locale from i18n
-- Pluralization: i18next `count` interpolation
-- No string concatenation -- use full sentence keys with interpolation
-- Fallback chain: zh-CN -> en
-
 ---
 
-## 10. Performance Budget
+## 10. Open Items
 
-### 10.1 Loading Performance
-
-| Metric | Target |
-|--------|--------|
-| First Contentful Paint (FCP) | < 1.5s (4G) |
-| Largest Contentful Paint (LCP) | < 2.5s (4G) |
-| Total blocking time (TBT) | < 200ms |
-| Initial JS bundle (gzipped) | < 200KB |
-
-### 10.2 Runtime Performance
-
-| Interaction | Target |
-|-------------|--------|
-| Canvas preview update (mosaic, compress slider) | < 16ms (60fps) |
-| Text stats update on keystroke | < 50ms |
-| PDF thumbnail render per page | < 200ms |
-| Comparison slider drag | 0ms perceived lag |
-| File drop zone response | < 100ms |
-
-### 10.3 Asset Budgets
-
-| Asset type | Budget |
-|-----------|--------|
-| Tool illustration SVG | < 5KB each |
-| Lucide icons (tree-shaken) | ~200B each |
-| Source Sans 3 font (4 weights, woff2) | ~60KB via @fontsource |
-| Source Code Pro font (2 weights, woff2) | ~30KB via @fontsource |
-
-### 10.4 Minimum Device Target
-
-- **Mobile:** 2019+ mid-range Android (4GB RAM)
-- **Desktop:** Chrome/Firefox/Safari/Edge, last 2 major versions
-- **Network:** Functional on 3G; optimized for 4G+
-
----
-
-## 11. Tool Naming & Routing Map
-
-| Product Name (EN) | Product Name (ZH) | Route | Component | i18n Key Prefix |
-|-------------------|--------------------|-------|-----------|-----------------|
-| Image Compress | 图片压缩 | `/image-tools/compress` | `CompressPage` | `compress` |
-| Remove Background | 去除背景 | `/image-tools/remove-bg` | `RemoveBgPage` | `removeBg` |
-| Mosaic | 马赛克 | `/image-tools/mosaic` | `MosaicPage` | `mosaic` |
-| Scan Enhance | 扫描增强 | `/image-tools/scan-enhance` | `ScanEnhancePage` | `scanEnhance` |
-| HEIC to JPG | HEIC 转 JPG | `/image-tools/heic-to-jpg` | `HeicToJpgPage` | `heicToJpg` |
-| Format Convert | 格式转换 | `/image-tools/convert` | `FormatConvertPage` | `convert` |
-| PDF Tools | PDF 工具 | `/pdf-tools` | `PdfToolsPage` | `pdf` |
-| ID Photo | 证件照 | `/id-photo` | `IdPhotoPage` | `idPhoto` |
-| Word Counter | 字数统计 | `/text-tools/word-counter` | `WordCounterPage` | `wordCounter` |
-
-**Naming rules:**
-- Route paths: kebab-case
-- Component names: PascalCase
-- i18n key prefixes: camelCase
-- Documentation references: Product Name (EN)
-
----
-
-## 12. Decisions Log
-
-| Decision | Choice | Section |
-|----------|--------|---------|
-| Color strategy | Monochrome -- no brand accent in UI, no category colors | 1.2 |
-| Brand indigo | Logo only (hardcoded `#4F46E5`), not a design token | 1.2 |
-| Visual tone | Minimal-neutral, content-first | 1.3 |
-| Typography | Source Sans 3 + System CJK, loaded via @fontsource | 2.2 |
-| Animation | Minimal -- one `fade-in` keyframe, Tailwind transitions only | 2.5 |
-| Empty states | Simple icon + description text | 5.2 |
-| Home page | Hero + all tools by category | 6.0 |
-| Navigation depth | 2 levels: Home -> Tool | 6.0 |
-| Header | Minimal -- Logo + user actions only | 6.1 |
-| Action bar | Fixed bottom, auto/manual/none modes | 6.3 |
-| Error handling | In-context, specific & actionable messages | 8 |
-| UI component library | shadcn/ui (new-york), Tailwind CSS v4, oklch | 1.4 |
-| Per-tool design | Separate files in `docs/spec/tools/` | 4 |
-
----
-
-## 13. Open Items
-
-1. **Dark mode polish** -- Dark mode is functional but not refined
+1. **Dark mode polish** -- Functional but not refined
 2. **Mobile gesture details** -- Swipe-to-dismiss, bottom sheet specifics for canvas tools
-3. **Prerender plugin** -- Evaluate build-time prerendering for SEO (replacing custom Vite SEO plugin)
-4. **ThemeProvider** -- Replace `next-themes` with custom Vite-native ThemeProvider
-5. **View Transitions** -- Adopt React 19 `<ViewTransition>` when stable
+3. **View Transitions** -- Adopt React 19 `<ViewTransition>` when upgrading from React 18

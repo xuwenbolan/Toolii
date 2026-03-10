@@ -78,7 +78,7 @@ All files get a `user_files` record. No more mtime-based cleanup — everything 
 
 | Source | user_id | Default retention | Counts toward quota |
 |--------|---------|-------------------|---------------------|
-| User upload | user.id | 3 days | Yes |
+| User upload | user.id | 7 days | Yes |
 | Tool result (logged-in) | user.id | 24h | Yes |
 | Tool result (anonymous) | NULL | 1h | No (no owner) |
 | Result share image | user.id or NULL | 24h | Yes (if owned) |
@@ -161,7 +161,7 @@ Concurrency: quota check uses `SELECT ... FOR UPDATE` on a per-user basis to pre
 
 | File type | Default | Max | Extendable |
 |-----------|---------|-----|------------|
-| User upload | 3 days | 7 days | Yes |
+| User upload | 7 days | 7 days | Yes |
 | Tool result (logged-in) | 24h | 7 days | Yes |
 | Tool result (anonymous) | 1h | 1h | No |
 | Result share image | 24h | 24h | No |
@@ -215,7 +215,6 @@ Content-Type: multipart/form-data
 
 Form fields:
   files: UploadFile[] (1 or more, required)
-  retention_days: int (1-7, default 3)
 
 Response 200:
 {
@@ -402,6 +401,24 @@ Response 200: {"ok": true}
 
 Only deletes the share group (link becomes invalid). Files remain in user's storage.
 
+### Unshare File (auth required)
+
+```
+DELETE /api/hub/files/{id}/shares
+
+Response 200:
+{
+  "removed_shares": 2
+}
+
+Errors:
+  404: Not found or not owned by user
+```
+
+Removes the file from all active share groups. Any share group that becomes empty after removal is automatically deleted. The file itself remains in user's storage.
+
+This powers the share toggle in the file list — users can disable sharing for a file without navigating to the Shares tab.
+
 ### Quick Share (auth required)
 
 ```
@@ -410,7 +427,6 @@ Content-Type: multipart/form-data
 
 Form fields:
   files: UploadFile[] (required)
-  retention_days: int (1-7, default 3)
   use_extract_code: bool (default false)
   message: str (optional, max 500)
 
@@ -501,10 +517,10 @@ Errors:
 Main file management page with two tabs or sections:
 
 **My Files tab:**
-- Upload area (drag & drop, multi-file)
-- Retention input (1-7 days, default 3)
-- File list: checkbox select, filename, size, source badge (upload/tool_result), expiry countdown, share count, actions
-- Actions per file: Download, Rename, Extend
+- Upload area (drag & drop, multi-file), all uploads default to 7-day retention
+- File list: checkbox select, filename, size, source badge (upload/tool_result), expiry countdown, share toggle, actions
+- Share toggle per file: when file has active shares (`share_count > 0`), show an ON toggle; clicking it OFF removes the file from all share groups (calls `DELETE /api/hub/files/{id}/shares`). When no shares exist, the toggle is hidden — use the "Share" action to create a new share.
+- Actions per file: Download, Rename, Extend, Share
 - Batch actions toolbar: Share selected, Delete selected
 - Storage usage bar: "128 MB / 500 MB"
 - Upload/download progress: use universal `TransferProgress` component
@@ -517,8 +533,8 @@ Main file management page with two tabs or sections:
 ### Quick Share Page (`/transfer`)
 
 Streamlined upload-and-share flow (replaces current Transfer create page, keeps same URL):
-- Upload files
-- Set retention, optional extract code, optional message
+- Upload files (7-day retention)
+- Optional extract code, optional message
 - One click: upload + share
 - Result: share link + extract code + copy button + Web Share API
 
