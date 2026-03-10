@@ -81,7 +81,7 @@ export function ConsoleLayout() {
       {/* Mobile overlay */}
       <div
         className={cn(
-          'fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 lg:hidden',
+          'fixed inset-0 z-40 bg-black/50 transition-opacity duration-[var(--duration-normal)] lg:hidden',
           mobileOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={() => setMobileOpen(false)}
@@ -90,7 +90,7 @@ export function ConsoleLayout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/50 bg-card transition-all duration-200 lg:static',
+          'fixed inset-y-0 left-0 z-40 flex flex-col border-r border-border/50 bg-card transition-all duration-[var(--duration-normal)] lg:static',
           collapsed ? 'lg:w-16' : 'lg:w-56',
           mobileOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}

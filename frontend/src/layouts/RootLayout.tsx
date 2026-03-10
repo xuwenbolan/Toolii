@@ -80,7 +80,7 @@ export function RootLayout() {
         <Suspense fallback={<div className="text-sm text-muted-foreground">{t('actions.processingWait')}</div>}>
           <div
             key={location.pathname}
-            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-200 motion-reduce:animate-none"
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1 motion-safe:duration-[var(--duration-normal)] motion-reduce:animate-none"
           >
             <Outlet />
           </div>
