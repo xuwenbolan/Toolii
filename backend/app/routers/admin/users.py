@@ -18,7 +18,7 @@ from app.schemas.admin import (
     UpdateUserStatusRequest,
 )
 from app.schemas.common import Message
-from app.services.admin_service import AdminService
+from app.services.admin_user_service import AdminUserService
 
 router = APIRouter(prefix="/users", tags=["admin-users"])
 
@@ -32,7 +32,7 @@ async def list_users(
     search: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
 ) -> AdminUserListResponse:
-    data = await AdminService(db).list_users(
+    data = await AdminUserService(db).list_users(
         limit=limit, offset=offset, search=search, is_active=is_active,
     )
     return AdminUserListResponse(**data)
@@ -44,7 +44,7 @@ async def get_user_detail(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
     db: AsyncSession = Depends(get_db),
 ) -> AdminUserDetailResponse:
-    data = await AdminService(db).get_user_detail(user_id)
+    data = await AdminUserService(db).get_user_detail(user_id)
     return AdminUserDetailResponse(**data)
 
 
@@ -57,7 +57,7 @@ async def update_user_status(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).toggle_user_status(user_id, is_active=payload.is_active)
+    await AdminUserService(db).toggle_user_status(user_id, is_active=payload.is_active)
     status = "enabled" if payload.is_active else "disabled"
     await audit(
         category="admin",
@@ -82,7 +82,7 @@ async def adjust_credits(
 ) -> AdjustCreditsResponse:
     if user_id == admin.id:
         raise AppError(code="SELF_OPERATION_FORBIDDEN", message="Cannot adjust own credits", status_code=403)
-    data = await AdminService(db).adjust_credits(
+    data = await AdminUserService(db).adjust_credits(
         user_id, amount=payload.amount, description=payload.description,
     )
     await audit(
@@ -111,7 +111,7 @@ async def update_hub_settings(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).update_hub_settings(
+    await AdminUserService(db).update_hub_settings(
         user_id,
         hub_quota_mb=payload.hub_quota_mb,
         hub_max_files=payload.hub_max_files,

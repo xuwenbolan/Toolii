@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -8,6 +8,9 @@ from app.models.base import Base, TimestampMixin
 
 class CreditTransaction(TimestampMixin, Base):
     __tablename__ = "credit_transactions"
+    __table_args__ = (
+        Index("ix_credit_transactions_user_created", "user_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 

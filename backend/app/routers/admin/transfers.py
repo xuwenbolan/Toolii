@@ -14,7 +14,7 @@ from app.schemas.admin import (
     AdminShareGroupListResponse,
 )
 from app.schemas.common import Message
-from app.services.admin_service import AdminService
+from app.services.admin_transfer_service import AdminTransferService
 
 router = APIRouter(prefix="/transfers", tags=["admin-transfers"])
 
@@ -27,7 +27,7 @@ async def list_hub_files(
     offset: int = Query(default=0, ge=0),
     source: str | None = Query(default=None),
 ) -> AdminHubFileListResponse:
-    data = await AdminService(db).list_hub_files(
+    data = await AdminTransferService(db).list_hub_files(
         limit=limit, offset=offset, source=source,
     )
     return AdminHubFileListResponse(**data)
@@ -41,7 +41,7 @@ async def delete_hub_file(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).delete_hub_file(file_id)
+    await AdminTransferService(db).delete_hub_file(file_id)
     await audit(
         category="admin",
         action="delete_hub_file",
@@ -61,7 +61,7 @@ async def list_share_groups(
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None),
 ) -> AdminShareGroupListResponse:
-    data = await AdminService(db).list_share_groups(
+    data = await AdminTransferService(db).list_share_groups(
         limit=limit, offset=offset, status=status,
     )
     return AdminShareGroupListResponse(**data)
@@ -75,7 +75,7 @@ async def delete_share_group(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).delete_share_group(group_id)
+    await AdminTransferService(db).delete_share_group(group_id)
     await audit(
         category="admin",
         action="delete_share_group",
@@ -96,7 +96,7 @@ async def list_result_shares(
     share_type: str | None = Query(default=None),
     expired: bool | None = Query(default=None),
 ) -> AdminResultShareListResponse:
-    data = await AdminService(db).list_result_shares(
+    data = await AdminTransferService(db).list_result_shares(
         limit=limit, offset=offset, share_type=share_type, expired=expired,
     )
     return AdminResultShareListResponse(**data)
@@ -110,7 +110,7 @@ async def delete_result_share(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).delete_result_share(share_id)
+    await AdminTransferService(db).delete_result_share(share_id)
     await audit(
         category="admin",
         action="delete_result_share",

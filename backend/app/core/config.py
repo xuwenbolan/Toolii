@@ -75,6 +75,20 @@ class Settings(BaseSettings):
     # Cortex GPU inference service
     cortex_url: str = Field(default="http://localhost:9100", alias="CORTEX_URL")
     cortex_api_key: str = Field(default="", alias="CORTEX_API_KEY")
+    cortex_cb_threshold: int = Field(default=5, alias="CORTEX_CB_THRESHOLD")
+    cortex_cb_cooldown: float = Field(default=30.0, alias="CORTEX_CB_COOLDOWN")
+    cortex_timeout_connect: float = Field(default=5.0, alias="CORTEX_TIMEOUT_CONNECT")
+    cortex_timeout_read: float = Field(default=120.0, alias="CORTEX_TIMEOUT_READ")
+    cortex_timeout_write: float = Field(default=30.0, alias="CORTEX_TIMEOUT_WRITE")
+    cortex_retry_delay: float = Field(default=0.5, alias="CORTEX_RETRY_DELAY")
+
+    # IP ban settings for rate-limit offenders
+    ip_ban_threshold: int = Field(default=5, alias="IP_BAN_THRESHOLD")
+    ip_ban_window: float = Field(default=300.0, alias="IP_BAN_WINDOW")
+    ip_ban_duration: float = Field(default=600.0, alias="IP_BAN_DURATION")
+
+    # Download URL default TTL (seconds)
+    download_url_ttl: int = Field(default=86400, alias="DOWNLOAD_URL_TTL")
 
     result_share_ttl_days: int = Field(default=7, alias="RESULT_SHARE_TTL_DAYS")
 

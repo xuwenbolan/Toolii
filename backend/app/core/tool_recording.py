@@ -8,15 +8,24 @@ import logging
 from fastapi.routing import APIRoute
 import jwt
 from jwt.exceptions import PyJWTError
+from sqlalchemy.exc import SQLAlchemyError
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.config import settings
-from app.core import database as _db
 from app.core.exceptions import AppError
 from app.models.processing_history import ProcessingHistory
 
 logger = logging.getLogger(__name__)
+
+
+def _default_session_factory():
+    from app.core import database
+    return database.SessionLocal()
+
+
+# Overridable session factory for testing
+session_factory = _default_session_factory
 
 
 # Categories where all endpoints share a single tool identity
@@ -38,7 +47,12 @@ def _extract_tool_name(path: str) -> str:
 
 
 def _try_extract_user_id(request: Request) -> int | None:
-    """Best-effort extraction of user_id from JWT token."""
+    """Best-effort extraction of user_id from JWT token.
+
+    Checks the in-memory token blacklist (O(1)) to reject revoked tokens.
+    """
+    from app.core.token_blacklist import token_blacklist
+
     auth = request.headers.get("authorization")
     if not auth or not auth.lower().startswith("bearer "):
         return None
@@ -51,6 +65,9 @@ def _try_extract_user_id(request: Request) -> int | None:
         )
         if payload.get("type") != "access":
             return None
+        jti = payload.get("jti")
+        if jti and token_blacklist.is_revoked(jti):
+            return None
         return int(payload["sub"])
     except (PyJWTError, KeyError, ValueError, TypeError):
         return None
@@ -61,15 +78,21 @@ async def _check_is_admin(user_id: int) -> bool:
     from app.models.user import User
 
     try:
-        async with _db.SessionLocal() as db:
+        async with session_factory() as db:
             from sqlalchemy import select
             result = await db.execute(
                 select(User.is_admin).where(User.id == user_id),
             )
             row = result.scalar_one_or_none()
             return bool(row)
-    except Exception:
+    except SQLAlchemyError:
         return False
+
+
+def _extract_ip(request: Request) -> str | None:
+    """Extract client IP from X-Forwarded-For or direct connection."""
+    xff = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return xff or (request.client.host if request.client else None)
 
 
 async def _record_usage(
@@ -79,10 +102,9 @@ async def _record_usage(
 ) -> None:
     """Record a single tool usage entry in its own db session."""
     try:
-        xff = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-        ip = xff or (request.client.host if request.client else None)
+        ip = _extract_ip(request)
         ua = (request.headers.get("user-agent") or "")[:256] or None
-        async with _db.SessionLocal() as session:
+        async with session_factory() as session:
             session.add(ProcessingHistory(
                 user_id=user_id,
                 tool_name=tool_name,
@@ -91,7 +113,7 @@ async def _record_usage(
                 user_agent=ua,
             ))
             await session.commit()
-    except Exception:
+    except SQLAlchemyError:
         logger.warning("Failed to record tool usage for %s", tool_name, exc_info=True)
 
 
@@ -99,7 +121,7 @@ async def _check_balance(user_id: int, amount: int) -> None:
     """Verify user has sufficient credits. Raises AppError(402) if not."""
     from app.services.credit_service import CreditService
 
-    async with _db.SessionLocal() as db:
+    async with session_factory() as db:
         svc = CreditService(db)
         balance = await svc.get_balance(user_id)
         if balance < amount:
@@ -115,7 +137,11 @@ async def _register_tool_result(response: Response, user_id: int | None) -> None
 
     Parses the JSON response body; if it contains a file_id field, creates
     a UserFile record so the file appears in the user's hub file list.
+    Anonymous users are skipped — they cannot access the hub, so registering
+    files (and generating thumbnails) would only create garbage data.
     """
+    if user_id is None:
+        return
     if not hasattr(response, "body"):
         return
     try:
@@ -130,7 +156,7 @@ async def _register_tool_result(response: Response, user_id: int | None) -> None
     try:
         from app.services.hub_service import HubService
 
-        async with _db.SessionLocal() as db:
+        async with session_factory() as db:
             hub = HubService(db)
             meta_dict = body.get("meta")
             # Exclude meta from the API response (internal field)
@@ -148,7 +174,7 @@ async def _register_tool_result(response: Response, user_id: int | None) -> None
                 meta=meta_dict,
             )
             await db.commit()
-    except Exception:
+    except (SQLAlchemyError, OSError):
         logger.warning("Failed to register tool result in hub", exc_info=True)
 
 
@@ -204,10 +230,13 @@ class ToolGatewayRoute(APIRoute):
                 # "verified" delegates to endpoint's Depends(get_verified_user)
                 # "auth" is satisfied by having a valid user_id
 
-            # 3. Daily limit check
+            # 3. Daily limit check (per-IP for anonymous users)
             daily_limit = tool.daily_limit_auth if user_id else tool.daily_limit_anon
             if daily_limit is not None:
-                count = await tool_service.get_daily_usage_count(tool_name, user_id)
+                client_ip = _extract_ip(request) if user_id is None else None
+                count = await tool_service.get_daily_usage_count(
+                    tool_name, user_id, ip=client_ip,
+                )
                 if count >= daily_limit:
                     raise AppError(
                         code="TOOL_DAILY_LIMIT",
@@ -241,6 +270,3 @@ class ToolGatewayRoute(APIRoute):
 
         return handler
 
-
-# Backward-compatible alias so existing imports continue to work
-ToolRecordingRoute = ToolGatewayRoute

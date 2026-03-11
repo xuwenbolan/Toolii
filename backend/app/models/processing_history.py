@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -8,6 +8,11 @@ from app.models.base import Base, TimestampMixin
 
 class ProcessingHistory(TimestampMixin, Base):
     __tablename__ = "processing_history"
+    __table_args__ = (
+        Index("ix_processing_history_user_created", "user_id", "created_at"),
+        Index("ix_processing_history_tool_user_created", "tool_name", "user_id", "created_at"),
+        Index("ix_processing_history_tool_ip_created", "tool_name", "ip", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 

@@ -16,9 +16,9 @@ from app.core.security import decode_jwt_token
 # ---------------------------------------------------------------------------
 # IP ban state for repeat rate-limit offenders
 # ---------------------------------------------------------------------------
-_BAN_THRESHOLD = 5          # rate-limit hits within window
-_BAN_WINDOW = 300.0         # 5 minutes
-_BAN_DURATION = 600.0       # 10 minutes
+_BAN_THRESHOLD = settings.ip_ban_threshold
+_BAN_WINDOW = settings.ip_ban_window
+_BAN_DURATION = settings.ip_ban_duration
 
 _violations: dict[str, list[float]] = {}
 _banned: dict[str, float] = {}
@@ -51,10 +51,15 @@ def _record_violation(ip: str) -> None:
         _violations.pop(ip, None)
 
     # Periodic cleanup: evict stale entries to prevent unbounded growth
-    if len(_violations) > 1000:
+    if len(_violations) > 512:
         stale = [k for k, v in _violations.items() if not v or v[-1] <= cutoff]
         for k in stale:
             del _violations[k]
+    if len(_banned) > 512:
+        now_m = time.monotonic()
+        expired = [k for k, v in _banned.items() if v <= now_m]
+        for k in expired:
+            del _banned[k]
 
 
 # ---------------------------------------------------------------------------

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi import Depends
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from app.core.config import settings
 from app.core.dependencies import get_db, get_verified_user
+from app.core.exceptions import AppError
 from app.core.file_validation import validate_image_bytes
+from app.core.upload_limits import max_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, dynamic_rate_limit_heavy, limiter
-from app.core.task_limiter import acquire_task_slot
+from app.core.task_limiter import task_slot
 from app.core.tool_recording import ToolGatewayRoute
 from app.models.user import User
 from app.schemas.image import FileResult
@@ -32,29 +33,22 @@ router = APIRouter(
 router_public = APIRouter(prefix=f"{settings.api_prefix}/photo", tags=["photo"])
 
 
-def _max_image_bytes() -> int:
-    return settings.max_upload_image_mb * 1024 * 1024
-
-
 @router_public.post("/upload", response_model=PhotoUploadResponse)
 @limiter.limit(dynamic_rate_limit_heavy)
 async def upload(
     request: Request,
     file: UploadFile = File(...),
 ) -> PhotoUploadResponse:
-    sem = await acquire_task_slot(request)
-    try:
+    async with task_slot(request):
         data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
+        if len(data) > max_image_bytes():
+            raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
         validate_image_bytes(data)
         return await PhotoService().upload_and_prepare(
             image_bytes=data,
             filename=file.filename or "photo",
             content_type=file.content_type or "application/octet-stream",
         )
-    finally:
-        sem.release()
 
 
 @router_public.post("/preview", response_model=PhotoPreviewResponse)
@@ -63,16 +57,13 @@ async def preview(
     request: Request,
     payload: PhotoPreviewRequest,
 ) -> PhotoPreviewResponse:
-    sem = await acquire_task_slot(request)
-    try:
+    async with task_slot(request):
         return await PhotoService().preview(
             upload_id=payload.upload_id,
             standard_code=payload.standard,
             background_color=payload.background_color,
             adjust=payload.adjust.model_dump() if payload.adjust is not None else None,
         )
-    finally:
-        sem.release()
 
 
 @router.post("/export", response_model=FileResult)
@@ -83,11 +74,8 @@ async def export(
     user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
+    async with task_slot(request):
         return await PhotoService().export(processed_id=payload.processed_id, user_id=user.id, db=db)
-    finally:
-        sem.release()
 
 
 @router.post("/layout", response_model=FileResult)
@@ -98,16 +86,13 @@ async def layout(
     user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> FileResult:
-    sem = await acquire_task_slot(request)
-    try:
+    async with task_slot(request):
         return await PhotoService().layout(
             processed_id=payload.processed_id,
             copies=payload.copies,
             user_id=user.id,
             db=db,
         )
-    finally:
-        sem.release()
 
 
 @router_public.get("/standards", response_model=list[PhotoStandard])

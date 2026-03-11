@@ -17,6 +17,13 @@ class UserPublic(BaseModel):
     is_admin: bool = False
     has_password: bool = False
 
+    @classmethod
+    def from_user(cls, user: object) -> "UserPublic":
+        """Build UserPublic from a User ORM model, setting has_password correctly."""
+        pub = cls.model_validate(user)
+        pub.has_password = getattr(user, "hashed_password", None) is not None
+        return pub
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(max_length=128)

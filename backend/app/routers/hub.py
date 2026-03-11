@@ -5,11 +5,12 @@ import json
 import re
 import zipfile
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.exceptions import AppError, NotFoundError
 from app.core.dependencies import get_db, get_verified_user
 from app.core.file_response import file_response
 from app.core.rate_limiter import dynamic_rate_limit, limiter
@@ -81,7 +82,7 @@ async def upload_files(
     db: AsyncSession = Depends(get_db),
 ) -> FileUploadResponse:
     if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
+        raise AppError(code="NO_FILES", message="No files provided")
 
     max_file_bytes = settings.max_hub_file_mb * 1024 * 1024
     hub = HubService(db)
@@ -204,12 +205,12 @@ async def upload_editor_image(
 ) -> EditorImageUploadResponse:
     content_type = file.content_type or ""
     if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Only PNG, JPEG, GIF, and WebP images are supported")
+        raise AppError(code="UNSUPPORTED_FORMAT", message="Only PNG, JPEG, GIF, and WebP images are supported")
 
     data = await file.read()
     max_bytes = settings.max_editor_image_mb * 1024 * 1024
     if len(data) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"Image exceeds {settings.max_editor_image_mb} MB limit")
+        raise AppError(code="FILE_TOO_LARGE", message=f"Image exceeds {settings.max_editor_image_mb} MB limit", status_code=413)
 
     hub = HubService(db)
     storage_id, url = await hub.upload_editor_image(
@@ -248,7 +249,7 @@ async def get_file_thumbnail(
     hub = HubService(db)
     uf = await hub.get_file(file_id, user.id)
     if not uf.thumb_file_id:
-        raise HTTPException(status_code=404, detail="No thumbnail")
+        raise NotFoundError("No thumbnail")
     path = hub.get_file_path(uf.thumb_file_id)
     return file_response(
         path,
@@ -317,7 +318,7 @@ async def serve_editor_image(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     if not _IMAGE_FILE_ID_RE.match(file_id):
-        raise HTTPException(status_code=404, detail="Not found")
+        raise NotFoundError()
 
     hub = HubService(db)
     path, content_type = await hub.get_editor_image(file_id)
@@ -457,7 +458,7 @@ async def quick_share(
     db: AsyncSession = Depends(get_db),
 ) -> QuickShareResponse:
     if not files:
-        raise HTTPException(status_code=400, detail="No files provided")
+        raise AppError(code="NO_FILES", message="No files provided")
 
     max_file_bytes = settings.max_hub_file_mb * 1024 * 1024
     hub = HubService(db)
@@ -523,7 +524,7 @@ async def share_existing_file(
     hub = HubService(db)
     uf = await hub.get_by_file_id(file_id)
     if not uf or uf.user_id != user.id:
-        raise HTTPException(status_code=404, detail="File not found")
+        raise NotFoundError("File not found")
 
     sg = await hub.create_share_group(
         user_id=user.id,
@@ -558,7 +559,7 @@ async def share_info(
     hub = HubService(db)
     info = await hub.get_share_info(token, code)
     if info is None:
-        raise HTTPException(status_code=404, detail="Share not found")
+        raise NotFoundError("Share not found")
     if info.get("need_code"):
         return ShareNeedCodeResponse()
     return ShareInfoResponse(**info)
@@ -576,7 +577,7 @@ async def share_download_file(
     hub = HubService(db)
     uf = await hub.get_share_file(token, file_id, code)
     if not uf:
-        raise HTTPException(status_code=404, detail="File not found")
+        raise NotFoundError("File not found")
     await db.commit()
     path = hub.get_file_path(uf.file_id)
     return file_response(path, media_type=uf.content_type, filename=uf.original_filename)

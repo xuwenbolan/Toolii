@@ -15,7 +15,7 @@ from app.schemas.admin import (
     CardSummaryResponse,
 )
 from app.schemas.common import Message
-from app.services.admin_service import AdminService
+from app.services.admin_card_service import AdminCardService
 
 router = APIRouter(prefix="/cards", tags=["admin-cards"])
 
@@ -29,7 +29,7 @@ async def list_cards(
     status: str | None = Query(default=None),
     card_type: str | None = Query(default=None),
 ) -> AdminCardListResponse:
-    data = await AdminService(db).list_cards(
+    data = await AdminCardService(db).list_cards(
         limit=limit, offset=offset, status=status, card_type=card_type,
     )
     return AdminCardListResponse(**data)
@@ -43,7 +43,7 @@ async def generate_cards(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> CardGenerateResponse:
-    codes = await AdminService(db).generate_cards(
+    codes = await AdminCardService(db).generate_cards(
         count=payload.count,
         credits=payload.credits,
         card_type=payload.card_type,
@@ -72,7 +72,7 @@ async def disable_card(
     admin: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_db),
 ) -> Message:
-    await AdminService(db).disable_card(card_id)
+    await AdminCardService(db).disable_card(card_id)
     await audit(
         category="admin",
         action="disable_card",
@@ -89,5 +89,5 @@ async def get_card_summary(
     admin: User = Depends(get_admin_user),  # noqa: ARG001
     db: AsyncSession = Depends(get_db),
 ) -> CardSummaryResponse:
-    data = await AdminService(db).get_card_summary()
+    data = await AdminCardService(db).get_card_summary()
     return CardSummaryResponse(**data)

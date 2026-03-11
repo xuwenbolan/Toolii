@@ -11,9 +11,12 @@ _SECURITY_HEADERS: dict[str, str] = {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
     # Disable legacy XSS auditor; rely on CSP instead.
     "X-XSS-Protection": "0",
+    # NOTE: In production, Nginx overrides this CSP with nonce-based policy
+    # from docker/security-headers.conf. This fallback applies in dev mode only.
     "Content-Security-Policy": (
         "default-src 'self'; "
-        "script-src 'self' https://www.googletagmanager.com https://accounts.google.com https://apis.google.com; "
+        "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://accounts.google.com https://apis.google.com; "
+        "worker-src 'self' blob:; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: blob: https://www.google-analytics.com https://www.gstatic.com; "
         "font-src 'self'; "

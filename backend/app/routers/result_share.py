@@ -2,17 +2,19 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
+from app.core.exceptions import AppError, NotFoundError
 from app.core.config import settings
 from app.core.dependencies import get_db, get_optional_user
 from app.core.file_response import file_response
 from app.core.file_validation import validate_image_bytes
+from app.core.upload_limits import max_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit, limiter
 from app.models.user import User
 from app.schemas.result_share import ResultShareCreateResponse, ResultShareDataResponse
@@ -37,10 +39,6 @@ _VALID_SHARE_TYPES = _FACEMAP_SHARE_TYPES | {
 }
 
 
-def _max_image_bytes() -> int:
-    return settings.max_upload_image_mb * 1024 * 1024
-
-
 @router.post("/create", response_model=ResultShareCreateResponse)
 @limiter.limit(dynamic_rate_limit)
 async def create_result_share(
@@ -60,17 +58,17 @@ async def create_result_share(
     `result_file_id` references the processed result file.
     """
     if share_type not in _VALID_SHARE_TYPES:
-        raise HTTPException(status_code=400, detail="Invalid share_type")
+        raise AppError(code="INVALID_SHARE_TYPE", message="Invalid share_type")
     if locale not in _VALID_LOCALES:
         locale = "zh-CN"
     if len(result_json) > _MAX_RESULT_JSON_BYTES:
-        raise HTTPException(status_code=400, detail="Result data too large")
+        raise AppError(code="PAYLOAD_TOO_LARGE", message="Result data too large")
 
     # Validate and clean JSON
     try:
         parsed = json.loads(result_json)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")  # noqa: B904
+        raise AppError(code="INVALID_JSON", message="Invalid JSON")  # noqa: B904
 
     # Strip visualization data for FaceMap types
     if share_type in _FACEMAP_SHARE_TYPES:
@@ -82,8 +80,8 @@ async def create_result_share(
 
     # Read and validate the uploaded image
     image_data = await image.read()
-    if len(image_data) > _max_image_bytes():
-        raise HTTPException(status_code=413, detail="File too large")
+    if len(image_data) > max_image_bytes():
+        raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
     validate_image_bytes(image_data)
 
     svc = ResultShareService(db)
@@ -95,7 +93,7 @@ async def create_result_share(
             path = file_svc.get_path(result_file_id)
             result_image_bytes = path.read_bytes()
         except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Result file not found")  # noqa: B904
+            raise NotFoundError("Result file not found")  # noqa: B904
 
         share = await svc.create_share(
             image_bytes=result_image_bytes,
@@ -145,19 +143,19 @@ async def create_similarity_share(
     if locale not in _VALID_LOCALES:
         locale = "zh-CN"
     if len(result_json) > _MAX_RESULT_JSON_BYTES:
-        raise HTTPException(status_code=400, detail="Result data too large")
+        raise AppError(code="PAYLOAD_TOO_LARGE", message="Result data too large")
 
     try:
         parsed = json.loads(result_json)
     except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")  # noqa: B904
+        raise AppError(code="INVALID_JSON", message="Invalid JSON")  # noqa: B904
     clean_json = json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
 
-    max_bytes = _max_image_bytes()
+    max_bytes = max_image_bytes()
     data1 = await file1.read()
     data2 = await file2.read()
     if len(data1) > max_bytes or len(data2) > max_bytes:
-        raise HTTPException(status_code=413, detail="File too large")
+        raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
     validate_image_bytes(data1)
     validate_image_bytes(data2)
 
@@ -239,7 +237,7 @@ async def get_result_share_original(
     svc = ResultShareService(db)
     share = await svc.get_share(token=token)
     if not share.original_image_file_id:
-        raise HTTPException(status_code=404, detail="No original image")
+        raise NotFoundError("No original image")
     path = svc.get_image_path(file_id=share.original_image_file_id)
     return file_response(
         path,

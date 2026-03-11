@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from slowapi.util import get_remote_address
@@ -13,13 +14,15 @@ from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.core.exceptions import AppError
+from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.file_response import file_response
 from app.core.security import verify_download_signature
 from app.models.user import User
 from app.services.credit_service import CreditService
 from app.services.file_service import FileService, build_download_url
 from app.services.hub_service import HubService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix=f"{settings.api_prefix}/download", tags=["download"])
 
@@ -33,15 +36,15 @@ async def download(
 ) -> Response:
     now = int(time.time())
     if exp < now:
-        raise HTTPException(status_code=410, detail="Expired")
+        raise AppError(code="LINK_EXPIRED", message="Download link expired", status_code=410)
 
     if not verify_download_signature(file_id=file_id, filename=fn, exp=exp, sig=sig):
-        raise HTTPException(status_code=403, detail="Invalid signature")
+        raise ForbiddenError("Invalid download signature")
 
     try:
         path = FileService().get_path(file_id)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Not found") from exc
+        raise NotFoundError("File not found") from exc
 
     return file_response(
         path,
@@ -73,14 +76,14 @@ async def unlock(
     hub = HubService(db)
     uf = await hub.get_by_file_id(file_id)
     if not uf:
-        raise HTTPException(status_code=404, detail="File not found")
+        raise NotFoundError("File not found")
 
     meta: dict = {}
     if uf.meta:
         try:
             meta = json.loads(uf.meta)
         except (json.JSONDecodeError, ValueError):
-            pass
+            logger.warning("Malformed meta JSON for file %s", file_id)
 
     clean_file_id = meta.get("clean_file_id")
     credit_cost = int(meta.get("credit_cost", 0))
@@ -95,7 +98,7 @@ async def unlock(
     # Verify ownership: only the user who created the file can unlock it
     owner_id = meta.get("owner_user_id")
     if owner_id is not None and owner_id != user.id:
-        raise HTTPException(status_code=403, detail="Not the file owner")
+        raise ForbiddenError("Not the file owner")
 
     # Determine the target file to serve
     target_file_id = clean_file_id or file_id
@@ -104,7 +107,7 @@ async def unlock(
     try:
         fs.get_path(target_file_id)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=410, detail="File expired") from exc
+        raise AppError(code="FILE_EXPIRED", message="File expired", status_code=410) from exc
 
     # Look up the target file for filename
     target_uf = await hub.get_by_file_id(target_file_id) if clean_file_id else uf

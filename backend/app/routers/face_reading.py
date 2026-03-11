@@ -1,26 +1,24 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 
 from app.core.config import settings
 from app.core.dependencies import get_verified_user
+from app.core.exceptions import AppError
 from app.core.file_validation import validate_image_bytes
+from app.core.upload_limits import max_image_bytes
 from app.core.rate_limiter import dynamic_rate_limit_heavy, limiter
 from app.core.task_limiter import acquire_task_slot
-from app.core.tool_recording import ToolRecordingRoute
+from app.core.tool_recording import ToolGatewayRoute
 from app.models.user import User
 from app.schemas.face_reading import FaceProfileResponse, FullReportResponse
 from app.schemas.face_similarity import FaceSimilarityResponse
 from app.services.face_similarity_service import FaceSimilarityService
 from app.services.physiognomy_service import FaceMapService
 
-router = APIRouter(prefix=f"{settings.api_prefix}/facemap", tags=["facemap"], route_class=ToolRecordingRoute)
+router = APIRouter(prefix=f"{settings.api_prefix}/facemap", tags=["facemap"], route_class=ToolGatewayRoute)
 
 _svc = FaceMapService()
-
-
-def _max_image_bytes() -> int:
-    return settings.max_upload_image_mb * 1024 * 1024
 
 
 def _normalize_locale(accept_lang: str | None) -> str:
@@ -42,8 +40,8 @@ async def face_profile(
     sem = await acquire_task_slot(request)
     try:
         data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
+        if len(data) > max_image_bytes():
+            raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
         validate_image_bytes(data)
         locale = _normalize_locale(request.headers.get("Accept-Language"))
         result = await _svc.analyze_profile(image_bytes=data, locale=locale)
@@ -63,8 +61,8 @@ async def face_report(
     sem = await acquire_task_slot(request)
     try:
         data = await file.read()
-        if len(data) > _max_image_bytes():
-            raise HTTPException(status_code=413, detail="File too large")
+        if len(data) > max_image_bytes():
+            raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
         validate_image_bytes(data)
         locale = _normalize_locale(request.headers.get("Accept-Language"))
         result = await _svc.analyze_report(
@@ -95,9 +93,9 @@ async def face_similarity(
     try:
         data1 = await file1.read()
         data2 = await file2.read()
-        max_bytes = _max_image_bytes()
+        max_bytes = max_image_bytes()
         if len(data1) > max_bytes or len(data2) > max_bytes:
-            raise HTTPException(status_code=413, detail="File too large")
+            raise AppError(code="FILE_TOO_LARGE", message="File too large", status_code=413)
         validate_image_bytes(data1)
         validate_image_bytes(data2)
         locale = _normalize_locale(request.headers.get("Accept-Language"))

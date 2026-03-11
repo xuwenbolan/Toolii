@@ -27,16 +27,10 @@ from app.services.email.lang import parse_lang
 router = APIRouter(prefix=f"{settings.api_prefix}/users", tags=["users"])
 
 
-def _to_user_public(user: User) -> UserPublic:
-    pub = UserPublic.model_validate(user)
-    pub.has_password = user.hashed_password is not None
-    return pub
-
-
 @router.get("/profile", response_model=UserPublic)
 @limiter.limit(settings.rate_limit_auth)
 async def profile(request: Request, user: User = Depends(get_current_user)) -> UserPublic:  # noqa: ARG001
-    return _to_user_public(user)
+    return UserPublic.from_user(user)
 
 
 @router.put("/password")
@@ -133,7 +127,7 @@ async def update_profile(
     body: dict = {
         "code": "PROFILE_UPDATED_VERIFY_EMAIL" if email_changed else "PROFILE_UPDATED",
         "message": "Profile updated" + (", please verify new email" if email_changed else ""),
-        "user": _to_user_public(user).model_dump(),
+        "user": UserPublic.from_user(user).model_dump(),
     }
     if dev_token is not None:
         body["_dev_verification_token"] = dev_token

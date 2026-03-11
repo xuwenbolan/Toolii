@@ -12,7 +12,7 @@ from app.core.audit_log import log_auth_event
 from app.core.config import settings
 from app.core.cookie import clear_refresh_cookie, get_refresh_cookie_name, set_refresh_cookie
 from app.core.dependencies import get_current_user, get_db
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import AppError, UnauthorizedError
 from app.core.rate_limiter import limiter
 from app.core.security import decode_jwt_token
 from app.core.token_blacklist import token_blacklist
@@ -37,12 +37,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{settings.api_prefix}/auth", tags=["auth"])
 
 
-def _to_user_public(user: User) -> UserPublic:
-    pub = UserPublic.model_validate(user)
-    pub.has_password = user.hashed_password is not None
-    return pub
-
-
 def _build_auth_response(
     user: User, *, extra_body: dict[str, object] | None = None
 ) -> tuple[JSONResponse, dict]:
@@ -50,7 +44,7 @@ def _build_auth_response(
     Returns (response, token_info) where token_info contains JTIs for login history."""
     token_info = AuthService.issue_tokens(user_id=user.id)
     body = AuthResponse(
-        user=_to_user_public(user),
+        user=UserPublic.from_user(user),
         tokens=AccessTokenResponse(
             access_token=token_info["access_token"],
             expires_in=token_info["expires_in"],
@@ -92,13 +86,13 @@ async def register(
         user, dev_token = await AuthService(db).register(
             email=payload.email, password=payload.password, name=payload.name, lang=lang
         )
-    except Exception:
+    except AppError:
         log_auth_event("register_failed", email=payload.email, ip=ip, success=False)
         raise
     log_auth_event("register_success", email=payload.email, user_id=user.id, ip=ip)
     extra = None
     if dev_token is not None:
-        logger.info("Dev verification token for %s: %s", payload.email, dev_token)
+        logger.debug("Dev verification token for %s: %s", payload.email, dev_token)
     response, token_info = _build_auth_response(user, extra_body=extra)
     await _record_login(
         db, user_id=user.id, ip=ip,
@@ -117,7 +111,7 @@ async def login(
     ip = get_remote_address(request)
     try:
         user = await AuthService(db).login(email=payload.email, password=payload.password)
-    except Exception:
+    except AppError:
         log_auth_event("login_failed", email=payload.email, ip=ip, success=False)
         raise
     log_auth_event("login_success", email=payload.email, user_id=user.id, ip=ip)
@@ -141,7 +135,7 @@ async def google_auth(
         user = await AuthService(db).google_auth(
             access_token=payload.access_token, link_password=payload.link_password
         )
-    except Exception:
+    except AppError:
         log_auth_event("google_auth_failed", ip=ip, success=False)
         raise
     log_auth_event("google_auth_success", email=user.email, user_id=user.id, ip=ip)
@@ -165,7 +159,7 @@ async def refresh(
         raise UnauthorizedError("Missing refresh token")
     try:
         user = await AuthService(db).refresh(refresh_token=cookie_value)
-    except Exception:
+    except AppError:
         log_auth_event("token_refresh_failed", ip=ip, success=False)
         raise
     log_auth_event("token_refresh", user_id=user.id, ip=ip)
@@ -236,7 +230,7 @@ async def logout_all(
 @router.get("/me", response_model=UserPublic)
 @limiter.limit(settings.rate_limit_auth)
 async def me(request: Request, user: User = Depends(get_current_user)) -> UserPublic:  # noqa: ARG001
-    return _to_user_public(user)
+    return UserPublic.from_user(user)
 
 
 @router.post("/verify-email")
@@ -264,7 +258,7 @@ async def resend_verification(
     dev_token = await AuthService(db).resend_verification(user_id=user.id, lang=lang)
     log_auth_event("resend_verification", email=user.email, user_id=user.id, ip=ip)
     if dev_token is not None:
-        logger.info("Dev verification token for %s: %s", user.email, dev_token)
+        logger.debug("Dev verification token for %s: %s", user.email, dev_token)
     return JSONResponse(content={"code": "VERIFICATION_EMAIL_SENT", "message": "Verification email sent"})
 
 
@@ -281,7 +275,7 @@ async def forgot_password(
     log_auth_event("forgot_password", email=payload.email, ip=ip)
     # Always return success to prevent email enumeration
     if dev_token is not None:
-        logger.info("Dev reset token for %s: %s", payload.email, dev_token)
+        logger.debug("Dev reset token for %s: %s", payload.email, dev_token)
     return JSONResponse(content={"code": "RESET_EMAIL_SENT", "message": "If this email is registered, you will receive a password reset email"})
 
 

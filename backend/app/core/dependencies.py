@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,20 @@ from app.core.exceptions import AppError, ForbiddenError, UnauthorizedError
 from app.core.security import decode_jwt_token
 from app.core.token_blacklist import token_blacklist
 from app.models.user import User
+
+
+# ---------------------------------------------------------------------------
+# Tool recording helpers (injected by ToolGatewayRoute)
+# ---------------------------------------------------------------------------
+
+def tool_credit_cost(request: Request) -> int:
+    """Read tool credit_cost injected by ToolGatewayRoute."""
+    return getattr(request.state, "tool_credit_cost", 0)
+
+
+def tool_owner_user_id(request: Request) -> int | None:
+    """Read owner user_id injected by ToolGatewayRoute."""
+    return getattr(request.state, "tool_user_id", None)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -33,8 +47,6 @@ async def get_optional_user(
         raise UnauthorizedError("Invalid token type")
 
     jti = token.raw.get("jti")
-    if jti and token_blacklist.is_revoked(jti):
-        raise UnauthorizedError("Token has been revoked")
     if jti and await token_blacklist.is_revoked_async(db, jti):
         raise UnauthorizedError("Token has been revoked")
 

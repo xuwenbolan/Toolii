@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_admin_user, get_db
 from app.models.user import User
 from app.schemas.admin import AuditLogListResponse
-from app.services.admin_service import AdminService
+from app.services.admin_ops_service import AdminOpsService
 
 router = APIRouter(prefix="/audit", tags=["admin-audit"])
 
@@ -22,7 +22,7 @@ async def list_audit_logs(
     user_id: int | None = Query(default=None),
     success: bool | None = Query(default=None),
 ) -> AuditLogListResponse:
-    data = await AdminService(db).list_audit_logs(
+    data = await AdminOpsService(db).list_audit_logs(
         limit=limit,
         offset=offset,
         category=category,

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import os
 import sys
+import threading
+from collections.abc import AsyncIterator
 
 # Suppress noisy C++ logs from MediaPipe / TensorFlow Lite
 os.environ.setdefault("GLOG_minloglevel", "2")
@@ -41,7 +44,6 @@ from app.core.security_headers import RequestSizeLimitMiddleware, SecurityHeader
 from app.core.database import SessionLocal
 from app.core.scheduler import scheduler, setup_scheduler
 from app.core.token_blacklist import token_blacklist
-import logging
 
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
@@ -55,10 +57,43 @@ from app.services import cortex_client, llm_client
 logger = logging.getLogger(__name__)
 
 
+@contextlib.asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Pre-warm ML models in a background thread so startup is not blocked
+    def _prewarm_models() -> None:
+        with _suppress_native_stderr():
+            prewarm_background_models(["silueta"])
+            prewarm_face_landmarker()
+            prewarm_facenet()
+        logger.info("Local fallback models loaded")
+
+    threading.Thread(target=_prewarm_models, name="model-prewarm", daemon=True).start()
+
+    # Cortex GPU service connectivity check
+    try:
+        health_resp = await cortex_client.health_check()
+        logger.info("Cortex GPU service connected: %s", health_resp.get("status"))
+    except Exception:
+        logger.warning("Cortex GPU service not available, will use local fallback models")
+
+    async with SessionLocal() as db:
+        await token_blacklist.load_cache(db)
+    setup_scheduler(scheduler)
+    scheduler.start()
+
+    yield
+
+    await cortex_client.close()
+    await llm_client.close()
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+
+
 def create_app() -> FastAPI:
     docs_enabled = settings.env == "dev"
     app = FastAPI(
         title=settings.project_name,
+        lifespan=_lifespan,
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
     )
@@ -99,38 +134,6 @@ def create_app() -> FastAPI:
     @app.get(f"{settings.api_prefix}/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
-
-    @app.on_event("startup")
-    async def _startup() -> None:
-        # Pre-warm ML models in a background thread so startup is not blocked
-        import threading
-
-        def _prewarm_models() -> None:
-            with _suppress_native_stderr():
-                prewarm_background_models(["silueta"])
-                prewarm_face_landmarker()
-                prewarm_facenet()
-            logger.info("Local fallback models loaded")
-
-        threading.Thread(target=_prewarm_models, name="model-prewarm", daemon=True).start()
-
-        # Cortex GPU service connectivity check
-        try:
-            health = await cortex_client.health_check()
-            logger.info("Cortex GPU service connected: %s", health.get("status"))
-        except Exception:
-            logger.warning("Cortex GPU service not available, will use local fallback models")
-        async with SessionLocal() as db:
-            await token_blacklist.load_cache(db)
-        setup_scheduler(scheduler)
-        scheduler.start()
-
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        await cortex_client.close()
-        await llm_client.close()
-        if scheduler.running:
-            scheduler.shutdown(wait=False)
 
     return app
 

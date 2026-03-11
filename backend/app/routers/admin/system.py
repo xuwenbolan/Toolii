@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, Path, Query, Request
 from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user
+from app.core.exceptions import AppError
 from app.core.rate_limiter import admin_write_rate_limit, limiter
 from app.models.user import User
 from app.services import cortex_client
@@ -25,7 +27,7 @@ async def cortex_status(
         health = await cortex_client.health_check()
         models = await cortex_client.models_status()
         return {"online": True, "health": health, "models": models}
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable", exc_info=True)
         return {"online": False, "health": None, "models": None}
 
@@ -37,7 +39,7 @@ async def cortex_models_check(
     """Validate all Cortex models."""
     try:
         return await cortex_client.models_check_all()
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for model check", exc_info=True)
         return {"healthy": False, "error": "cortex_unavailable"}
 
@@ -50,7 +52,7 @@ async def cortex_model_check(
     """Validate a single Cortex model."""
     try:
         return await cortex_client.model_check(model_name)
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for model check: %s", model_name, exc_info=True)
         return {"name": model_name, "healthy": False, "error": "cortex_unavailable"}
 
@@ -71,7 +73,7 @@ async def cortex_unload_all(
             ip=get_remote_address(request),
         )
         return result
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for unload-all", exc_info=True)
         return {"status": "error", "error": "cortex_unavailable"}
 
@@ -94,7 +96,7 @@ async def cortex_unload_model(
             detail=model_name,
         )
         return result
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for unload: %s", model_name, exc_info=True)
         return {"status": "error", "error": "cortex_unavailable"}
 
@@ -117,7 +119,7 @@ async def cortex_enable_model(
             detail=model_name,
         )
         return result
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for enable: %s", model_name, exc_info=True)
         return {"status": "error", "error": "cortex_unavailable"}
 
@@ -140,7 +142,7 @@ async def cortex_disable_model(
             detail=model_name,
         )
         return result
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for disable: %s", model_name, exc_info=True)
         return {"status": "error", "error": "cortex_unavailable"}
 
@@ -153,6 +155,6 @@ async def cortex_timeline(
     """Fetch recent VRAM timeline samples from Cortex."""
     try:
         return await cortex_client.fetch_timeline(last)
-    except Exception:
+    except (AppError, httpx.HTTPError):
         logger.warning("Cortex unavailable for timeline", exc_info=True)
         return {"samples": [], "shared_memory_detected": False}

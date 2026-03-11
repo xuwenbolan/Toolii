@@ -5,6 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.core import database as _db
 from app.core.login_guard import login_guard
 from app.core.token_blacklist import token_blacklist
+from app.services.file_service import FileService
 from app.services.hub_service import HubService
 from app.services.result_share_service import ResultShareService
 from app.services.photo_service import cleanup_expired_sessions
@@ -130,7 +131,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         from app.models.credit_transaction import CreditTransaction
         from app.models.email_verification import EmailVerificationToken
         from app.models.result_share import ResultShare
-        from app.models.user_file import ShareGroup, UserFile
+        from app.models.user_file import FileStatus, ShareGroup, UserFile
         from app.models.login_history import LoginHistory
         from app.models.password_reset import PasswordResetToken
         from app.models.processing_history import ProcessingHistory
@@ -140,6 +141,7 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         from app.models.user_credit import UserCredit
 
         logger = logging.getLogger("app.scheduler")
+        fs = FileService()
         cutoff = datetime.now(timezone.utc) - timedelta(days=7)
         async with _db.SessionLocal() as db:
             result = await db.execute(
@@ -153,6 +155,22 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
             user_ids = [row[0] for row in result.all()]
             if not user_ids:
                 return
+
+            # Delete user files from disk before removing DB records
+            file_result = await db.execute(
+                select(UserFile).where(
+                    UserFile.user_id.in_(user_ids),
+                    UserFile.status.in_([FileStatus.ACTIVE, FileStatus.PENDING]),
+                )
+            )
+            for uf in file_result.scalars().all():
+                for fid in (uf.file_id, uf.thumb_file_id):
+                    if fid:
+                        try:
+                            fs.delete(fid)
+                        except OSError:
+                            pass
+                uf.status = FileStatus.DELETED
 
             # Delete rows with non-nullable FK
             for table in (
@@ -208,4 +226,49 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         id="delete_unverified_accounts",
         replace_existing=True,
         misfire_grace_time=60,
+    )
+
+    async def _cleanup_old_records() -> None:
+        """Purge old anonymous ProcessingHistory and AuditLog records."""
+        import logging
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import delete
+
+        from app.models.audit_log import AuditLog
+        from app.models.processing_history import ProcessingHistory
+
+        logger = logging.getLogger("app.scheduler")
+        async with _db.SessionLocal() as db:
+            # Anonymous processing history older than 30 days
+            ph_cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+            ph_result = await db.execute(
+                delete(ProcessingHistory).where(
+                    ProcessingHistory.user_id.is_(None),
+                    ProcessingHistory.created_at < ph_cutoff,
+                )
+            )
+            ph_count = ph_result.rowcount
+
+            # Audit logs older than 90 days (all, not just anonymous)
+            al_cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+            al_result = await db.execute(
+                delete(AuditLog).where(AuditLog.created_at < al_cutoff)
+            )
+            al_count = al_result.rowcount
+
+            await db.commit()
+            if ph_count or al_count:
+                logger.info(
+                    "Cleaned up %d anonymous processing_history and %d audit_log records",
+                    ph_count, al_count,
+                )
+
+    scheduler.add_job(
+        _cleanup_old_records,
+        "interval",
+        hours=24,
+        id="cleanup_old_records",
+        replace_existing=True,
+        misfire_grace_time=300,
     )

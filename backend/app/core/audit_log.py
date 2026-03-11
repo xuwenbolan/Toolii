@@ -23,6 +23,15 @@ from typing import Any
 _logger = logging.getLogger("app.audit")
 
 
+def _default_session_factory():
+    from app.core import database
+    return database.SessionLocal()
+
+
+# Overridable session factory for testing
+session_factory = _default_session_factory
+
+
 async def audit(
     *,
     category: str,
@@ -66,10 +75,9 @@ async def audit(
 
     # 2. Persist to database
     try:
-        from app.core import database as _db
         from app.models.audit_log import AuditLog
 
-        async with _db.SessionLocal() as session:
+        async with session_factory() as session:
             session.add(AuditLog(
                 user_id=user_id,
                 category=category,
@@ -82,7 +90,7 @@ async def audit(
                 detail=detail_str,
             ))
             await session.commit()
-    except Exception:
+    except Exception:  # noqa: BLE001 — fire-and-forget must never propagate
         _logger.warning(
             "Failed to persist audit log: %s.%s", category, action, exc_info=True,
         )

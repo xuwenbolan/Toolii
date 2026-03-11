@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request
 from slowapi.util import get_remote_address
 
 from app.core.audit_log import audit
 from app.core.dependencies import get_admin_user
+from app.core.exceptions import NotFoundError
 from app.models.user import User
 from app.schemas.admin import (
     AdminFileDownloadResponse,
@@ -39,7 +40,7 @@ async def get_download_url(
     try:
         url = await FileBrowserService().get_admin_download_url(directory, file_id)
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="File not found") from exc
+        raise NotFoundError("File not found") from exc
     await audit(
         category="admin",
         action="file_download",
