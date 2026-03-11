@@ -5,7 +5,7 @@ import { formatBytes } from '@/lib/fileValidation'
 import type { UserFileItem } from '@/services/hubApi'
 
 import { FileRowActions } from './FileRowActions'
-import { getFileExtension, getFileTypeIcon, isImageType } from './fileTypeIcons'
+import { getFileExtension, getFileTypeIcon, isImageType, isPdfType } from './fileTypeIcons'
 import { useFileThumbnail } from './useFileThumbnail'
 import { formatTime, isMarkdownFile } from './utils'
 
@@ -14,6 +14,7 @@ function GridCard({
   isSelected,
   onToggleSelect,
   onEdit,
+  onPreview,
   onRename,
   onExtend,
   onShare,
@@ -24,6 +25,7 @@ function GridCard({
   isSelected: boolean
   onToggleSelect: () => void
   onEdit: () => void
+  onPreview: () => void
   onRename: () => void
   onExtend: () => void
   onShare: () => void
@@ -32,6 +34,7 @@ function GridCard({
 }) {
   const { t, i18n } = useTranslation('hub')
   const isImage = isImageType(item.content_type)
+  const isPdf = isPdfType(item.content_type)
   const { url: thumbUrl } = useFileThumbnail(item.id, item.content_type, isImage)
   const Icon = getFileTypeIcon(item.content_type)
   const isMd = isMarkdownFile(item.file_name)
@@ -82,7 +85,9 @@ function GridCard({
         <div className="absolute right-1 top-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
           <FileRowActions
             isMarkdown={isMd}
+            isPreviewable={isPdf || isImage}
             onEdit={onEdit}
+            onPreview={onPreview}
             onRename={onRename}
             onExtend={onExtend}
             onShare={onShare}
@@ -99,6 +104,14 @@ function GridCard({
             type="button"
             className="w-full truncate text-left text-sm font-medium transition hover:text-primary"
             onClick={onEdit}
+          >
+            {item.file_name}
+          </button>
+        ) : isPdf ? (
+          <button
+            type="button"
+            className="w-full truncate text-left text-sm font-medium transition hover:text-primary"
+            onClick={onPreview}
           >
             {item.file_name}
           </button>
@@ -121,6 +134,7 @@ export function FileGridView({
   selected,
   onToggleSelect,
   onEdit,
+  onPreview,
   onRename,
   onExtend,
   onShare,
@@ -131,6 +145,7 @@ export function FileGridView({
   selected: Set<number>
   onToggleSelect: (id: number) => void
   onEdit: (item: UserFileItem) => void
+  onPreview: (item: UserFileItem) => void
   onRename: (item: UserFileItem) => void
   onExtend: (item: UserFileItem) => void
   onShare: (item: UserFileItem) => void
@@ -146,6 +161,7 @@ export function FileGridView({
           isSelected={selected.has(item.id)}
           onToggleSelect={() => onToggleSelect(item.id)}
           onEdit={() => onEdit(item)}
+          onPreview={() => onPreview(item)}
           onRename={() => onRename(item)}
           onExtend={() => onExtend(item)}
           onShare={() => onShare(item)}

@@ -8,19 +8,21 @@ import {
   LayoutGrid,
   List,
   Loader2,
-  Share2,
   SquarePen,
-  Trash2,
   UploadCloud,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { SEOHead } from '@/components/common/SEOHead'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,20 +31,17 @@ import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import {
   buildFileDownloadUrl,
-  deleteFiles,
   listFiles,
   uploadFiles,
   type UserFileItem,
 } from '@/services/hubApi'
 
 import { SimplePagination } from '@/components/common/SimplePagination'
-import { ExtendDialog } from './hub/ExtendDialog'
 import { FileGridView } from './hub/FileGridView'
 import { FileListView } from './hub/FileListView'
-import { RenameDialog } from './hub/RenameDialog'
-import { ShareDialog } from './hub/ShareDialog'
 import { SharesTab } from './hub/SharesTab'
 import { UploadOverlay } from './hub/UploadOverlay'
+import { BulkActionBar, HubDialogs, useHubDialogs } from './HubDialogs'
 
 const PAGE_SIZE = 20
 const SOURCE_FILTERS = ['all', 'upload', 'tool'] as const
@@ -56,7 +55,7 @@ function getInitialViewMode(): ViewMode {
   return 'list'
 }
 
-// ── Main page ───────────────────────────────────────────────
+// -- Main page --
 
 export function HubFilesPage() {
   const { t } = useTranslation('hub')
@@ -84,21 +83,17 @@ export function HubFilesPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [deleteOpen, setDeleteOpen] = useState(false)
 
   // Upload state
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
 
-  // Action dialogs
-  const [renameItem, setRenameItem] = useState<UserFileItem | null>(null)
-  const [extendItem, setExtendItem] = useState<UserFileItem | null>(null)
-  const [shareFileIds, setShareFileIds] = useState<number[]>([])
-  const [shareDialogOpen, setShareDialogOpen] = useState(false)
-  const [deleteItem, setDeleteItem] = useState<UserFileItem | null>(null)
+  // Preview state
+  const [previewItem, setPreviewItem] = useState<UserFileItem | null>(null)
+
   const download = useFileDownload()
 
-  // ── Data fetching ──
+  // -- Data fetching --
 
   const openDocument = useCallback((item: UserFileItem) => {
     navigate(`/doc/edit/${item.id}`)
@@ -131,7 +126,17 @@ export function HubFilesPage() {
     void fetchList()
   }, [fetchList])
 
-  // ── Upload (page-level dropzone) ──
+  // -- Dialogs & bulk actions --
+
+  const clearSelection = useCallback(() => setSelected(new Set()), [])
+
+  const { actions, dialogProps } = useHubDialogs(
+    selected,
+    () => { void fetchList() },
+    clearSelection,
+  )
+
+  // -- Upload (page-level dropzone) --
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (files.length === 0 || uploading) return
@@ -183,7 +188,7 @@ export function HubFilesPage() {
     disabled: uploading,
   })
 
-  // ── Selection ──
+  // -- Selection --
 
   const toggleSelect = useCallback((id: number) => {
     setSelected((prev) => {
@@ -202,46 +207,15 @@ export function HubFilesPage() {
     }
   }, [items, selected.size])
 
-  // ── Actions ──
+  // -- Other actions --
 
-  const handleDelete = useCallback(async () => {
-    const ids = deleteItem ? [deleteItem.id] : [...selected]
-    if (ids.length === 0) return
-    try {
-      await deleteFiles(ids)
-      setSelected(new Set())
-      setDeleteItem(null)
-      void fetchList()
-    } catch {
-      // silent
-    } finally {
-      setDeleteOpen(false)
-    }
-  }, [selected, deleteItem, fetchList])
+  const handlePreview = useCallback((item: UserFileItem) => {
+    setPreviewItem(item)
+  }, [])
 
   const handleDownload = useCallback((item: UserFileItem) => {
     return download(buildFileDownloadUrl(item.id), item.file_name)
   }, [download])
-
-  const handleShare = useCallback((item: UserFileItem) => {
-    setShareFileIds([item.id])
-    setShareDialogOpen(true)
-  }, [])
-
-  const handleBatchShare = useCallback(() => {
-    setShareFileIds([...selected])
-    setShareDialogOpen(true)
-  }, [selected])
-
-  const handleSingleDelete = useCallback((item: UserFileItem) => {
-    setDeleteItem(item)
-    setDeleteOpen(true)
-  }, [])
-
-  const handleBatchDelete = useCallback(() => {
-    setDeleteItem(null)
-    setDeleteOpen(true)
-  }, [])
 
   const handleTabChange = useCallback((value: string) => {
     setSearchParams(value === 'shares' ? { tab: 'shares' } : {}, { replace: true })
@@ -260,7 +234,6 @@ export function HubFilesPage() {
   }, [navigate, t])
 
   const usagePercent = quotaBytes > 0 ? Math.min((usedBytes / quotaBytes) * 100, 100) : 0
-  const deleteCount = deleteItem ? 1 : selected.size
 
   return (
     <>
@@ -365,7 +338,7 @@ export function HubFilesPage() {
             <TabsTrigger value="shares">{t('tabShares')}</TabsTrigger>
           </TabsList>
 
-          {/* ── Files tab ── */}
+          {/* -- Files tab -- */}
           <TabsContent value="files">
             <div className="space-y-4 pt-1">
               {/* Filter bar + view toggle */}
@@ -404,8 +377,6 @@ export function HubFilesPage() {
                 </div>
               </div>
 
-              {/* Bulk actions (rendered outside flow, at page bottom) */}
-
               {/* File list / grid */}
               {loading ? (
                 viewMode === 'list' ? (
@@ -441,11 +412,12 @@ export function HubFilesPage() {
                   selected={selected}
                   onToggleSelect={toggleSelect}
                   onEdit={openDocument}
-                  onRename={setRenameItem}
-                  onExtend={setExtendItem}
-                  onShare={handleShare}
+                  onPreview={handlePreview}
+                  onRename={actions.setRenameItem}
+                  onExtend={actions.setExtendItem}
+                  onShare={actions.openShare}
                   onDownload={handleDownload}
-                  onDelete={handleSingleDelete}
+                  onDelete={actions.openSingleDelete}
                 />
               ) : (
                 <FileGridView
@@ -453,11 +425,12 @@ export function HubFilesPage() {
                   selected={selected}
                   onToggleSelect={toggleSelect}
                   onEdit={openDocument}
-                  onRename={setRenameItem}
-                  onExtend={setExtendItem}
-                  onShare={handleShare}
+                  onPreview={handlePreview}
+                  onRename={actions.setRenameItem}
+                  onExtend={actions.setExtendItem}
+                  onShare={actions.openShare}
                   onDownload={handleDownload}
-                  onDelete={handleSingleDelete}
+                  onDelete={actions.openSingleDelete}
                 />
               )}
 
@@ -465,7 +438,7 @@ export function HubFilesPage() {
             </div>
           </TabsContent>
 
-          {/* ── Shares tab ── */}
+          {/* -- Shares tab -- */}
           <TabsContent value="shares">
             <div className="pt-1">
               <SharesTab />
@@ -475,55 +448,40 @@ export function HubFilesPage() {
       </div>
 
       {/* Floating bulk action bar */}
-      {selected.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-xl border bg-background/95 px-4 py-2.5 shadow-lg backdrop-blur-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-[var(--duration-normal)]">
-          <Checkbox
-            checked={selected.size === items.length}
-            onCheckedChange={toggleSelectAll}
-            aria-label={t('selectAll')}
-          />
-          <span className="text-sm font-medium">{t('selected', { count: selected.size })}</span>
-          <Button size="sm" variant="outline" onClick={handleBatchShare}>
-            <Share2 className="mr-1 h-3.5 w-3.5" />
-            {t('share')}
-          </Button>
-          <Button size="sm" variant="destructive" onClick={handleBatchDelete}>
-            <Trash2 className="mr-1 h-3.5 w-3.5" />
-            {t('delete')}
-          </Button>
-        </div>
-      )}
+      <BulkActionBar
+        selectedCount={selected.size}
+        totalCount={items.length}
+        onToggleSelectAll={toggleSelectAll}
+        onShare={actions.openBatchShare}
+        onDelete={actions.openBatchDelete}
+      />
 
       {/* Dialogs */}
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={t('deleteConfirmTitle')}
-        description={t('deleteConfirmDesc', { count: deleteCount })}
-        confirmLabel={t('deleteConfirm')}
-        cancelLabel={t('cancel')}
-        variant="destructive"
-        onConfirm={() => { void handleDelete() }}
-      />
+      <HubDialogs {...dialogProps} />
 
-      <RenameDialog
-        item={renameItem}
-        onClose={() => setRenameItem(null)}
-        onDone={() => { void fetchList() }}
-      />
-
-      <ExtendDialog
-        item={extendItem}
-        onClose={() => setExtendItem(null)}
-        onDone={() => { void fetchList() }}
-      />
-
-      <ShareDialog
-        open={shareDialogOpen}
-        fileIds={shareFileIds}
-        onClose={() => setShareDialogOpen(false)}
-        onShared={() => { void fetchList() }}
-      />
+      {/* PDF / file preview dialog */}
+      <Dialog open={previewItem != null} onOpenChange={(open) => { if (!open) setPreviewItem(null) }}>
+        <DialogContent className="max-w-4xl p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle className="truncate">{previewItem?.file_name}</DialogTitle>
+          </DialogHeader>
+          {previewItem && previewItem.content_type === 'application/pdf' ? (
+            <iframe
+              src={buildFileDownloadUrl(previewItem.id)}
+              title={previewItem.file_name}
+              className="h-[75vh] w-full border-t"
+            />
+          ) : previewItem && previewItem.content_type.startsWith('image/') ? (
+            <div className="flex items-center justify-center border-t p-4">
+              <img
+                src={buildFileDownloadUrl(previewItem.id)}
+                alt={previewItem.file_name}
+                className="max-h-[75vh] w-auto rounded-md object-contain"
+              />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

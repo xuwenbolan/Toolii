@@ -6,7 +6,7 @@ import { formatBytes } from '@/lib/fileValidation'
 import type { UserFileItem } from '@/services/hubApi'
 
 import { FileRowActions } from './FileRowActions'
-import { getFileTypeIcon } from './fileTypeIcons'
+import { getFileTypeIcon, isPdfType } from './fileTypeIcons'
 import { formatTime, isMarkdownFile } from './utils'
 
 export function FileListView({
@@ -14,6 +14,7 @@ export function FileListView({
   selected,
   onToggleSelect,
   onEdit,
+  onPreview,
   onRename,
   onExtend,
   onShare,
@@ -24,6 +25,7 @@ export function FileListView({
   selected: Set<number>
   onToggleSelect: (id: number) => void
   onEdit: (item: UserFileItem) => void
+  onPreview: (item: UserFileItem) => void
   onRename: (item: UserFileItem) => void
   onExtend: (item: UserFileItem) => void
   onShare: (item: UserFileItem) => void
@@ -38,6 +40,7 @@ export function FileListView({
         const Icon = getFileTypeIcon(item.content_type)
         const isSelected = selected.has(item.id)
         const isMd = isMarkdownFile(item.file_name)
+        const isPdf = isPdfType(item.content_type)
 
         return (
           <div
@@ -66,6 +69,14 @@ export function FileListView({
                 >
                   {item.file_name}
                 </button>
+              ) : isPdf ? (
+                <button
+                  type="button"
+                  className="truncate text-left text-sm font-medium transition hover:text-primary"
+                  onClick={() => onPreview(item)}
+                >
+                  {item.file_name}
+                </button>
               ) : (
                 <p className="truncate text-sm font-medium">{item.file_name}</p>
               )}
@@ -84,7 +95,9 @@ export function FileListView({
             </div>
             <FileRowActions
               isMarkdown={isMd}
+              isPreviewable={isPdf}
               onEdit={() => onEdit(item)}
+              onPreview={() => onPreview(item)}
               onRename={() => onRename(item)}
               onExtend={() => onExtend(item)}
               onShare={() => onShare(item)}

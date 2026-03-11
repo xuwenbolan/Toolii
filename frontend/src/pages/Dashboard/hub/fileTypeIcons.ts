@@ -31,6 +31,10 @@ export function isImageType(contentType: string): boolean {
   return contentType.startsWith('image/')
 }
 
+export function isPdfType(contentType: string): boolean {
+  return contentType === 'application/pdf'
+}
+
 export function getFileExtension(filename: string): string {
   const dot = filename.lastIndexOf('.')
   if (dot === -1 || dot === filename.length - 1) return ''

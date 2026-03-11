@@ -4,6 +4,7 @@ import {
   CalendarPlus,
   Check,
   Download,
+  Eye,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -25,7 +26,9 @@ type DownloadPhase = 'idle' | 'loading' | 'done'
 
 export function FileRowActions({
   isMarkdown,
+  isPreviewable,
   onEdit,
+  onPreview,
   onRename,
   onExtend,
   onShare,
@@ -33,7 +36,9 @@ export function FileRowActions({
   onDelete,
 }: {
   isMarkdown?: boolean
+  isPreviewable?: boolean
   onEdit?: () => void
+  onPreview?: () => void
   onRename: () => void
   onExtend: () => void
   onShare: () => void
@@ -91,6 +96,12 @@ export function FileRowActions({
             <DropdownMenuItem onClick={onEdit}>
               <SquarePen className="h-4 w-4" />
               {t('editDoc')}
+            </DropdownMenuItem>
+          )}
+          {isPreviewable && onPreview && (
+            <DropdownMenuItem onClick={onPreview}>
+              <Eye className="h-4 w-4" />
+              {t('preview')}
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onShare}>
