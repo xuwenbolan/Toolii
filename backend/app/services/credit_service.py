@@ -111,45 +111,29 @@ class CreditService:
         tx_type: str,
         description: str | None = None,
         reference_id: str | None = None,
-        autocommit: bool = True,
     ) -> tuple[CreditTransaction, int, int]:
+        """Apply a credit delta. Does NOT commit — caller must manage the transaction."""
         if amount_delta == 0:
             raise AppError(code="INVALID_CREDIT_AMOUNT", message="Credit change amount cannot be 0", status_code=400)
         if not tx_type.strip():
             raise AppError(code="INVALID_TX_TYPE", message="Transaction type cannot be empty", status_code=400)
 
-        async def _run() -> tuple[CreditTransaction, int, int]:
-            wallet = await self._get_or_create_wallet(user_id=user_id, for_update=True)
-            balance_before = int(wallet.balance)
-            balance_after = balance_before + int(amount_delta)
-            if balance_after < 0:
-                raise AppError(code="INSUFFICIENT_CREDITS", message="Insufficient credits", status_code=402)
-            wallet.balance = balance_after
-            tx = await self._record_tx(
-                user_id=user_id,
-                tx_type=tx_type,
-                amount_delta=amount_delta,
-                balance_before=balance_before,
-                balance_after=balance_after,
-                description=description,
-                reference_id=reference_id,
-            )
-            if autocommit:
-                await self._db.commit()
-            return tx, balance_before, balance_after
-
-        if not autocommit:
-            return await _run()
-
-        try:
-            return await _run()
-        except AppError:
-            await self._db.rollback()
-            raise
-        except SQLAlchemyError as exc:
-            await self._db.rollback()
-            logger.exception("Credit change failed for user %s", user_id)
-            raise AppError(code="CREDIT_CHANGE_FAILED", message="Credit balance change failed", status_code=500) from exc
+        wallet = await self._get_or_create_wallet(user_id=user_id, for_update=True)
+        balance_before = int(wallet.balance)
+        balance_after = balance_before + int(amount_delta)
+        if balance_after < 0:
+            raise AppError(code="INSUFFICIENT_CREDITS", message="Insufficient credits", status_code=402)
+        wallet.balance = balance_after
+        tx = await self._record_tx(
+            user_id=user_id,
+            tx_type=tx_type,
+            amount_delta=amount_delta,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            description=description,
+            reference_id=reference_id,
+        )
+        return tx, balance_before, balance_after
 
     async def get_balance(self, *, user_id: int) -> int:
         result = await self._db.execute(select(UserCredit).where(UserCredit.user_id == user_id))
@@ -211,31 +195,22 @@ class CreditService:
     ) -> CreditAddResult:
         if amount <= 0:
             raise AppError(code="INVALID_CREDIT_AMOUNT", message="Amount to add must be greater than 0", status_code=400)
-        try:
-            tx, balance_before, balance_after = await self._apply_delta(
-                user_id=user_id,
-                amount_delta=int(amount),
-                tx_type=tx_type,
-                description=description,
-                reference_id=reference_id,
-                autocommit=autocommit,
-            )
-            return CreditAddResult(
-                transaction_id=int(tx.id),
-                user_id=user_id,
-                amount=int(amount),
-                balance_before=balance_before,
-                balance_after=balance_after,
-            )
-        except AppError:
-            if autocommit:
-                raise
-            raise
-        except SQLAlchemyError as exc:
-            if autocommit:
-                logger.exception("Credit add failed for user %s", user_id)
-                raise AppError(code="CREDIT_ADD_FAILED", message="Credit add failed", status_code=500) from exc
-            raise
+        tx, balance_before, balance_after = await self._apply_delta(
+            user_id=user_id,
+            amount_delta=int(amount),
+            tx_type=tx_type,
+            description=description,
+            reference_id=reference_id,
+        )
+        if autocommit:
+            await self._db.commit()
+        return CreditAddResult(
+            transaction_id=int(tx.id),
+            user_id=user_id,
+            amount=int(amount),
+            balance_before=balance_before,
+            balance_after=balance_after,
+        )
 
     async def consume(
         self,
@@ -249,31 +224,22 @@ class CreditService:
     ) -> CreditConsumeResult:
         if amount <= 0:
             raise AppError(code="INVALID_CREDIT_AMOUNT", message="Amount to consume must be greater than 0", status_code=400)
-        try:
-            tx, balance_before, balance_after = await self._apply_delta(
-                user_id=user_id,
-                amount_delta=-int(amount),
-                tx_type=tx_type,
-                description=description,
-                reference_id=reference_id,
-                autocommit=autocommit,
-            )
-            return CreditConsumeResult(
-                transaction_id=int(tx.id),
-                user_id=user_id,
-                amount=int(amount),
-                balance_before=balance_before,
-                balance_after=balance_after,
-            )
-        except AppError:
-            if autocommit:
-                raise
-            raise
-        except SQLAlchemyError as exc:
-            if autocommit:
-                logger.exception("Credit consume failed for user %s", user_id)
-                raise AppError(code="CREDIT_CONSUME_FAILED", message="Credit consume failed", status_code=500) from exc
-            raise
+        tx, balance_before, balance_after = await self._apply_delta(
+            user_id=user_id,
+            amount_delta=-int(amount),
+            tx_type=tx_type,
+            description=description,
+            reference_id=reference_id,
+        )
+        if autocommit:
+            await self._db.commit()
+        return CreditConsumeResult(
+            transaction_id=int(tx.id),
+            user_id=user_id,
+            amount=int(amount),
+            balance_before=balance_before,
+            balance_after=balance_after,
+        )
 
     async def redeem_code(
         self,
@@ -304,22 +270,21 @@ class CreditService:
             card.redeemed_by_user_id = user_id
             card.redeemed_at = utcnow()
 
-            added = await self.add(
+            tx, balance_before, balance_after = await self._apply_delta(
                 user_id=user_id,
-                amount=int(card.credits),
+                amount_delta=int(card.credits),
                 tx_type="redeem",
                 description=f"Card redemption ({card.card_type})",
                 reference_id=f"card-redeem:{card.id}",
-                autocommit=False,
             )
             await self._db.commit()
 
             return CreditRedeemResult(
-                transaction_id=added.transaction_id,
+                transaction_id=int(tx.id),
                 user_id=user_id,
                 added_credits=int(card.credits),
-                balance_before=added.balance_before,
-                balance_after=added.balance_after,
+                balance_before=balance_before,
+                balance_after=balance_after,
                 card_type=card.card_type,
             )
         except AppError:

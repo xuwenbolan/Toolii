@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import paginate
 from app.models.processing_history import ProcessingHistory
 
 
@@ -37,12 +38,9 @@ class HistoryService:
         offset: int = 0,
     ) -> tuple[list[ProcessingHistory], int]:
         base = select(ProcessingHistory).where(ProcessingHistory.user_id == user_id)
-
-        count_q = select(func.count()).select_from(base.subquery())
-        total = (await self._db.execute(count_q)).scalar_one()
-
-        items_q = base.order_by(ProcessingHistory.created_at.desc()).offset(offset).limit(limit)
-        result = await self._db.execute(items_q)
-        items = list(result.scalars().all())
-
-        return items, total
+        items, total = await paginate(
+            self._db, base,
+            order_by=ProcessingHistory.created_at.desc(),
+            limit=limit, offset=offset,
+        )
+        return list(items), total

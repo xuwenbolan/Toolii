@@ -63,15 +63,36 @@ _DEFAULT_EXPIRES_IN = 24 * 3600
 
 
 def cleanup_expired_sessions() -> int:
-    """Remove photo sessions that have exceeded their TTL. Returns count removed."""
+    """Remove photo sessions that have exceeded their TTL. Returns count removed.
+
+    Also deletes associated files from disk to prevent orphaned storage.
+    """
     cutoff = time.time() - _SESSION_TTL
     removed = 0
+    fs = FileService()
     with _session_lock:
-        for store in (_upload_sessions, _processed_sessions):
-            expired = [k for k, v in store.items() if v.created_at < cutoff]
-            for k in expired:
-                del store[k]
-                removed += 1
+        # Collect expired upload sessions and their file IDs
+        expired_uploads = [k for k, v in _upload_sessions.items() if v.created_at < cutoff]
+        for k in expired_uploads:
+            session = _upload_sessions.pop(k)
+            for fid in (session.file_id, session.cutout_file_id):
+                if fid:
+                    try:
+                        fs.delete(fid)
+                    except OSError:
+                        pass
+            removed += 1
+
+        # Collect expired processed sessions and their file IDs
+        expired_processed = [k for k, v in _processed_sessions.items() if v.created_at < cutoff]
+        for k in expired_processed:
+            session = _processed_sessions.pop(k)
+            if session.file_id:
+                try:
+                    fs.delete(session.file_id)
+                except OSError:
+                    pass
+            removed += 1
     return removed
 
 

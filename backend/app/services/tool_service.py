@@ -89,8 +89,9 @@ async def update_tool(tool_name: str, **fields: object) -> Tool:
 async def get_daily_usage_count(
     tool_name: str,
     user_id: int | None,
+    ip: str | None = None,
 ) -> int:
-    """Count today's usage for a tool by a specific user (or all anonymous)."""
+    """Count today's usage for a tool by user or by IP (for anonymous)."""
     today = date.today()
     async with _db.SessionLocal() as db:
         stmt = (
@@ -103,6 +104,12 @@ async def get_daily_usage_count(
         )
         if user_id is not None:
             stmt = stmt.where(ProcessingHistory.user_id == user_id)
+        elif ip:
+            # Per-IP limit for anonymous users instead of global anonymous count
+            stmt = stmt.where(
+                ProcessingHistory.user_id.is_(None),
+                ProcessingHistory.ip == ip,
+            )
         else:
             stmt = stmt.where(ProcessingHistory.user_id.is_(None))
         result = await db.execute(stmt)

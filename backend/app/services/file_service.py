@@ -106,7 +106,9 @@ class FileService:
             return None
 
 
-def build_download_url(*, file_id: str, filename: str, ttl_seconds: int = 86400) -> str:
+def build_download_url(*, file_id: str, filename: str, ttl_seconds: int | None = None) -> str:
+    if ttl_seconds is None:
+        ttl_seconds = settings.download_url_ttl
     exp = int(time.time()) + ttl_seconds
     safe_name = safe_filename(filename)
     sig = sign_download(file_id=file_id, filename=safe_name, exp=exp)
