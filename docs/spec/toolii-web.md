@@ -169,6 +169,38 @@ Defined in `frontend/src/config/i18n.ts`. Files in `frontend/public/locales/{lng
 - **Desktop:** Chrome/Firefox/Safari/Edge, last 2 major versions
 - **Network:** Functional on 3G; optimized for 4G+
 
+## Shared Hooks Architecture
+
+### useFileUpload
+
+Core upload lifecycle hook. Manages `pending`, `progress`, `error`, `errorMeta` state. Features:
+- AbortController: auto-aborts previous in-flight request on new `run()`, cleanup on unmount
+- Retry: stores last task for `retry()` callback
+- Returns `abort()` for external cancellation
+
+### useImageTool\<T\>
+
+Composition hook for single-file image tool pages. Built on `useFileUpload` + `useObjectUrl` + `useToolRunState`. Manages:
+- File selection (`file`, `handleFiles`)
+- Result state (`result`, `resultPanelOpen`)
+- Input preview URL (auto blob URL lifecycle)
+- `runTool(apiCall)` with error handling
+
+Tool-specific options (e.g. model, quality, strength) remain as local state in each page.
+
+### useHubDialogs
+
+Manages all dialog state for HubFilesPage: rename, extend, delete (single + batch), share (single + batch). Returns `actions` (wire into file views) and `dialogProps` (spread into `HubDialogs` compound component).
+
+## Admin Page Architecture
+
+`AdminSystemPage` is a thin orchestrator (~180 lines) composing:
+- `CortexStatusCard` — GPU dashboard (VRAM gauges, queue, alerts)
+- `CortexModelsList` — Model table with enable/disable/unload/check actions
+- `CortexTimeline` — Recent event log
+
+Shared utilities live in `cortex-helpers.ts` (format functions, color maps, alert logic).
+
 ## Related Specs
 
 - [frontend-design.md](frontend-design.md) — Visual identity, interaction patterns, design tokens

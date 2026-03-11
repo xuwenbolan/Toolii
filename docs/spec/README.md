@@ -46,6 +46,7 @@ All specifications are organized by module. Each file covers one module or cross
 ## Frontend
 
 - [frontend-design.md](frontend-design.md) — Visual identity, interaction patterns, design tokens, page design
+- [frontend-audit-2026-03-10.md](frontend-audit-2026-03-10.md) — Design spec compliance audit (45 gaps: 16 critical, 17 medium, 12 minor)
 - [frontend-upgrade.md](frontend-upgrade.md) — Frontend upgrade roadmap (phases 0-6)
 - [cortex-dashboard.md](cortex-dashboard.md) — Cortex dashboard visualization and management enhancement
 - [tools/](tools/) — Per-tool interaction design (one file per tool):

@@ -1,6 +1,6 @@
 # toolii-backend Module Spec
 
-Status: draft | Updated: 2026-03-03
+Status: draft | Updated: 2026-03-10
 
 ## Role
 
@@ -55,21 +55,61 @@ Backend receives request
 
 **Key rule**: Only `remove-bg` has CPU fallback. All other GPU tasks return 503 cleanly.
 
+## Error Handling
+
+All routers use `AppError` subclasses (defined in `core/exceptions.py`) — never bare `HTTPException`.
+
+| Exception | Default Status | Usage |
+|-----------|---------------|-------|
+| `AppError(code, message)` | 400 | Domain errors with machine-readable code |
+| `NotFoundError` | 404 | Resource not found |
+| `ForbiddenError` | 403 | Permission denied |
+| `UnauthorizedError` | 401 | Auth required |
+
+Error codes follow `UPPER_SNAKE_CASE` convention: `FILE_TOO_LARGE`, `INVALID_JSON`, `CORTEX_UNAVAILABLE`, etc.
+
+## Session & Transaction Patterns
+
+- `core/tool_recording.py` and `core/audit_log.py` use an overridable `session_factory` callable for DI (testable without real DB)
+- `credit_service._apply_delta()` does not commit — caller manages the transaction boundary
+- Services receive async session via FastAPI dependency injection
+
 ## Project Structure
 
 ```
 backend/
 ├── app/
-│   ├── main.py           # Application entry
-│   ├── core/             # Config, dependencies, security
-│   ├── routers/          # API routes
-│   ├── services/         # Business logic
-│   ├── schemas/          # Pydantic models
-│   ├── models/           # SQLAlchemy models (future)
-│   ├── processing/       # Image/PDF processing logic
-│   └── utils/            # Shared utilities
-├── cli/                  # Admin CLI tools
-├── alembic/              # Database migrations
+│   ├── main.py              # Application entry (lifespan context manager)
+│   ├── core/                # Config, dependencies, security
+│   │   ├── config.py        # Settings (all operational params configurable via env)
+│   │   ├── async_utils.py   # Dedicated I/O thread pool (run_sync)
+│   │   ├── dependencies.py  # Shared FastAPI deps (tool_credit_cost, tool_owner_user_id)
+│   │   ├── exceptions.py    # AppError, NotFoundError, ForbiddenError, UnauthorizedError
+│   │   ├── pagination.py    # Single-query pagination with COUNT(*) OVER()
+│   │   ├── task_limiter.py  # Async task slot context manager
+│   │   ├── upload_limits.py # Shared upload size limit helpers
+│   │   ├── tool_recording.py # Tool usage recording (DI session_factory)
+│   │   ├── audit_log.py     # Audit log recording (DI session_factory)
+│   │   └── rate_limiter.py  # Dynamic rate limiting + IP ban
+│   ├── routers/             # API routes
+│   ├── services/            # Business logic
+│   │   ├── file_result_builder.py  # Unified FileResult construction (free/gated)
+│   │   ├── hub_service.py          # File hub: CRUD, quota, expiration
+│   │   ├── hub_upload_service.py   # Upload handling, thumbnail generation
+│   │   ├── hub_share_service.py    # Share groups, share links
+│   │   ├── credit_service.py       # Wallet, transactions, card codes
+│   │   ├── admin_dashboard_service.py  # Admin dashboard stats
+│   │   ├── admin_user_service.py       # Admin user CRUD + hub settings
+│   │   ├── admin_card_service.py       # Admin card code management
+│   │   ├── admin_ops_service.py        # Admin operations + audit logs
+│   │   ├── admin_transfer_service.py   # Admin hub files + share groups
+│   │   └── ...
+│   ├── schemas/             # Pydantic models
+│   ├── models/              # SQLAlchemy models
+│   ├── processing/          # Image/PDF processing logic
+│   └── utils/               # Shared utilities
+├── cli/                     # Admin CLI tools
+├── alembic/                 # Database migrations
 └── tests/
 ```
 

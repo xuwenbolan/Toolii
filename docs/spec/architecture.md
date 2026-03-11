@@ -1,6 +1,6 @@
 # System Architecture
 
-Status: draft | Updated: 2026-03-03
+Status: draft | Updated: 2026-03-10
 
 ---
 
@@ -202,10 +202,10 @@ Toolii/
 ├── backend/                  # FastAPI backend
 │   ├── app/
 │   │   ├── main.py           # Application entry
-│   │   ├── routers/          # API routes (ID photo, image, PDF)
-│   │   ├── services/         # Business logic
+│   │   ├── routers/          # API routes (AppError-based error handling)
+│   │   ├── services/         # Business logic (hub split: hub/upload/share)
 │   │   ├── models/           # Database models
-│   │   └── core/             # Config, dependencies
+│   │   └── core/             # Config, dependencies, exceptions, DI
 │   └── tests/                # Backend tests
 ├── frontend/                 # React frontend
 │   ├── src/

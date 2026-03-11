@@ -1,6 +1,6 @@
 # toolii-cortex Module Spec
 
-Status: draft | Updated: 2026-03-03
+Status: draft | Updated: 2026-03-10
 
 ## Role
 
@@ -23,8 +23,11 @@ No auth, no storage, no business logic.
 
 ### Cortex OWNS
 
-- ONNX model loading and lifecycle (ModelManager with LRU eviction)
+- ONNX model loading and lifecycle (`model_loader.py` with LRU eviction, `model_registry.py` for discovery)
 - VRAM budget management and OOM recovery
+- Model health monitoring and circuit breaking (`model_health.py`)
+- Request concurrency control and dedup (`concurrency.py`)
+- Request statistics and throughput tracking (`request_stats.py`)
 - Per-model pre/post processing (resize, normalize, tile, decode)
 - Model download script
 
@@ -43,8 +46,20 @@ cortex/
 ├── app/
 │   ├── main.py                 # FastAPI app factory
 │   ├── config.py               # Settings: model_dir, vram_budget, port
-│   ├── model_manager.py        # OnnxModelManager
-│   ├── router.py               # All /v1/* endpoints (thin dispatch layer)
+│   ├── gpu.py                  # GPU/CUDA utilities
+│   ├── utils.py                # Shared helpers
+│   │
+│   │   # Model management (split from former monolithic model_manager.py)
+│   ├── model_manager.py        # OnnxModelManager facade
+│   ├── model_registry.py       # Model registration and discovery
+│   ├── model_loader.py         # ONNX session loading, VRAM management, eviction
+│   ├── model_health.py         # Circuit breaker, health checks
+│   │
+│   │   # Request handling (split from former monolithic router.py)
+│   ├── router.py               # /v1/* endpoints with unified _run_inference/_attach_meta helpers
+│   ├── concurrency.py          # Semaphore, dedup, queue management
+│   ├── request_stats.py        # Request counting, timing, throughput
+│   │
 │   └── engines/                # Per-model pre/post processing
 │       ├── base.py             # BaseEngine ABC
 │       ├── birefnet.py         # Background removal (4 variants)

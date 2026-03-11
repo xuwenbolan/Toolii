@@ -1,6 +1,6 @@
 # Backend Code Cleanup
 
-Status: done | Updated: 2026-03-03
+Status: final | Updated: 2026-03-10
 
 Synchronized with Cortex integration. Removed duplication, aligned API parameters.
 
@@ -40,6 +40,18 @@ Synchronized with Cortex integration. Removed duplication, aligned API parameter
 - `SegmentResult`: now uses `masks: list[SegmentMask]` array format
 - `OcrResult`: simplified (engine/lang/width/height moved to meta dict)
 - `SegmentMask`: new model (mask_b64, score, low_res_mask_b64)
+
+### 7. Standardized error responses
+
+All routers use `AppError` subclasses from `core/exceptions.py`. No bare `HTTPException` in application routers.
+
+### 8. Split hub_service.py
+
+Split into focused services: `hub_service.py` (CRUD, quota, expiration), `hub_upload_service.py` (upload, thumbnails), `hub_share_service.py` (sharing).
+
+### 9. DI session factory for background writers
+
+`tool_recording.py` and `audit_log.py` use overridable `session_factory` callable instead of direct `database.SessionLocal()` imports.
 
 ## Remaining (lower priority)
 
