@@ -307,7 +307,7 @@ export function SegmentPage() {
         description={t('segment.seoDescription')}
         keywords={t('segment.seoKeywords')}
         canonicalPath="/image-tools/segment"
-        jsonLd={[buildToolJsonLd({ name: t('segment.seoTitle'), description: t('segment.seoDescription'), url: '/image-tools/segment' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('segment.title'), path: '/image-tools/segment' }])]}
+        jsonLd={[buildToolJsonLd({ name: t('segment.seoTitle'), description: t('segment.seoDescription'), url: '/image-tools/segment' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('segment.title'), path: '/image-tools/segment' }])]}
       />
       <ToolPageShell title={t('segment.title')} description={t('segment.description')} toolName="image/segment" backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5">

@@ -133,7 +133,7 @@ export function FaceMapPage() {
         jsonLd={[
           buildToolJsonLd({ name: t('faceMap:seo.title'), description: t('faceMap:seo.description'), url: '/facemap' }),
           buildBreadcrumbJsonLd([
-            { name: 'Home', path: '/' },
+            { name: t('common:nav.home'), path: '/' },
             { name: t('faceMap:seo.title'), path: '/facemap' },
           ]),
         ]}

@@ -38,38 +38,74 @@ function getProgressHandler(
   }
 }
 
-export async function compressImage(
+// -- Shared utilities for image tool API calls --
+
+type FormDataFieldValue = string | number | boolean | object | null | undefined
+
+/**
+ * Build a FormData with the file and optional key-value fields.
+ * - null/undefined values are skipped
+ * - booleans are converted to 'true'/'false'
+ * - objects/arrays are JSON-stringified
+ * - numbers are converted via String()
+ */
+function buildImageFormData(
   file: File,
-  opts: { quality?: number; targetKb?: number; outputFormat?: string } = {},
-  onProgress?: (percent: number) => void,
-) {
+  fields: Record<string, FormDataFieldValue> = {},
+): FormData {
   const fd = new FormData()
   fd.append('file', file)
-  if (opts.quality != null) fd.append('quality', String(opts.quality))
-  if (opts.targetKb != null) fd.append('target_kb', String(opts.targetKb))
-  if (opts.outputFormat) fd.append('output_format', opts.outputFormat)
-
-  const res = await api.post<FileResult>('/api/image/compress', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
+  for (const [key, val] of Object.entries(fields)) {
+    if (val == null) continue
+    if (typeof val === 'boolean') {
+      fd.append(key, String(val))
+    } else if (typeof val === 'object') {
+      fd.append(key, JSON.stringify(val))
+    } else {
+      fd.append(key, String(val))
+    }
+  }
+  return fd
 }
 
-export async function convertImage(
-  file: File,
-  opts: { outputFormat: string; quality?: number },
-  onProgress?: (percent: number) => void,
+/**
+ * Factory: create a function that posts FormData to a fixed endpoint and returns typed data.
+ */
+function createImageToolApi<T, O extends Record<string, FormDataFieldValue>>(
+  endpoint: string,
+  mapOpts: (opts: O) => Record<string, FormDataFieldValue>,
 ) {
-  const fd = new FormData()
-  fd.append('file', file)
-  fd.append('output_format', opts.outputFormat)
-  if (opts.quality != null) fd.append('quality', String(opts.quality))
-
-  const res = await api.post<FileResult>('/api/image/convert', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
+  return async (
+    file: File,
+    opts: O,
+    onProgress?: (percent: number) => void,
+  ): Promise<T> => {
+    const fd = buildImageFormData(file, mapOpts(opts))
+    const res = await api.post<T>(endpoint, fd, {
+      onUploadProgress: getProgressHandler(onProgress, file.size),
+    })
+    return res.data
+  }
 }
+
+// -- Public API functions --
+
+export const compressImage = createImageToolApi<
+  FileResult,
+  { quality?: number; targetKb?: number; outputFormat?: string }
+>('/api/image/compress', (opts) => ({
+  quality: opts.quality,
+  target_kb: opts.targetKb,
+  output_format: opts.outputFormat,
+}))
+
+export const convertImage = createImageToolApi<
+  FileResult,
+  { outputFormat: string; quality?: number }
+>('/api/image/convert', (opts) => ({
+  output_format: opts.outputFormat,
+  quality: opts.quality,
+}))
 
 export type MosaicRegion = {
   x: number
@@ -78,125 +114,69 @@ export type MosaicRegion = {
   h: number
 }
 
-export async function mosaicImage(
-  file: File,
-  opts: { pixelSize?: number; regions?: MosaicRegion[] } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.pixelSize != null) fd.append('pixel_size', String(opts.pixelSize))
-  if (opts.regions != null) fd.append('regions', JSON.stringify(opts.regions))
+export const mosaicImage = createImageToolApi<
+  FileResult,
+  { pixelSize?: number; regions?: MosaicRegion[] }
+>('/api/image/mosaic', (opts) => ({
+  pixel_size: opts.pixelSize,
+  regions: opts.regions,
+}))
 
-  const res = await api.post<FileResult>('/api/image/mosaic', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
+export const enhanceScan = createImageToolApi<
+  FileResult,
+  { mode?: 'bw' | 'color' }
+>('/api/image/scan-enhance', (opts) => ({
+  mode: opts.mode,
+}))
 
-export async function enhanceScan(
-  file: File,
-  opts: { mode?: 'bw' | 'color' } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.mode) fd.append('mode', opts.mode)
+export const removeBackground = createImageToolApi<
+  FileResult,
+  { model?: string }
+>('/api/image/remove-bg', (opts) => ({
+  model: opts.model,
+}))
 
-  const res = await api.post<FileResult>('/api/image/scan-enhance', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
+export const upscaleImage = createImageToolApi<
+  FileResult,
+  { scale?: number; model?: string; denoise_strength?: number; face_enhance?: boolean }
+>('/api/image/upscale', (opts) => ({
+  scale: opts.scale,
+  model: opts.model,
+  denoise_strength: opts.denoise_strength,
+  face_enhance: opts.face_enhance,
+}))
 
-export async function removeBackground(
-  file: File,
-  opts: { model?: string } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.model) fd.append('model', opts.model)
+export const restoreFace = createImageToolApi<
+  FileResult,
+  { w?: number; upscale?: number }
+>('/api/image/restore-face', (opts) => ({
+  w: opts.w,
+  upscale: opts.upscale,
+}))
 
-  const res = await api.post<FileResult>('/api/image/remove-bg', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
+export const denoiseImage = createImageToolApi<
+  FileResult,
+  { strength?: number; task?: string; model_width?: number }
+>('/api/image/denoise', (opts) => ({
+  strength: opts.strength,
+  task: opts.task,
+  model_width: opts.model_width,
+}))
 
-export async function upscaleImage(
-  file: File,
-  opts: { scale?: number; model?: string; denoise_strength?: number; face_enhance?: boolean } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.scale != null) fd.append('scale', String(opts.scale))
-  if (opts.model) fd.append('model', opts.model)
-  if (opts.denoise_strength != null) fd.append('denoise_strength', String(opts.denoise_strength))
-  if (opts.face_enhance) fd.append('face_enhance', 'true')
+export const colorizeImage = createImageToolApi<
+  FileResult,
+  { model?: string }
+>('/api/image/colorize', (opts) => ({
+  model: opts.model,
+}))
 
-  const res = await api.post<FileResult>('/api/image/upscale', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
-
-export async function restoreFace(
-  file: File,
-  opts: { w?: number; upscale?: number } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.w != null) fd.append('w', String(opts.w))
-  if (opts.upscale != null) fd.append('upscale', String(opts.upscale))
-
-  const res = await api.post<FileResult>('/api/image/restore-face', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
-
-export async function denoiseImage(
-  file: File,
-  opts: { strength?: number; task?: string; model_width?: number } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.strength != null) fd.append('strength', String(opts.strength))
-  if (opts.task) fd.append('task', opts.task)
-  if (opts.model_width != null) fd.append('model_width', String(opts.model_width))
-
-  const res = await api.post<FileResult>('/api/image/denoise', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
-
-export async function colorizeImage(
-  file: File,
-  opts: { model?: string } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.model) fd.append('model', opts.model)
-
-  const res = await api.post<FileResult>('/api/image/colorize', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
-
+// inpaintImage has a unique signature (extra mask param), so it uses the utilities directly
 export async function inpaintImage(
   file: File,
   mask: Blob,
   onProgress?: (percent: number) => void,
 ) {
-  const fd = new FormData()
-  fd.append('file', file)
+  const fd = buildImageFormData(file)
   fd.append('mask', mask, 'mask.png')
 
   const res = await api.post<FileResult>('/api/image/inpaint', fd, {
@@ -222,20 +202,12 @@ export type OcrResult = {
   full_text: string
 }
 
-export async function ocrImage(
-  file: File,
-  opts: { lang?: OcrLang } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.lang) fd.append('lang', opts.lang)
-
-  const res = await api.post<OcrResult>('/api/image/ocr', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
+export const ocrImage = createImageToolApi<
+  OcrResult,
+  { lang?: OcrLang }
+>('/api/image/ocr', (opts) => ({
+  lang: opts.lang,
+}))
 
 export type SegmentResult = {
   mask_b64: string
@@ -244,18 +216,10 @@ export type SegmentResult = {
   height: number
 }
 
-export async function segmentImage(
-  file: File,
-  opts: { points?: number[][]; boxes?: number[][] } = {},
-  onProgress?: (percent: number) => void,
-) {
-  const fd = new FormData()
-  fd.append('file', file)
-  if (opts.points) fd.append('points', JSON.stringify(opts.points))
-  if (opts.boxes) fd.append('boxes', JSON.stringify(opts.boxes))
-
-  const res = await api.post<SegmentResult>('/api/image/segment', fd, {
-    onUploadProgress: getProgressHandler(onProgress, file.size),
-  })
-  return res.data
-}
+export const segmentImage = createImageToolApi<
+  SegmentResult,
+  { points?: number[][]; boxes?: number[][] }
+>('/api/image/segment', (opts) => ({
+  points: opts.points,
+  boxes: opts.boxes,
+}))

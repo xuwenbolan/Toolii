@@ -18,7 +18,7 @@ export function HeicToJpgPage() {
           name: t('heicToJpg.seoTitle'),
           description: t('heicToJpg.seoDescription'),
           url: '/image-tools/heic-to-jpg',
-        }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('heicToJpg.title'), path: '/image-tools/heic-to-jpg' }])]}
+        }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('heicToJpg.title'), path: '/image-tools/heic-to-jpg' }])]}
       />
       <ConvertForm
         title={t('heicToJpg.title')}

@@ -201,8 +201,9 @@ export function TransferCreatePage() {
                       size="icon"
                       className="h-6 w-6 shrink-0"
                       onClick={() => removeFile(index)}
+                      aria-label={t('common:actions.delete')}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </div>
                 ))}

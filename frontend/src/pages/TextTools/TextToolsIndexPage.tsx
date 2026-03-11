@@ -21,7 +21,7 @@ export function TextToolsIndexPage() {
         description={t('seoDescription')}
         keywords={t('seoKeywords')}
         canonicalPath="/text-tools"
-        jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/text-tools' }])}
+        jsonLd={buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/text-tools' }])}
       />
       <div className="space-y-5">
         <div className="flex items-center gap-3">

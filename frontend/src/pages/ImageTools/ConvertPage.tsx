@@ -17,7 +17,7 @@ export function ConvertPage() {
         description={t('convert.seoDescription')}
         keywords={t('convert.seoKeywords')}
         canonicalPath="/image-tools/convert"
-        jsonLd={[buildToolJsonLd({ name: t('convert.seoTitle'), description: t('convert.seoDescription'), url: '/image-tools/convert' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('convert.title'), path: '/image-tools/convert' }])]}
+        jsonLd={[buildToolJsonLd({ name: t('convert.seoTitle'), description: t('convert.seoDescription'), url: '/image-tools/convert' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('convert.title'), path: '/image-tools/convert' }])]}
       />
       <ConvertForm title={t('convert.title')} description={t('convert.description')} toolName="image/convert" />
 

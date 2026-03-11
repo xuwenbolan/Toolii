@@ -2,24 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ImageCompareSlider } from '@/components/tools/ImageCompareSlider'
+import { ImageResultContent } from '@/components/tools/ImageResultContent'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
-import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { ToolWorkspaceDropzone } from '@/components/tools/ToolWorkspaceDropzone'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useFileUpload } from '@/hooks/useFileUpload'
-import { useObjectUrl } from '@/hooks/useObjectUrl'
-import { useToolRunState } from '@/hooks/useToolRunState'
+import { useImageTool } from '@/hooks/useImageTool'
 import { formatBytes } from '@/lib/fileValidation'
 import { isIntInRange, parseFiniteNumber } from '@/lib/numberInput'
-import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { compressImage, getResultDisplayUrl, type FileResult } from '@/services/imageApi'
+import { compressImage, getResultDisplayUrl } from '@/services/imageApi'
 
 const PREVIEW_MAX_DIMENSION = 2200
 
@@ -87,24 +83,27 @@ async function generateCompressPreview(file: File, qualityPercent: number) {
 
 export function CompressPage() {
   const { t } = useTranslation(['tools', 'common'])
-  const [file, setFile] = useState<File | null>(null)
   const [qualityInput, setQualityInput] = useState('80')
   const [targetKbInput, setTargetKbInput] = useState('')
-  const [result, setResult] = useState<FileResult | null>(null)
-  const [resultPanelOpen, setResultPanelOpen] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewSize, setPreviewSize] = useState<number | null>(null)
   const [previewPending, setPreviewPending] = useState(false)
   const previewSeqRef = useRef(0)
   const previewUrlRef = useRef<string | null>(null)
-  const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
-  const inputPreviewUrl = useObjectUrl(file)
+
+  const {
+    file, handleFiles: baseHandleFiles, inputPreviewUrl,
+    result, resultPanelOpen, openResultPanel, closeResultPanel,
+    pending, progress, error, errorMeta, retry,
+    runTool, runState,
+  } = useImageTool()
 
   const quality = parseFiniteNumber(qualityInput)
   const targetKb = parseFiniteNumber(targetKbInput)
   const qualityValid = quality != null && isIntInRange(quality, 1, 100)
   const targetKbValid = targetKbInput.trim() === '' || (targetKb != null && isIntInRange(targetKb, 1, 1_000_000))
   const formValid = qualityValid && targetKbValid
+  const canRun = runState.canRun && formValid
 
   const clearPreview = useCallback(() => {
     if (previewUrlRef.current) {
@@ -116,6 +115,7 @@ export function CompressPage() {
     setPreviewPending(false)
   }, [])
 
+  // Clean up preview URL on unmount
   useEffect(() => {
     return () => {
       if (previewUrlRef.current) {
@@ -124,6 +124,7 @@ export function CompressPage() {
     }
   }, [])
 
+  // Generate client-side compression preview
   useEffect(() => {
     if (!file || !qualityValid || quality == null) {
       clearPreview()
@@ -165,8 +166,18 @@ export function CompressPage() {
     }
   }, [clearPreview, file, quality, qualityValid])
 
-  const fileInfo = useMemo(() => {
-    if (!file) return undefined
+  const handleFiles = useCallback((files: File[]) => {
+    previewSeqRef.current += 1
+    clearPreview()
+    baseHandleFiles(files)
+  }, [baseHandleFiles, clearPreview])
+
+  // Override status text with preview info
+  const statusText = useMemo(() => {
+    if (runState.phase === 'error' || runState.phase === 'processing' || runState.phase === 'done') {
+      return runState.statusText
+    }
+    if (!file) return runState.statusText
 
     const parts = [`${file.name} · ${formatBytes(file.size)}`]
     if (previewPending) {
@@ -174,53 +185,29 @@ export function CompressPage() {
     } else if (previewSize != null) {
       parts.push(t('compress.previewEstimate', { size: formatBytes(previewSize) }))
     }
-
     return parts.join(' · ')
-  }, [file, previewPending, previewSize, t])
-
-  const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
-  const runState = useToolRunState({
-    mode: 'manual',
-    hasInput: Boolean(file),
-    hasResult: Boolean(result),
-    pending,
-    error,
-    texts: {
-      input: fileInfo,
-      result: resultInfo,
-    },
-  })
-  const canRun = runState.canRun && formValid
+  }, [file, previewPending, previewSize, runState.phase, runState.statusText, t])
 
   const compareAfterUrl = (result ? getResultDisplayUrl(result) : null) ?? previewUrl
   const compareAfterSize = result?.size ?? previewSize ?? undefined
 
-  const handleCompress = async () => {
-    if (!file || !formValid || quality == null) return
-    setResult(null)
-    setResultPanelOpen(false)
-
-    try {
-      const res = await run((onProgress) =>
-        compressImage(
-          file,
-          {
-            quality,
-            targetKb: targetKbInput.trim() === '' ? undefined : (targetKb ?? undefined),
-          },
-          onProgress,
-        ),
-      )
-      setResult(res)
-      setResultPanelOpen(true)
-    } catch {
-      // Error message is handled by useFileUpload.
-    }
+  const handleCompress = () => {
+    if (!formValid || quality == null) return
+    void runTool((f, onProgress) =>
+      compressImage(
+        f,
+        {
+          quality,
+          targetKb: targetKbInput.trim() === '' ? undefined : (targetKb ?? undefined),
+        },
+        onProgress,
+      ),
+    )
   }
 
   return (
     <>
-      <SEOHead title={t('compress.seoTitle')} description={t('compress.seoDescription')} keywords={t('compress.seoKeywords')} canonicalPath="/image-tools/compress" jsonLd={[buildToolJsonLd({ name: t('compress.seoTitle'), description: t('compress.seoDescription'), url: '/image-tools/compress' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('compress.title'), path: '/image-tools/compress' }])]} />
+      <SEOHead title={t('compress.seoTitle')} description={t('compress.seoDescription')} keywords={t('compress.seoKeywords')} canonicalPath="/image-tools/compress" jsonLd={[buildToolJsonLd({ name: t('compress.seoTitle'), description: t('compress.seoDescription'), url: '/image-tools/compress' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('compress.title'), path: '/image-tools/compress' }])]} />
       <ToolPageShell
         title={t('compress.title')}
         description={t('compress.description')}
@@ -234,14 +221,7 @@ export function CompressPage() {
             accept={{ 'image/*': [] }}
             multiple={false}
             maxFiles={1}
-            onFiles={(files) => {
-              previewSeqRef.current += 1
-              clearPreview()
-              reset()
-              setResult(null)
-              setResultPanelOpen(false)
-              setFile(files[0] ?? null)
-            }}
+            onFiles={handleFiles}
             title={t('compress.dropTitle', t('common:upload.dropHere'))}
             hint={t('compress.dropHint', t('common:upload.orSelectBelow'))}
           />
@@ -305,7 +285,7 @@ export function CompressPage() {
 
       <ToolActionBar
         mode="manual"
-        status={runState.statusText}
+        status={statusText}
         pending={pending}
         progress={progress}
         error={error}
@@ -313,37 +293,35 @@ export function CompressPage() {
         toolName="image/compress"
         ctaLabel={t('compress.startCompress')}
         ctaDisabled={!canRun}
-        onCta={() => {
-          void handleCompress()
-        }}
-        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
+        onCta={handleCompress}
+        onViewResult={result ? openResultPanel : undefined}
         maxWidthClassName="max-w-6xl"
       />
 
       <ToolResultPanel
         open={Boolean(result && resultPanelOpen)}
         title={t('common:actions.downloadResult')}
-        onClose={() => setResultPanelOpen(false)}
+        onClose={closeResultPanel}
       >
         {result && file && inputPreviewUrl ? (
-          <div className="space-y-4">
-            <ImageCompareSlider
-              beforeUrl={inputPreviewUrl}
-              afterUrl={getResultDisplayUrl(result)}
-              beforeAlt={file.name}
-              afterAlt={result.filename}
-              beforeMeta={formatBytes(file.size)}
-              afterMeta={formatBytes(result.size)}
-              protectedPreview={result?.requires_credit}
-            />
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
-                {t('common:actions.back')}
-              </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="compress" className="w-auto" />
-              <GatedDownloadButton result={result} className="w-auto" />
-            </div>
-          </div>
+          <ImageResultContent
+            file={file}
+            result={result}
+            inputPreviewUrl={inputPreviewUrl}
+            shareType="compress"
+            onClose={closeResultPanel}
+            preview={
+              <ImageCompareSlider
+                beforeUrl={inputPreviewUrl}
+                afterUrl={getResultDisplayUrl(result)}
+                beforeAlt={file.name}
+                afterAlt={result.filename}
+                beforeMeta={formatBytes(file.size)}
+                afterMeta={formatBytes(result.size)}
+                protectedPreview={result?.requires_credit}
+              />
+            }
+          />
         ) : null}
       </ToolResultPanel>
     </>

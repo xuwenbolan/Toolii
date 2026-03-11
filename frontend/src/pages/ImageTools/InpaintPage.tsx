@@ -353,7 +353,7 @@ export function InpaintPage() {
         description={t('inpaint.seoDescription')}
         keywords={t('inpaint.seoKeywords')}
         canonicalPath="/image-tools/inpaint"
-        jsonLd={[buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('inpaint.title'), path: '/image-tools/inpaint' }])]}
+        jsonLd={[buildToolJsonLd({ name: t('inpaint.seoTitle'), description: t('inpaint.seoDescription'), url: '/image-tools/inpaint' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('inpaint.title'), path: '/image-tools/inpaint' }])]}
       />
       <ToolPageShell title={t('inpaint.title')} description={t('inpaint.description')} toolName="image/inpaint" backTo="/image-tools" layout="workspace" width="wide">
         <div className="space-y-5">

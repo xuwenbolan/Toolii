@@ -2,6 +2,7 @@ import { Coins, Eye, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { useToolNavigationGuard } from '@/hooks/useToolNavigationGuard'
 import { cn } from '@/lib/utils'
 import { useToolStore } from '@/stores/toolStore'
 
@@ -50,13 +51,15 @@ export function ToolActionBar({
   const showViewResult = done && !pending && !error && onViewResult
   const showCost = creditCost > 0 && !pending && !done && !error
 
+  const navGuardDialog = useToolNavigationGuard({ pending, hasUnsavedResult: done && !error })
+
   return (
     <div className={cn('fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4 motion-safe:animate-fade-in', className)} style={{ bottom: 'var(--sai-bottom)' }}>
       <div className={cn('mx-auto w-full', maxWidthClassName)}>
         <div
           className={cn(
             'overflow-hidden rounded-xl border border-border/70 bg-background/90 shadow-lg backdrop-blur-md',
-            error ? 'border-destructive/25 bg-destructive-light/60' : null,
+            error ? 'border-destructive/25' : null,
           )}
         >
           <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -68,10 +71,12 @@ export function ToolActionBar({
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 ) : null}
-                <p className={cn('truncate text-sm', error ? 'text-destructive' : 'text-muted-foreground')}>{status}</p>
+                <p className={cn('truncate text-sm', error ? 'text-destructive' : 'text-muted-foreground')} aria-live="polite">
+                  {pending && clampedProgress != null ? `${status} ${clampedProgress}%` : status}
+                </p>
                 {showCost ? (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                    <Coins className="h-3 w-3" />
+                    <Coins className="h-3 w-3" aria-hidden="true" />
                     {t('actions.creditCost', { count: creditCost })}
                   </span>
                 ) : null}
@@ -80,7 +85,7 @@ export function ToolActionBar({
             <div className="flex shrink-0 items-center gap-2">
               {showViewResult ? (
                 <Button type="button" size="sm" variant="outline" onClick={onViewResult}>
-                  <Eye className="mr-1.5 h-4 w-4" />
+                  <Eye className="mr-1.5 h-4 w-4" aria-hidden="true" />
                   {t('actions.viewResult')}
                 </Button>
               ) : null}
@@ -114,6 +119,7 @@ export function ToolActionBar({
           ) : null}
         </div>
       </div>
+      {navGuardDialog}
     </div>
   )
 }

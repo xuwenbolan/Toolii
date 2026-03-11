@@ -1,14 +1,17 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ImagePlus, RefreshCw, Share2, X } from 'lucide-react'
 import { useDropzone } from 'react-dropzone'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { ShareLinkDialog } from '@/components/common/ShareLinkDialog'
-import { ToolPageShell } from '@/components/tools/ToolPageShell'
+import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
+import { ToolPageShell } from '@/components/tools/ToolPageShell'
+import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useToolRunState } from '@/hooks/useToolRunState'
 
 import { useFaceSimilarityState } from './useFaceSimilarityState'
 import { OverallScoreRing } from './components/OverallScoreRing'
@@ -194,6 +197,20 @@ function SimilarityResults({
 export function FaceSimilarityPage() {
   const { t } = useTranslation(['faceSimilarity', 'common'])
   const state = useFaceSimilarityState()
+  const [resultPanelOpen, setResultPanelOpen] = useState(false)
+
+  const runState = useToolRunState({
+    mode: 'manual',
+    hasInput: state.hasBothFiles,
+    hasResult: state.hasResult,
+    pending: state.pending,
+    error: state.error,
+  })
+
+  // Auto-open result panel when comparison completes
+  useEffect(() => {
+    if (state.hasResult) setResultPanelOpen(true)
+  }, [state.hasResult])
 
   return (
     <>
@@ -207,16 +224,65 @@ export function FaceSimilarityPage() {
         description={t('faceSimilarity:subtitle')}
         toolName="facemap/similarity"
       >
-        {/* Error banner */}
-        <ToolErrorBanner
-          error={state.error}
-          errorMeta={state.errorMeta}
-          onRetry={state.retry}
-          className="mb-4"
-        />
+        <div className="space-y-5">
+          <ToolErrorBanner
+            error={state.error}
+            errorMeta={state.errorMeta}
+            onRetry={state.retry}
+          />
 
-        {state.hasResult && state.result ? (
-          /* Results phase */
+          {/* Dual face dropzones */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-5">
+            <FaceDropzone
+              label={t('faceSimilarity:upload.face1Title')}
+              hint={t('faceSimilarity:upload.face1Hint')}
+              previewUrl={state.previewUrl1}
+              onSelect={state.handleFile1Select}
+              onClear={() => state.handleFile1Select([])}
+              replaceLabel={t('faceSimilarity:upload.replace')}
+            />
+            <FaceDropzone
+              label={t('faceSimilarity:upload.face2Title')}
+              hint={t('faceSimilarity:upload.face2Hint')}
+              previewUrl={state.previewUrl2}
+              onSelect={state.handleFile2Select}
+              onClear={() => state.handleFile2Select([])}
+              replaceLabel={t('faceSimilarity:upload.replace')}
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground/60 text-center">
+            {t('faceSimilarity:disclaimer')}
+          </p>
+
+          {/* Comparison history */}
+          <ComparisonHistory
+            entries={state.historyEntries}
+            onClear={state.clearHistory}
+          />
+        </div>
+      </ToolPageShell>
+
+      <ToolActionBar
+        mode="manual"
+        status={runState.statusText}
+        pending={state.pending}
+        progress={state.progress}
+        error={state.error}
+        done={runState.phase === 'done'}
+        toolName="facemap/similarity"
+        ctaLabel={t('faceSimilarity:upload.button')}
+        ctaDisabled={!state.hasBothFiles}
+        onCta={() => void state.handleCompare()}
+        onViewResult={state.hasResult ? () => setResultPanelOpen(true) : undefined}
+      />
+
+      <ToolResultPanel
+        open={Boolean(state.result && resultPanelOpen)}
+        title={t('faceSimilarity:result.overallScore')}
+        onClose={() => setResultPanelOpen(false)}
+      >
+        {state.result ? (
           <div className="space-y-5">
             <SimilarityResults
               result={state.result}
@@ -235,71 +301,20 @@ export function FaceSimilarityPage() {
                   ? t('faceSimilarity:share.creating')
                   : t('faceSimilarity:share.button')}
               </Button>
-              <Button variant="outline" onClick={state.handleReset}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setResultPanelOpen(false)
+                  state.handleReset()
+                }}
+              >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 {t('faceSimilarity:upload.recompare')}
               </Button>
             </div>
           </div>
-        ) : (
-          /* Upload phase */
-          <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 sm:gap-5">
-              <FaceDropzone
-                label={t('faceSimilarity:upload.face1Title')}
-                hint={t('faceSimilarity:upload.face1Hint')}
-                previewUrl={state.previewUrl1}
-                onSelect={state.handleFile1Select}
-                onClear={() => state.handleFile1Select([])}
-                replaceLabel={t('faceSimilarity:upload.replace')}
-              />
-              <FaceDropzone
-                label={t('faceSimilarity:upload.face2Title')}
-                hint={t('faceSimilarity:upload.face2Hint')}
-                previewUrl={state.previewUrl2}
-                onSelect={state.handleFile2Select}
-                onClear={() => state.handleFile2Select([])}
-                replaceLabel={t('faceSimilarity:upload.replace')}
-              />
-            </div>
-
-            {/* Progress bar */}
-            {state.pending && state.progress !== null && (
-              <div className="space-y-1">
-                <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all duration-300 ease-out"
-                    style={{ width: `${state.progress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  {state.progress < 100 ? `${state.progress}%` : t('common:actions.processing')}
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-center">
-              <Button
-                size="lg"
-                onClick={state.handleCompare}
-                disabled={!state.hasBothFiles || state.pending}
-              >
-                {state.pending ? t('common:actions.processing') : t('faceSimilarity:upload.button')}
-              </Button>
-            </div>
-
-            <p className="text-xs text-muted-foreground/60 text-center">
-              {t('faceSimilarity:disclaimer')}
-            </p>
-
-            {/* Comparison history */}
-            <ComparisonHistory
-              entries={state.historyEntries}
-              onClear={state.clearHistory}
-            />
-          </div>
-        )}
-      </ToolPageShell>
+        ) : null}
+      </ToolResultPanel>
 
       <ShareLinkDialog
         open={state.shareDialogOpen}

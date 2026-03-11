@@ -49,8 +49,9 @@ export function ToolResultPanel({ open, title, onClose, className, children }: P
       <section
         className={cn(
           'w-full max-w-3xl rounded-2xl border border-border/70 bg-background shadow-2xl',
-          'transition-[opacity,transform] duration-[var(--duration-normal)] ease-[var(--ease-out)]',
-          visible ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0',
+          visible
+            ? 'translate-y-0 opacity-100 transition-[opacity,transform] duration-[var(--duration-normal)] ease-[var(--ease-out)]'
+            : 'translate-y-full opacity-0 transition-[opacity,transform] duration-200 ease-in',
           className,
         )}
         onClick={(event) => event.stopPropagation()}

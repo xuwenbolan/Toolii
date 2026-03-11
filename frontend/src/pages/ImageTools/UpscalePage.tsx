@@ -1,84 +1,57 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd, buildToolJsonLd } from '@/lib/jsonLd'
-import { BeforeAfterPreview } from '@/components/tools/BeforeAfterPreview'
 import { ArtifactPreviewCard } from '@/components/tools/ArtifactPreviewCard'
 import { GatedDownloadButton } from '@/components/tools/GatedDownloadButton'
+import { ImageResultContent } from '@/components/tools/ImageResultContent'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { ToolPageShell } from '@/components/tools/ToolPageShell'
-import { FileDropzone } from '@/components/upload/FileDropzone'
+import { ToolWorkspaceDropzone } from '@/components/tools/ToolWorkspaceDropzone'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
-import { useFileUpload } from '@/hooks/useFileUpload'
-import { useObjectUrl } from '@/hooks/useObjectUrl'
-import { useToolRunState } from '@/hooks/useToolRunState'
+import { useImageTool } from '@/hooks/useImageTool'
 import { formatBytes } from '@/lib/fileValidation'
-import { ShareResultButton } from '@/components/tools/ShareResultButton'
-import { getResultDisplayUrl, upscaleImage, type FileResult } from '@/services/imageApi'
+import { getResultDisplayUrl, upscaleImage } from '@/services/imageApi'
 
 type Scale = 2 | 4
 
 export function UpscalePage() {
   const { t } = useTranslation(['tools', 'common'])
-  const [file, setFile] = useState<File | null>(null)
   const [scale, setScale] = useState<Scale>(4)
   const [model, setModel] = useState<'x4plus' | 'x4v3' | 'anime'>('x4plus')
   const [denoiseStrength, setDenoiseStrength] = useState(0.5)
   const [faceEnhance, setFaceEnhance] = useState(false)
-  const [result, setResult] = useState<FileResult | null>(null)
-  const [resultPanelOpen, setResultPanelOpen] = useState(false)
-  const { pending, progress, error, errorMeta, reset, run, retry } = useFileUpload()
-  const inputPreviewUrl = useObjectUrl(file)
+  const {
+    file, handleFiles, inputPreviewUrl,
+    result, resultPanelOpen, openResultPanel, closeResultPanel,
+    pending, progress, error, errorMeta, retry,
+    runTool, runState,
+  } = useImageTool()
 
-  const fileInfo = useMemo(() => {
-    if (!file) return null
-    return `${file.name} · ${formatBytes(file.size)}`
-  }, [file])
-  const resultInfo = result ? `${result.filename} · ${formatBytes(result.size)}` : undefined
-  const runState = useToolRunState({
-    mode: 'manual',
-    hasInput: Boolean(file),
-    hasResult: Boolean(result),
-    pending,
-    error,
-    texts: { input: fileInfo ?? undefined, result: resultInfo },
-  })
-
-  const runUpscale = async () => {
-    if (!file) return
-    setResult(null)
-    setResultPanelOpen(false)
-    try {
+  const runUpscale = () => {
+    void runTool((f, onProgress) => {
       const opts: Parameters<typeof upscaleImage>[1] = { scale, model }
       if (model === 'x4v3') opts.denoise_strength = denoiseStrength
       if (faceEnhance) opts.face_enhance = true
-      const res = await run((onProgress) => upscaleImage(file, opts, onProgress))
-      setResult(res)
-      setResultPanelOpen(true)
-    } catch {
-      // Error handled by useFileUpload.
-    }
+      return upscaleImage(f, opts, onProgress)
+    })
   }
 
   return (
     <>
-      <SEOHead title={t('upscale.seoTitle')} description={t('upscale.seoDescription')} keywords={t('upscale.seoKeywords')} canonicalPath="/image-tools/upscale" jsonLd={[buildToolJsonLd({ name: t('upscale.seoTitle'), description: t('upscale.seoDescription'), url: '/image-tools/upscale' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('upscale.title'), path: '/image-tools/upscale' }])]} />
+      <SEOHead title={t('upscale.seoTitle')} description={t('upscale.seoDescription')} keywords={t('upscale.seoKeywords')} canonicalPath="/image-tools/upscale" jsonLd={[buildToolJsonLd({ name: t('upscale.seoTitle'), description: t('upscale.seoDescription'), url: '/image-tools/upscale' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t('upscale.title'), path: '/image-tools/upscale' }])]} />
       <ToolPageShell title={t('upscale.title')} description={t('upscale.description')} toolName="image/upscale" backTo="/image-tools">
         <div className="space-y-5">
-          <FileDropzone
-            accept="image/*"
-            onFiles={(files) => {
-              reset()
-              setResult(null)
-              setResultPanelOpen(false)
-              setFile(files[0])
-            }}
+          <ToolWorkspaceDropzone
+            accept={{ 'image/*': [] }}
+            multiple={false}
+            onFiles={handleFiles}
           />
           <ToolErrorBanner error={error} errorMeta={errorMeta} onRetry={file ? () => retry() : undefined} />
 
@@ -178,30 +151,13 @@ export function UpscalePage() {
         toolName="image/upscale"
         ctaLabel={t('upscale.startUpscale')}
         ctaDisabled={!file || pending}
-        onCta={() => { void runUpscale() }}
-        onViewResult={result ? () => setResultPanelOpen(true) : undefined}
+        onCta={runUpscale}
+        onViewResult={result ? openResultPanel : undefined}
       />
 
-      <ToolResultPanel open={Boolean(result && resultPanelOpen)} title={t('common:actions.downloadResult')} onClose={() => setResultPanelOpen(false)}>
+      <ToolResultPanel open={Boolean(result && resultPanelOpen)} title={t('common:actions.downloadResult')} onClose={closeResultPanel}>
         {result && file ? (
-          <div className="space-y-4">
-            <BeforeAfterPreview
-              beforeFilename={file.name}
-              beforeSizeText={formatBytes(file.size)}
-              beforeUrl={inputPreviewUrl}
-              afterFilename={result.filename}
-              afterSizeText={formatBytes(result.size)}
-              afterUrl={getResultDisplayUrl(result)}
-              protectedPreview={result?.requires_credit}
-            />
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setResultPanelOpen(false)}>
-                {t('common:actions.back')}
-              </Button>
-              <ShareResultButton originalFile={file} resultFileId={result.file_id} resultSize={result.size} shareType="upscale" className="w-auto" />
-              <GatedDownloadButton result={result} className="w-auto" />
-            </div>
-          </div>
+          <ImageResultContent file={file} result={result} inputPreviewUrl={inputPreviewUrl} shareType="upscale" onClose={closeResultPanel} />
         ) : null}
       </ToolResultPanel>
     </>

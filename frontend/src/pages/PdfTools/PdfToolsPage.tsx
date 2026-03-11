@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ArrowLeft,
   CheckSquare,
   RotateCw,
   Scissors,
@@ -9,7 +8,6 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 
 import { PdfPageLightbox } from '@/components/pdf/PdfPageLightbox'
 import { PdfWorkspaceEmpty } from '@/components/pdf/PdfWorkspaceEmpty'
@@ -17,11 +15,10 @@ import { PdfWorkspaceGrid } from '@/components/pdf/PdfWorkspaceGrid'
 import { SEOHead } from '@/components/common/SEOHead'
 import { buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { ToolActionBar } from '@/components/tools/ToolActionBar'
-import { ToolDisabledBanner } from '@/components/tools/ToolDisabledBanner'
 import { ToolErrorBanner } from '@/components/tools/ToolErrorBanner'
+import { ToolPageShell } from '@/components/tools/ToolPageShell'
 import { ToolResultPanel } from '@/components/tools/ToolResultPanel'
 import { Button } from '@/components/ui/button'
-import { useToolStore } from '@/stores/toolStore'
 import { useFileDownload } from '@/hooks/useFileDownload'
 import { useFileUpload } from '@/hooks/useFileUpload'
 import { useMultiPdfThumbnails } from '@/hooks/useMultiPdfThumbnails'
@@ -45,8 +42,6 @@ async function downloadResultAsFile(result: FileResult): Promise<File> {
 
 export function PdfToolsPage() {
   const { t } = useTranslation(['tools', 'common'])
-  const { isToolEnabled, loaded: toolStoreLoaded } = useToolStore()
-  const isDisabled = toolStoreLoaded && !isToolEnabled('pdf/tools')
   const download = useFileDownload()
   const workspace = usePdfWorkspace()
   const { thumbnails, pageCounts, loading: thumbsLoading } = useMultiPdfThumbnails(
@@ -246,84 +241,60 @@ export function PdfToolsPage() {
         description={t('pdf.seoDescription')}
         keywords={t('pdf.seoKeywords')}
         canonicalPath="/pdf-tools"
-        jsonLd={buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('pdf.title'), path: '/pdf-tools' }])}
+        jsonLd={buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('pdf.title'), path: '/pdf-tools' }])}
       />
 
-      {isDisabled ? (
-        <div className="mx-auto w-full max-w-[96rem] space-y-4">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
-              <Link to="/" className="inline-flex items-center gap-1.5">
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t('common:actions.back')}</span>
-              </Link>
-            </Button>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
-              {t('pdf.workspace.title')}
-            </h1>
-          </div>
-          <ToolDisabledBanner />
-        </div>
-      ) : (
-      <>
-      <div className="mx-auto w-full max-w-[96rem] space-y-4">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm" className="h-8 w-fit px-2.5">
-              <Link to="/" className="inline-flex items-center gap-1.5">
-                <ArrowLeft className="h-4 w-4" />
-                <span>{t('common:actions.back')}</span>
-              </Link>
-            </Button>
-            <h1 className="text-lg font-semibold tracking-tight sm:text-xl">
-              {t('pdf.workspace.title')}
-            </h1>
-          </div>
-        </div>
+      <ToolPageShell
+        title={t('pdf.workspace.title')}
+        description={t('pdf.seoDescription')}
+        toolName="pdf/tools"
+        width="full"
+        className="max-w-[96rem]"
+      >
+        <div className="space-y-4">
+          {!hasPages && !thumbsLoading ? (
+            <PdfWorkspaceEmpty onFiles={(f) => void handleAddFiles(f)} />
+          ) : (
+            <PdfWorkspaceGrid
+              pages={workspace.pages}
+              thumbnails={thumbnails}
+              selectedIds={workspace.selectedIds}
+              loading={thumbsLoading}
+              onReorder={workspace.reorderPages}
+              onToggleSelect={workspace.toggleSelect}
+              onRotatePage={(id) => workspace.rotatePage(id, 90)}
+              onDeletePage={workspace.deletePage}
+              onAddFiles={(f) => void handleAddFiles(f)}
+              onPreviewPage={setPreviewIndex}
+            />
+          )}
 
-        {!hasPages && !thumbsLoading ? (
-          <PdfWorkspaceEmpty onFiles={(f) => void handleAddFiles(f)} />
-        ) : (
-          <PdfWorkspaceGrid
-            pages={workspace.pages}
-            thumbnails={thumbnails}
-            selectedIds={workspace.selectedIds}
-            loading={thumbsLoading}
-            onReorder={workspace.reorderPages}
-            onToggleSelect={workspace.toggleSelect}
-            onRotatePage={(id) => workspace.rotatePage(id, 90)}
-            onDeletePage={workspace.deletePage}
-            onAddFiles={(f) => void handleAddFiles(f)}
-            onPreviewPage={setPreviewIndex}
+          {/* Status bar */}
+          {hasPages && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
+              <span>
+                {workspace.pages.length} {t('pdf.workspace.pageCount')}
+              </span>
+              <span>
+                {workspace.sourceFiles.length} {t('pdf.workspace.fileCount')} · {formatBytes(totalSize)}
+              </span>
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                onClick={workspace.clearWorkspace}
+              >
+                {t('pdf.workspace.clearAll')}
+              </button>
+            </div>
+          )}
+
+          <ToolErrorBanner
+            error={error}
+            errorMeta={errorMeta}
+            onRetry={hasPages ? () => retry() : undefined}
           />
-        )}
-
-        {/* Status bar */}
-        {hasPages && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-xs text-muted-foreground">
-            <span>
-              {workspace.pages.length} {t('pdf.workspace.pageCount')}
-            </span>
-            <span>
-              {workspace.sourceFiles.length} {t('pdf.workspace.fileCount')} · {formatBytes(totalSize)}
-            </span>
-            <button
-              type="button"
-              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-              onClick={workspace.clearWorkspace}
-            >
-              {t('pdf.workspace.clearAll')}
-            </button>
-          </div>
-        )}
-
-        <ToolErrorBanner
-          error={error}
-          errorMeta={errorMeta}
-          onRetry={hasPages ? () => retry() : undefined}
-        />
-      </div>
+        </div>
+      </ToolPageShell>
 
       <ToolActionBar
         mode="manual"
@@ -372,7 +343,7 @@ export function PdfToolsPage() {
       {/* Floating selection action bar */}
       <div
         className={[
-          'fixed inset-x-0 bottom-[4.75rem] z-40 flex justify-center transition-all duration-300',
+          'fixed inset-x-0 bottom-[4.75rem] z-40 flex justify-center transition-all duration-[var(--duration-normal)]',
           selectionCount > 0
             ? 'translate-y-0 opacity-100'
             : 'pointer-events-none translate-y-full opacity-0',
@@ -456,8 +427,6 @@ export function PdfToolsPage() {
           </button>
         </div>
       </div>
-      </>
-      )}
     </>
   )
 }

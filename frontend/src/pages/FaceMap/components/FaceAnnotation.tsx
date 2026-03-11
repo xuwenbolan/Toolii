@@ -460,7 +460,7 @@ function HighlightLayer({
       if (pt) {
         elements.push(
           <circle key={`hl-${ptKey}`} cx={pt[0] * w} cy={pt[1] * h} r="5" fill={color} opacity="0.8">
-            <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite" />
+            <animate attributeName="r" values="5;7;5" dur="1.5s" repeatCount="indefinite" media="(prefers-reduced-motion: no-preference)" />
           </circle>,
         )
       }

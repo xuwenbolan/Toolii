@@ -17,7 +17,7 @@ export function FormatConvertPage({ slug, i18nKey, apiFormat, acceptMime }: Prop
         description={t(`${i18nKey}.seoDescription`)}
         keywords={t(`${i18nKey}.seoKeywords`)}
         canonicalPath={`/image-tools/${slug}`}
-        jsonLd={[buildToolJsonLd({ name: t(`${i18nKey}.seoTitle`), description: t(`${i18nKey}.seoDescription`), url: `/image-tools/${slug}` }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t(`${i18nKey}.title`), path: `/image-tools/${slug}` }])]}
+        jsonLd={[buildToolJsonLd({ name: t(`${i18nKey}.seoTitle`), description: t(`${i18nKey}.seoDescription`), url: `/image-tools/${slug}` }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/image-tools' }, { name: t(`${i18nKey}.title`), path: `/image-tools/${slug}` }])]}
       />
       <ConvertForm
         title={t(`${i18nKey}.title`)}

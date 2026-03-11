@@ -112,7 +112,7 @@ export function IdPhotoPage() {
         description={t('seo.description')}
         keywords={t('seo.keywords')}
         canonicalPath="/id-photo"
-        jsonLd={[buildToolJsonLd({ name: t('seo.title'), description: t('seo.description'), url: '/id-photo' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('title'), path: '/id-photo' }])]}
+        jsonLd={[buildToolJsonLd({ name: t('seo.title'), description: t('seo.description'), url: '/id-photo' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('title'), path: '/id-photo' }])]}
       />
 
       <ToolPageShell title={t('title')} description={t('workflow')} backTo="/" width="wide">

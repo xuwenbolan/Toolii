@@ -38,7 +38,7 @@ export function WordCounterPage() {
         description={t('wordCounter.seoDescription')}
         keywords={t('wordCounter.seoKeywords')}
         canonicalPath="/text-tools/word-counter"
-        jsonLd={[buildToolJsonLd({ name: t('wordCounter.seoTitle'), description: t('wordCounter.seoDescription'), url: '/text-tools/word-counter' }), buildBreadcrumbJsonLd([{ name: 'Home', path: '/' }, { name: t('seoTitle'), path: '/text-tools' }, { name: t('wordCounter.title'), path: '/text-tools/word-counter' }])]}
+        jsonLd={[buildToolJsonLd({ name: t('wordCounter.seoTitle'), description: t('wordCounter.seoDescription'), url: '/text-tools/word-counter' }), buildBreadcrumbJsonLd([{ name: t('common:nav.home'), path: '/' }, { name: t('seoTitle'), path: '/text-tools' }, { name: t('wordCounter.title'), path: '/text-tools/word-counter' }])]}
       />
       <ToolPageShell
         title={t('wordCounter.title')}
