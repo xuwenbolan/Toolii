@@ -71,12 +71,12 @@ export function ShareTransferButton({ fileId, variant = 'outline', size, classNa
       >
         {copied ? (
           <>
-            <Check className="mr-1.5 h-4 w-4 motion-safe:animate-[fade-in_0.2s_ease-out]" />
+            <Check className="mr-1.5 h-4 w-4 motion-safe:animate-[fade-in_0.2s_ease-out]" aria-hidden="true" />
             {t('share.copied')}
           </>
         ) : (
           <>
-            <Copy className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:scale-110" />
+            <Copy className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:scale-110" aria-hidden="true" />
             {t('share.copyLink')}
           </>
         )}
@@ -95,12 +95,12 @@ export function ShareTransferButton({ fileId, variant = 'outline', size, classNa
     >
       {pending ? (
         <>
-          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
           {t('share.creating')}
         </>
       ) : (
         <>
-          <Link2 className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:rotate-12" />
+          <Link2 className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:rotate-12" aria-hidden="true" />
           {error ? t('share.retryError') : t('share.button')}
         </>
       )}

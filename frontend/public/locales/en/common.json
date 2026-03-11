@@ -84,7 +84,8 @@
     "creditCost_one": "{{count}} credit",
     "creditCost_other": "{{count}} credits",
     "print": "Print",
-    "moreActions": "More actions"
+    "moreActions": "More actions",
+    "delete": "Delete"
   },
   "upload": {
     "dropHere": "Drop files here",
@@ -241,6 +242,13 @@
     "TOOL_DISABLED": "This tool is currently unavailable",
     "TOOL_ACCESS_DENIED": "You do not have permission to use this tool",
     "TOOL_DAILY_LIMIT": "Daily usage limit reached, please try again tomorrow"
+  },
+  "navGuard": {
+    "title": "Leave this page?",
+    "processing": "Processing is in progress. Leaving now will lose all progress.",
+    "unsavedResult": "You have an undownloaded result. Leaving now will lose it.",
+    "leave": "Leave",
+    "stay": "Stay"
   },
   "apiMessages": {
     "LOGGED_OUT": "Logged out",

@@ -83,7 +83,8 @@
     "viewResult": "查看结果",
     "creditCost": "消耗 {{count}} 积分",
     "print": "打印",
-    "moreActions": "更多操作"
+    "moreActions": "更多操作",
+    "delete": "删除"
   },
   "upload": {
     "dropHere": "拖拽文件到这里",
@@ -240,6 +241,13 @@
     "TOOL_DISABLED": "该工具暂不可用",
     "TOOL_ACCESS_DENIED": "暂无权限使用此工具",
     "TOOL_DAILY_LIMIT": "今日使用次数已达上限，请明天再试"
+  },
+  "navGuard": {
+    "title": "确定要离开吗？",
+    "processing": "正在处理中，离开将丢失当前进度。",
+    "unsavedResult": "处理结果尚未下载，离开将丢失结果。",
+    "leave": "离开",
+    "stay": "留下"
   },
   "apiMessages": {
     "LOGGED_OUT": "已退出登录",

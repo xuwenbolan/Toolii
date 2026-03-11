@@ -63,8 +63,9 @@ export function ShareLinkDialog({
               variant="outline"
               className="shrink-0"
               onClick={() => void handleCopy()}
+              aria-label={copied ? copiedLabel : copyLabel}
             >
-              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+              {copied ? <Check className="h-4 w-4 text-green-600" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
             </Button>
           </div>
 
@@ -75,12 +76,12 @@ export function ShareLinkDialog({
           >
             {copied ? (
               <>
-                <Check className="mr-2 h-4 w-4" />
+                <Check className="mr-2 h-4 w-4" aria-hidden="true" />
                 {copiedLabel}
               </>
             ) : (
               <>
-                <Copy className="mr-2 h-4 w-4" />
+                <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
                 {copyLabel}
               </>
             )}

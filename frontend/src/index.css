@@ -58,12 +58,62 @@ svg {
   }
 }
 
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-4px);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes icon-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes section-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Theme bridge: CSS vars -> Tailwind utilities ──────────── */
 
 @theme inline {
   /* Custom animations */
-  --animate-fade-in: fade-in 0.4s ease-out both;
-  --animate-fade-in-delay-1: fade-in 0.4s ease-out 0.15s both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-fade-in-delay-1: fade-in 0.25s ease-out 0.15s both;
 
   /* Radius scale */
   --radius-sm: calc(var(--radius) - 4px);
@@ -131,6 +181,7 @@ svg {
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
 
   /* Radius */
   --radius: 0.625rem;
@@ -231,6 +282,22 @@ svg {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Mobile touch target (48px minimum) ───────────────────── */
+
+@media (pointer: coarse) {
+  button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 48px;
+    min-height: 48px;
+    width: 100%;
+    height: 100%;
   }
 }
 

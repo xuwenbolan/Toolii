@@ -83,8 +83,8 @@ export function EditorStatusBar({
       <div className="mx-auto flex h-7 max-w-[1600px] items-center gap-2.5 px-3 text-[11px] text-muted-foreground sm:px-4">
         {/* Save status */}
         <div className="flex items-center gap-1.5">
-          <span className={`inline-block h-2 w-2 rounded-full transition-colors duration-300 ${STATUS_DOT[saveStatus]}`} />
-          <span className={saveStatus === 'error' ? 'text-destructive' : saveFlash ? 'text-success transition-colors duration-300' : 'transition-colors duration-300'}>{statusLabel}</span>
+          <span className={`inline-block h-2 w-2 rounded-full transition-colors duration-[var(--duration-normal)] ${STATUS_DOT[saveStatus]}`} />
+          <span className={saveStatus === 'error' ? 'text-destructive' : saveFlash ? 'text-success transition-colors duration-[var(--duration-normal)]' : 'transition-colors duration-[var(--duration-normal)]'}>{statusLabel}</span>
         </div>
 
         <div className="flex-1" />

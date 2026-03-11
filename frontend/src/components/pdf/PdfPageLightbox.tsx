@@ -98,6 +98,9 @@ export function PdfPageLightbox({ open, files, pages, initialIndex, onClose }: P
 
         const ctx = canvas.getContext('2d', { alpha: false })
         if (!ctx) return
+        // Fill white to prevent black edges from Math.ceil rounding
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
         await pdfPage.render({ canvas, canvasContext: ctx, viewport }).promise

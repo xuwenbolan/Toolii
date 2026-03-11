@@ -39,9 +39,9 @@ export function DownloadButton({ url, label, variant, size, className }: Props) 
       onClick={handleClick}
     >
       {loading ? (
-        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
       ) : (
-        <Download className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:translate-y-0.5" />
+        <Download className="mr-1.5 h-4 w-4 transition-transform duration-[var(--duration-fast)] group-hover:translate-y-0.5" aria-hidden="true" />
       )}
       {resolvedLabel}
     </Button>

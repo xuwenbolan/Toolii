@@ -25,6 +25,7 @@
   "retentionLabel": "Retention",
   "retentionDays": "{{days}}d",
   "download": "Download",
+  "preview": "Preview",
   "rename": "Rename",
   "extend": "Extend",
   "delete": "Delete",

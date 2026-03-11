@@ -1,5 +1,3 @@
-import { Tokenizer } from '@huggingface/tokenizers'
-
 // --- Model definitions ---
 
 export type AccuracyLevel = 'exact' | 'estimate'
@@ -46,7 +44,8 @@ export const MODELS: ModelDef[] = [
 // --- Caches ---
 
 const openaiEncoderCache = new Map<string, (text: string) => number[]>()
-const hfTokenizerCache = new Map<string, Tokenizer>()
+// Typed as unknown to avoid static import of @huggingface/tokenizers
+const hfTokenizerCache = new Map<string, unknown>()
 
 // --- OpenAI tokenizer (gpt-tokenizer, dynamic import) ---
 
@@ -67,9 +66,11 @@ async function loadOpenAIEncoder(encoding: string): Promise<(text: string) => nu
 
 // --- HuggingFace tokenizer (tokenizer.json files) ---
 
-async function loadHFTokenizer(fileKey: string): Promise<Tokenizer> {
+async function loadHFTokenizer(fileKey: string) {
   const cached = hfTokenizerCache.get(fileKey)
-  if (cached) return cached
+  if (cached) return cached as { encode: (text: string) => { ids: number[] } }
+
+  const { Tokenizer } = await import('@huggingface/tokenizers')
 
   const [tokenizerJson, configJson] = await Promise.all([
     fetch(`/tokenizers/${fileKey}.json`).then((r) => r.json()),
