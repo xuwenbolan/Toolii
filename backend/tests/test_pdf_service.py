@@ -24,7 +24,7 @@ def _make_pdf(pages: int = 1) -> bytes:
 def pdf_service(tmp_path, monkeypatch):
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "file_storage_dir", str(tmp_path / "files"))
+    monkeypatch.setattr(settings, "hub_storage_dir", str(tmp_path / "files"))
     return PdfService()
 
 

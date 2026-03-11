@@ -9,9 +9,9 @@ from app.processing.face_similarity import (
     compare_faces,
     prewarm_facenet,
     _extract_embedding,
-    _crop_region,
-    _similarity_to_percent,
-    _REGIONS,
+    _crop_full_face,
+    _embedding_sim_to_percent,
+    _geometric_sim_to_percent,
 )
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "test"
@@ -48,8 +48,8 @@ class TestEmbeddingExtraction:
         img = _decode_image(img_bytes)
         lm, _, w, h, _ = _detect(img_bytes)
 
-        # Crop eyes region
-        crop = _crop_region(img, lm, _REGIONS["eyes"], w, h)
+        # Crop full face region
+        crop = _crop_full_face(img, lm, w, h)
         emb = _extract_embedding(crop)
         assert emb is not None
         assert emb.shape == (512,)
@@ -57,31 +57,42 @@ class TestEmbeddingExtraction:
         import numpy as np
         assert abs(np.linalg.norm(emb) - 1.0) < 1e-5
 
-    def test_different_regions_give_different_embeddings(self):
-        img_bytes = _load(MAN1)
-        img = _decode_image(img_bytes)
-        lm, _, w, h, _ = _detect(img_bytes)
+    def test_different_faces_give_different_embeddings(self):
+        img_bytes1 = _load(MAN1)
+        img_bytes2 = _load(WOMAN1)
+        img1 = _decode_image(img_bytes1)
+        img2 = _decode_image(img_bytes2)
+        lm1, _, w1, h1, _ = _detect(img_bytes1)
+        lm2, _, w2, h2, _ = _detect(img_bytes2)
 
         import numpy as np
-        emb_eyes = _extract_embedding(_crop_region(img, lm, _REGIONS["eyes"], w, h))
-        emb_nose = _extract_embedding(_crop_region(img, lm, _REGIONS["nose"], w, h))
-        assert emb_eyes is not None and emb_nose is not None
+        emb1 = _extract_embedding(_crop_full_face(img1, lm1, w1, h1))
+        emb2 = _extract_embedding(_crop_full_face(img2, lm2, w2, h2))
+        assert emb1 is not None and emb2 is not None
 
-        # Different regions should produce different embeddings
-        sim = float(np.dot(emb_eyes, emb_nose))
-        assert sim < 0.95, f"Eyes and nose embeddings too similar: {sim}"
+        # Different people should produce different embeddings
+        sim = float(np.dot(emb1, emb2))
+        assert sim < 0.8, f"Different people embeddings too similar: {sim}"
 
 
 class TestSimilarityScoring:
-    def test_percent_mapping(self):
-        assert _similarity_to_percent(0.0) == 15  # floor
-        assert _similarity_to_percent(1.0) == 98  # ceiling
-        assert _similarity_to_percent(0.5) >= 60
-        assert _similarity_to_percent(0.5) <= 70
+    def test_embedding_percent_mapping(self):
+        assert _embedding_sim_to_percent(0.0) == 15  # floor
+        assert _embedding_sim_to_percent(1.0) == 98  # ceiling
         # Monotonic
         prev = 0
         for s in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-            p = _similarity_to_percent(s)
+            p = _embedding_sim_to_percent(s)
+            assert p >= prev, f"Not monotonic at {s}: {p} < {prev}"
+            prev = p
+
+    def test_geometric_percent_mapping(self):
+        assert _geometric_sim_to_percent(0.0) == 15  # floor
+        assert _geometric_sim_to_percent(1.0) == 98  # ceiling
+        # Monotonic
+        prev = 0
+        for s in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+            p = _geometric_sim_to_percent(s)
             assert p >= prev, f"Not monotonic at {s}: {p} < {prev}"
             prev = p
 

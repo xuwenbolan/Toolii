@@ -108,13 +108,11 @@ async def test_upload_size_limits_enforced(async_client, monkeypatch: pytest.Mon
 
 @pytest.mark.asyncio
 async def test_signed_download_url_success_tamper_and_expire(async_client) -> None:
+    from app.services.file_service import build_download_url
+
     service = FileService()
-    stored = service.save_bytes(data=b"hello-toolii", filename="demo.txt", content_type="text/plain")
-    signed_url = service.build_download_url(
-        file_id=stored.file_id,
-        filename=stored.original_filename,
-        ttl_seconds=120,
-    )
+    stored = service.save_bytes(b"hello-toolii")
+    signed_url = build_download_url(file_id=stored.file_id, filename="demo.txt", ttl_seconds=120)
 
     ok = await async_client.get(signed_url)
     assert ok.status_code == 200
@@ -123,10 +121,6 @@ async def test_signed_download_url_success_tamper_and_expire(async_client) -> No
     tampered = await async_client.get(_replace_query_value(signed_url, "sig", "invalid-signature"))
     assert tampered.status_code == 403
 
-    expired_url = service.build_download_url(
-        file_id=stored.file_id,
-        filename=stored.original_filename,
-        ttl_seconds=-1,
-    )
+    expired_url = build_download_url(file_id=stored.file_id, filename="demo.txt", ttl_seconds=-1)
     expired = await async_client.get(expired_url)
     assert expired.status_code == 410
