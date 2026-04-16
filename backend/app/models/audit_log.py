@@ -16,7 +16,9 @@ class AuditLog(Base):
 
     # Who performed the action
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True, index=True,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Event classification: auth, user, admin, credit, share, transfer, tool, system

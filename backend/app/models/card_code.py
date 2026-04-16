@@ -21,5 +21,9 @@ class CardCode(TimestampMixin, Base):
 
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    redeemed_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    redeemed_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 

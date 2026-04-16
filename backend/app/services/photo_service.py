@@ -14,6 +14,7 @@ from typing import Any
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.exceptions import AppError
 from app.processing.compliance_checker import check_photo_compliance
 from app.processing.face_detection import select_primary_face
@@ -56,10 +57,15 @@ _upload_sessions: dict[str, UploadSession] = {}
 _processed_sessions: dict[str, ProcessedSession] = {}
 _session_lock = threading.Lock()
 
-# Sessions older than this (seconds) will be purged by the scheduler.
-_SESSION_TTL = 2 * 3600  # 2 hours
-
 _DEFAULT_EXPIRES_IN = 24 * 3600
+
+
+def _session_ttl_seconds() -> int:
+    """Photo upload/preview session lifetime, driven by settings."""
+    hours = settings.photo_session_ttl_hours
+    if hours <= 0:
+        hours = 24
+    return hours * 3600
 
 
 def cleanup_expired_sessions() -> int:
@@ -67,7 +73,7 @@ def cleanup_expired_sessions() -> int:
 
     Also deletes associated files from disk to prevent orphaned storage.
     """
-    cutoff = time.time() - _SESSION_TTL
+    cutoff = time.time() - _session_ttl_seconds()
     removed = 0
     fs = FileService()
     with _session_lock:

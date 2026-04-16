@@ -31,7 +31,9 @@ class UserFile(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True, index=True
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # FileService storage UUID (32-char hex)
@@ -80,7 +82,9 @@ class ShareGroup(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"), nullable=False, index=True
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # 8-char alphanumeric short link token

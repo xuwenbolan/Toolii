@@ -15,8 +15,16 @@ class ShareLink(TimestampMixin, Base):
 
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
 
-    from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    to_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    from_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    to_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
 

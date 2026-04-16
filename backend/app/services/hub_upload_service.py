@@ -220,19 +220,28 @@ class HubUploadService:
         else:
             expires = parent.expires_at
 
-        uf = UserFile(
-            user_id=user_id,
-            file_id=stored.file_id,
-            original_filename=safe_filename(filename),
-            size=stored.size,
-            content_type=content_type,
-            source=FileSource.EDITOR_IMAGE,
-            status=FileStatus.PENDING,
-            parent_file_id=parent.id,
-            expires_at=expires,
-        )
-        self._db.add(uf)
-        await self._db.flush()
+        try:
+            uf = UserFile(
+                user_id=user_id,
+                file_id=stored.file_id,
+                original_filename=safe_filename(filename),
+                size=stored.size,
+                content_type=content_type,
+                source=FileSource.EDITOR_IMAGE,
+                status=FileStatus.PENDING,
+                parent_file_id=parent.id,
+                expires_at=expires,
+            )
+            self._db.add(uf)
+            await self._db.flush()
+        except Exception:
+            # DB row never committed -- remove the file we just wrote so
+            # the storage dir does not grow with unreachable blobs.
+            try:
+                self._fs.delete(stored.file_id)
+            except OSError:
+                pass
+            raise
         return stored.file_id, f"{_IMAGE_URL_PREFIX}{stored.file_id}"
 
     async def get_editor_image(self, storage_file_id: str) -> tuple[Path, str]:

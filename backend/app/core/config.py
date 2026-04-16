@@ -52,6 +52,7 @@ class Settings(BaseSettings):
 
     max_upload_image_mb: int = Field(default=20, alias="MAX_UPLOAD_IMAGE_MB")
     max_upload_pdf_mb: int = Field(default=50, alias="MAX_UPLOAD_PDF_MB")
+    max_upload_docx_mb: int = Field(default=50, alias="MAX_UPLOAD_DOCX_MB")
     max_pdf_pages: int = Field(default=500, alias="MAX_PDF_PAGES")
     max_batch_files: int = Field(default=20, alias="MAX_BATCH_FILES")
     max_batch_total_mb: int = Field(default=100, alias="MAX_BATCH_TOTAL_MB")
@@ -91,6 +92,13 @@ class Settings(BaseSettings):
     download_url_ttl: int = Field(default=86400, alias="DOWNLOAD_URL_TTL")
 
     result_share_ttl_days: int = Field(default=7, alias="RESULT_SHARE_TTL_DAYS")
+
+    # How long upload/preview sessions remain valid for the ID photo flow.
+    # Users routinely pause between preview and paid export, so a short TTL
+    # can cause paying users to lose their session mid-checkout. Sessions
+    # are still memory-resident and reset on process restart; this only
+    # raises the ceiling for a running process.
+    photo_session_ttl_hours: int = Field(default=24, alias="PHOTO_SESSION_TTL_HOURS")
 
     # Nginx X-Accel-Redirect for Range request support (production only)
     use_x_accel_redirect: bool = Field(default=False, alias="USE_X_ACCEL_REDIRECT")
