@@ -10,7 +10,7 @@ import { getResultDisplayUrl, type FileResult } from '@/services/imageApi'
 type Props = {
   file: File
   result: FileResult
-  inputPreviewUrl: string | undefined
+  inputPreviewUrl: string | null | undefined
   shareType: string
   onClose: () => void
   /** Override the preview section with a custom element (e.g. ImageCompareSlider) */

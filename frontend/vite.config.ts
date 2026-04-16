@@ -290,6 +290,13 @@ export default defineConfig({
           if (id.includes('zod')) return 'zod'
           if (id.includes('pdfjs-dist')) return 'pdfjs'
           if (id.includes('gpt-tokenizer')) return 'tokenizer'
+          if (id.includes('@huggingface/tokenizers')) return 'tokenizer-hf'
+          // Milkdown powers both the editor and the transfer preview, so
+          // isDocEditorOnlyModule doesn't catch it. Pin it to the same
+          // chunk as the editor so it only loads when either page mounts.
+          if (/\/node_modules\/(@milkdown|prosemirror|markdown-it|rehype|remark|unified)\//.test(id)) {
+            return 'doc-editor'
+          }
           if (id.includes('react-image-crop')) return 'image-crop'
           return 'vendor'
         },

@@ -157,7 +157,7 @@ export function UpscalePage() {
 
       <ToolResultPanel open={Boolean(result && resultPanelOpen)} title={t('common:actions.downloadResult')} onClose={closeResultPanel}>
         {result && file ? (
-          <ImageResultContent file={file} result={result} inputPreviewUrl={inputPreviewUrl} shareType="upscale" onClose={closeResultPanel} />
+          <ImageResultContent file={file} result={result} inputPreviewUrl={inputPreviewUrl ?? undefined} shareType="upscale" onClose={closeResultPanel} />
         ) : null}
       </ToolResultPanel>
     </>
