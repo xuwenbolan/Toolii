@@ -4,9 +4,14 @@ import time
 from datetime import datetime, timezone
 
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.token_blacklist import TokenBlacklistEntry
+
+
+class TokenAlreadyRevokedError(Exception):
+    """Raised when attempting to revoke a token that is already blacklisted."""
 
 
 class TokenBlacklistService:
@@ -24,7 +29,11 @@ class TokenBlacklistService:
         token_type: str,
         expires_at: datetime,
     ) -> None:
-        """Revoke a token by adding it to the blacklist."""
+        """Revoke a token by adding it to the blacklist.
+
+        Raises TokenAlreadyRevokedError if the jti is already blacklisted
+        (concurrent refresh race condition).
+        """
         entry = TokenBlacklistEntry(
             jti=jti,
             user_id=user_id,
@@ -32,7 +41,12 @@ class TokenBlacklistService:
             expires_at=expires_at,
         )
         db.add(entry)
-        await db.commit()
+        try:
+            await db.commit()
+        except IntegrityError:
+            await db.rollback()
+            self._cache[jti] = int(expires_at.timestamp())
+            raise TokenAlreadyRevokedError(jti)
         self._cache[jti] = int(expires_at.timestamp())
 
     def is_revoked(self, jti: str) -> bool:

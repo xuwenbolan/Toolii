@@ -86,7 +86,7 @@ async def create_share(
 async def claim_share(
     token: str,
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db=Depends(get_db),
 ) -> ShareClaimResponse:
     result = await ShareService(db).claim(token=token, user_id=user.id)

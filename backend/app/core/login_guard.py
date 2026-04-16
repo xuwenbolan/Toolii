@@ -1,25 +1,30 @@
 from __future__ import annotations
 
+import logging
 import math
-import time
-from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
+from app.models.login_attempt import LoginAttempt
+
+logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = 5
 _WINDOW_SECONDS = 300       # 5 minutes
 _LOCKOUT_SECONDS = 900      # 15 minutes
 
 
-@dataclass
-class _FailureRecord:
-    count: int = 0
-    first_failure: float = 0.0
-    locked_until: float = 0.0
-
-
 class LoginGuard:
-    """Track failed login attempts per email and enforce temporary lockout."""
+    """DB-backed lockout for failed login attempts.
+
+    State is persisted in the ``login_attempts`` table so that lockouts
+    survive process restarts and are shared across worker processes.
+    Lookups are keyed on the lowercase email so callers never depend on
+    in-memory state.
+    """
 
     def __init__(
         self,
@@ -29,55 +34,101 @@ class LoginGuard:
         lockout_seconds: int = _LOCKOUT_SECONDS,
     ) -> None:
         self._max_attempts = max_attempts
-        self._window = window_seconds
-        self._lockout = lockout_seconds
-        self._records: dict[str, _FailureRecord] = {}
+        self._window = timedelta(seconds=window_seconds)
+        self._lockout = timedelta(seconds=lockout_seconds)
 
-    def check(self, email: str) -> None:
+    @staticmethod
+    def _key(email: str) -> str:
+        return email.strip().lower()
+
+    @staticmethod
+    def _as_utc(dt: datetime | None) -> datetime | None:
+        """Normalize to tz-aware UTC.
+
+        SQLite does not preserve timezone information, so values loaded
+        back from ``DateTime(timezone=True)`` columns arrive as naive
+        datetimes. Treat those as UTC to keep arithmetic consistent
+        across SQLite and PostgreSQL.
+        """
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
+    async def check(self, db: AsyncSession, email: str) -> None:
         """Raise if *email* is currently locked out."""
-        key = email.strip().lower()
-        rec = self._records.get(key)
+        key = self._key(email)
+        rec = await db.scalar(
+            select(LoginAttempt).where(LoginAttempt.email == key)
+        )
         if rec is None:
             return
-        now = time.monotonic()
-        if rec.locked_until > now:
-            remaining_minutes = math.ceil((rec.locked_until - now) / 60)
+        now = datetime.now(timezone.utc)
+        first_failure = self._as_utc(rec.first_failure_at)
+        locked_until = self._as_utc(rec.locked_until)
+        if locked_until is not None and locked_until > now:
+            remaining_minutes = max(1, math.ceil((locked_until - now).total_seconds() / 60))
             raise AppError(
                 code="ACCOUNT_LOCKED",
                 message=f"Too many failed attempts. Try again in {remaining_minutes} minute(s).",
                 status_code=429,
             )
-        # Reset if window expired
-        if now - rec.first_failure > self._window:
-            del self._records[key]
+        # Drop expired window records on the read path so stale rows don't
+        # accumulate between scheduler runs.
+        if first_failure + self._window < now and (
+            locked_until is None or locked_until <= now
+        ):
+            await db.delete(rec)
+            await db.flush()
 
-    def record_failure(self, email: str) -> None:
-        """Record a failed login. Lock the account if threshold exceeded."""
-        key = email.strip().lower()
-        now = time.monotonic()
-        rec = self._records.get(key)
-        if rec is None or (now - rec.first_failure > self._window):
-            rec = _FailureRecord(count=0, first_failure=now)
-            self._records[key] = rec
-        rec.count += 1
-        if rec.count >= self._max_attempts:
-            rec.locked_until = now + self._lockout
+    async def record_failure(self, db: AsyncSession, email: str) -> None:
+        """Record a failed login attempt. Lock the account if threshold exceeded."""
+        key = self._key(email)
+        now = datetime.now(timezone.utc)
+        rec = await db.scalar(
+            select(LoginAttempt).where(LoginAttempt.email == key)
+        )
+        if rec is None or self._as_utc(rec.first_failure_at) + self._window < now:
+            # New window: either first-ever failure or previous window expired.
+            if rec is not None:
+                rec.failure_count = 1
+                rec.first_failure_at = now
+                rec.locked_until = None
+            else:
+                rec = LoginAttempt(
+                    email=key,
+                    failure_count=1,
+                    first_failure_at=now,
+                    locked_until=None,
+                )
+                db.add(rec)
+        else:
+            rec.failure_count += 1
+            if rec.failure_count >= self._max_attempts:
+                rec.locked_until = now + self._lockout
+        await db.commit()
 
-    def record_success(self, email: str) -> None:
+    async def record_success(self, db: AsyncSession, email: str) -> None:
         """Clear failure record on successful login."""
-        key = email.strip().lower()
-        self._records.pop(key, None)
+        key = self._key(email)
+        await db.execute(delete(LoginAttempt).where(LoginAttempt.email == key))
+        await db.commit()
 
-    def cleanup_expired(self) -> None:
-        """Remove stale entries. Called periodically by the scheduler."""
-        now = time.monotonic()
-        stale = [
-            k
-            for k, v in self._records.items()
-            if now - v.first_failure > self._window and v.locked_until <= now
-        ]
-        for k in stale:
-            del self._records[k]
+    async def cleanup_expired(self, db: AsyncSession) -> None:
+        """Delete rows whose failure window and lockout have both expired."""
+        now = datetime.now(timezone.utc)
+        window_cutoff = now - self._window
+        result = await db.execute(
+            delete(LoginAttempt).where(
+                LoginAttempt.first_failure_at < window_cutoff,
+                (LoginAttempt.locked_until.is_(None))
+                | (LoginAttempt.locked_until <= now),
+            )
+        )
+        await db.commit()
+        if result.rowcount:
+            logger.debug("Cleaned up %d expired login_attempts rows", result.rowcount)
 
 
 login_guard = LoginGuard()

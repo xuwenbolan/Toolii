@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit_log import audit
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_verified_user
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.file_response import file_response
 from app.core.security import verify_download_signature
@@ -62,7 +62,7 @@ class UnlockResult(BaseModel):
 async def unlock(
     request: Request,
     file_id: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_verified_user),
     db: AsyncSession = Depends(get_db),
 ) -> UnlockResult:
     """Pay credits to unlock a gated file and receive a clean download URL.

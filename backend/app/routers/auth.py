@@ -37,9 +37,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix=f"{settings.api_prefix}/auth", tags=["auth"])
 
 
-def _build_auth_response(
-    user: User, *, extra_body: dict[str, object] | None = None
-) -> tuple[JSONResponse, dict]:
+def _build_auth_response(user: User) -> tuple[JSONResponse, dict]:
     """Build JSONResponse with access token in body and refresh token in HttpOnly cookie.
     Returns (response, token_info) where token_info contains JTIs for login history."""
     token_info = AuthService.issue_tokens(user_id=user.id)
@@ -50,8 +48,6 @@ def _build_auth_response(
             expires_in=token_info["expires_in"],
         ),
     ).model_dump()
-    if extra_body:
-        body.update(extra_body)
     response = JSONResponse(content=body)
     max_age = settings.refresh_token_expire_days * 86400
     set_refresh_cookie(response, token_info["refresh_token"], max_age)
@@ -83,17 +79,14 @@ async def register(
     ip = get_remote_address(request)
     lang = parse_lang(request.headers.get("accept-language"))
     try:
-        user, dev_token = await AuthService(db).register(
+        user = await AuthService(db).register(
             email=payload.email, password=payload.password, name=payload.name, lang=lang
         )
     except AppError:
         log_auth_event("register_failed", email=payload.email, ip=ip, success=False)
         raise
     log_auth_event("register_success", email=payload.email, user_id=user.id, ip=ip)
-    extra = None
-    if dev_token is not None:
-        logger.debug("Dev verification token for %s: %s", payload.email, dev_token)
-    response, token_info = _build_auth_response(user, extra_body=extra)
+    response, token_info = _build_auth_response(user)
     await _record_login(
         db, user_id=user.id, ip=ip,
         user_agent=request.headers.get("user-agent"), token_info=token_info,
@@ -255,10 +248,8 @@ async def resend_verification(
 ) -> JSONResponse:
     ip = get_remote_address(request)
     lang = parse_lang(request.headers.get("accept-language"))
-    dev_token = await AuthService(db).resend_verification(user_id=user.id, lang=lang)
+    await AuthService(db).resend_verification(user_id=user.id, lang=lang)
     log_auth_event("resend_verification", email=user.email, user_id=user.id, ip=ip)
-    if dev_token is not None:
-        logger.debug("Dev verification token for %s: %s", user.email, dev_token)
     return JSONResponse(content={"code": "VERIFICATION_EMAIL_SENT", "message": "Verification email sent"})
 
 
@@ -271,11 +262,9 @@ async def forgot_password(
 ) -> JSONResponse:
     ip = get_remote_address(request)
     lang = parse_lang(request.headers.get("accept-language"))
-    dev_token = await AuthService(db).forgot_password(email=payload.email, lang=lang)
+    await AuthService(db).forgot_password(email=payload.email, lang=lang)
     log_auth_event("forgot_password", email=payload.email, ip=ip)
     # Always return success to prevent email enumeration
-    if dev_token is not None:
-        logger.debug("Dev reset token for %s: %s", payload.email, dev_token)
     return JSONResponse(content={"code": "RESET_EMAIL_SENT", "message": "If this email is registered, you will receive a password reset email"})
 
 

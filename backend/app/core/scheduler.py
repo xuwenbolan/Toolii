@@ -41,8 +41,12 @@ def setup_scheduler(_: AsyncIOScheduler) -> None:
         replace_existing=True,
         misfire_grace_time=60,
     )
+    async def _cleanup_login_guard() -> None:
+        async with _db.SessionLocal() as db:
+            await login_guard.cleanup_expired(db)
+
     scheduler.add_job(
-        login_guard.cleanup_expired,
+        _cleanup_login_guard,
         "interval",
         minutes=10,
         id="cleanup_login_guard",

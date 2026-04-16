@@ -6,6 +6,7 @@ from app.models.email_verification import EmailVerificationToken
 from app.models.result_share import ResultShare
 from app.models.feedback import Feedback
 from app.models.user_file import ShareGroup, ShareGroupFile, UserFile
+from app.models.login_attempt import LoginAttempt
 from app.models.login_history import LoginHistory
 from app.models.password_reset import PasswordResetToken
 from app.models.processing_history import ProcessingHistory
@@ -23,6 +24,7 @@ __all__ = [
     "EmailVerificationToken",
     "ResultShare",
     "Feedback",
+    "LoginAttempt",
     "LoginHistory",
     "PasswordResetToken",
     "ProcessingHistory",

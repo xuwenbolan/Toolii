@@ -50,9 +50,8 @@ class AuthService:
 
     async def register(
         self, *, email: str, password: str, name: str | None = None, lang: str = "zh"
-    ) -> tuple[User, str | None]:
-        """Register a new user. Returns (user, dev_token) where dev_token is
-        the raw verification token only in dev mode (for testing convenience)."""
+    ) -> User:
+        """Register a new user and dispatch the verification email."""
         email = email.strip().lower()
 
         result = await self._db.execute(select(User).where(User.email == email))
@@ -82,19 +81,24 @@ class AuthService:
             )
         )
 
-        dev_token = raw_token if settings.env == "dev" else None
-        return user, dev_token
+        # In dev mode, log the token to the server log only. Never return it
+        # to the caller: the raw token grants email-verification bypass and
+        # must not leak into an HTTP response body.
+        if settings.env == "dev":
+            logger.debug("Dev verification token for %s: %s", user.email, raw_token)
+
+        return user
 
     async def login(self, *, email: str, password: str) -> User:
         email = email.strip().lower()
 
         # Check lockout before doing any DB work
-        login_guard.check(email)
+        await login_guard.check(self._db, email)
 
         result = await self._db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user is None:
-            login_guard.record_failure(email)
+            await login_guard.record_failure(self._db, email)
             raise UnauthorizedError("Invalid email or password")
         if not user.is_active and user.deleted_at is not None:
             raise AppError(
@@ -103,16 +107,16 @@ class AuthService:
                 status_code=403,
             )
         if not user.is_active:
-            login_guard.record_failure(email)
+            await login_guard.record_failure(self._db, email)
             raise UnauthorizedError("Invalid email or password")
         if not user.hashed_password:
-            login_guard.record_failure(email)
+            await login_guard.record_failure(self._db, email)
             raise UnauthorizedError("This account only supports Google login")
         if not verify_password(password, user.hashed_password):
-            login_guard.record_failure(email)
+            await login_guard.record_failure(self._db, email)
             raise UnauthorizedError("Invalid email or password")
 
-        login_guard.record_success(email)
+        await login_guard.record_success(self._db, email)
         return user
 
     async def google_auth(self, *, access_token: str, link_password: str | None = None) -> User:
@@ -233,14 +237,19 @@ class AuthService:
 
         # Rotate: blacklist the old refresh token so it cannot be reused
         if jti:
+            from app.core.token_blacklist import TokenAlreadyRevokedError
             expires_at = datetime.fromtimestamp(token.exp, tz=timezone.utc)
-            await token_blacklist.revoke(
-                self._db,
-                jti=jti,
-                user_id=user.id,
-                token_type="refresh",
-                expires_at=expires_at,
-            )
+            try:
+                await token_blacklist.revoke(
+                    self._db,
+                    jti=jti,
+                    user_id=user.id,
+                    token_type="refresh",
+                    expires_at=expires_at,
+                )
+            except TokenAlreadyRevokedError:
+                # Concurrent refresh race: another request already revoked this token
+                raise UnauthorizedError("Token has been revoked")
 
         return user
 
@@ -291,8 +300,8 @@ class AuthService:
             status_code=400,
         )
 
-    async def resend_verification(self, *, user_id: int, lang: str = "zh") -> str | None:
-        """Resend verification email. Returns raw token in dev mode."""
+    async def resend_verification(self, *, user_id: int, lang: str = "zh") -> None:
+        """Resend verification email."""
         result = await self._db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user is None:
@@ -313,7 +322,8 @@ class AuthService:
             )
         )
 
-        return raw_token if settings.env == "dev" else None
+        if settings.env == "dev":
+            logger.debug("Dev verification token for %s: %s", user.email, raw_token)
 
     async def _create_verification_token(self, user_id: int) -> str:
         """Create a verification token and store its hash in DB. Returns raw token."""
@@ -330,17 +340,16 @@ class AuthService:
         self._db.add(record)
         return raw_token
 
-    async def forgot_password(self, *, email: str, lang: str = "zh") -> str | None:
+    async def forgot_password(self, *, email: str, lang: str = "zh") -> None:
         """Create password reset token and send email.
-        Always returns successfully to avoid email enumeration.
-        Returns raw token in dev mode if user exists."""
+        Always returns successfully to avoid email enumeration."""
         email = email.strip().lower()
         result = await self._db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
         if user is None or not user.is_active or not user.hashed_password:
             # Don't reveal whether email exists
-            return None
+            return
 
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
@@ -365,7 +374,8 @@ class AuthService:
             )
         )
 
-        return raw_token if settings.env == "dev" else None
+        if settings.env == "dev":
+            logger.debug("Dev reset token for %s: %s", user.email, raw_token)
 
     async def reset_password(self, *, token: str, new_password: str) -> User:
         """Verify reset token and update password. Revokes all existing sessions."""
