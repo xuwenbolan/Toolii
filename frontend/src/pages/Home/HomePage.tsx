@@ -24,6 +24,12 @@ const TOOL_CATEGORIES = [
     toolName: 'pdf/tools',
   },
   {
+    titleKey: 'home.wordTools',
+    descKey: 'home.wordToolsDesc',
+    to: '/word-tools',
+    toolName: 'docx/tools',
+  },
+  {
     titleKey: 'home.textTools',
     descKey: 'home.textToolsDesc',
     to: '/text-tools',

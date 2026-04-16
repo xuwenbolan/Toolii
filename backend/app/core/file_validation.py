@@ -85,6 +85,24 @@ def validate_pdf_bytes(data: bytes) -> None:
         raise AppError(code="INVALID_FILE_TYPE", message="Not a valid PDF file", status_code=400)
 
 
+def validate_docx_bytes(data: bytes) -> None:
+    """Raise AppError if *data* is not a valid DOCX file (ZIP with word/document.xml)."""
+    import zipfile
+
+    if len(data) < 4 or data[:4] != b"PK\x03\x04":
+        raise AppError(code="INVALID_FILE_TYPE", message="Not a valid DOCX file", status_code=400)
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            if "word/document.xml" not in zf.namelist():
+                raise AppError(
+                    code="INVALID_FILE_TYPE", message="Not a valid DOCX file", status_code=400
+                )
+    except zipfile.BadZipFile:
+        raise AppError(
+            code="INVALID_FILE_TYPE", message="File appears to be corrupted", status_code=400
+        ) from None
+
+
 def check_pdf_page_count(data: bytes, *, max_pages: int | None = None) -> int:
     """Return page count and raise AppError if it exceeds *max_pages*."""
     from PyPDF2 import PdfReader

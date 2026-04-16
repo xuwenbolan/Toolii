@@ -5,6 +5,7 @@
     "idPhoto": "ID Photo",
     "imageTools": "Image Tools",
     "pdfTools": "PDF Tools",
+    "wordTools": "Word Tools",
     "textTools": "Text Tools",
     "dashboard": "My Account",
     "redeemCredits": "Redeem Credits",
@@ -43,6 +44,8 @@
     "imageToolsDesc": "Compression, HEIC conversion, format conversion, mosaic, and scan enhancement.",
     "pdfTools": "PDF Tools",
     "pdfToolsDesc": "Compress, merge, split/reorder, and images to PDF.",
+    "wordTools": "Word Tools",
+    "wordToolsDesc": "Preview, health check, repair, merge, and convert to PDF.",
     "textTools": "Text Tools",
     "textToolsDesc": "Word counter, character counter, and AI token counter.",
     "fileTransfer": "File Transfer",
@@ -85,7 +88,10 @@
     "creditCost_other": "{{count}} credits",
     "print": "Print",
     "moreActions": "More actions",
-    "delete": "Delete"
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "replace": "Replace",
+    "clearAll": "Clear All"
   },
   "upload": {
     "dropHere": "Drop files here",

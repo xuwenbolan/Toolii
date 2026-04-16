@@ -25,6 +25,7 @@ export function RootLayout() {
     location.pathname.startsWith('/image-tools/') ||
     location.pathname === '/pdf-tools' ||
     location.pathname.startsWith('/pdf-tools/') ||
+    location.pathname === '/word-tools' ||
     location.pathname === '/text-tools/word-counter'
   const isDocWorkspaceRoute = location.pathname.startsWith('/doc/edit/')
 

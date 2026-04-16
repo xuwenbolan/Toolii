@@ -5,6 +5,7 @@
     "idPhoto": "证件照",
     "imageTools": "图片工具",
     "pdfTools": "PDF 工具",
+    "wordTools": "Word 工具",
     "textTools": "文本工具",
     "dashboard": "个人中心",
     "redeemCredits": "兑换卡密",
@@ -43,6 +44,8 @@
     "imageToolsDesc": "压缩、HEIC 转换、格式转换、马赛克、扫描增强。",
     "pdfTools": "PDF 工具",
     "pdfToolsDesc": "压缩、合并、拆分/重排、图转 PDF。",
+    "wordTools": "Word 工具",
+    "wordToolsDesc": "预览、健康检查、修复、合并、转换 PDF。",
     "textTools": "文本工具",
     "textToolsDesc": "字数统计、字符统计、AI Token 计数。",
     "fileTransfer": "文件快传",
@@ -84,7 +87,10 @@
     "creditCost": "消耗 {{count}} 积分",
     "print": "打印",
     "moreActions": "更多操作",
-    "delete": "删除"
+    "delete": "删除",
+    "cancel": "取消",
+    "replace": "替换",
+    "clearAll": "全部清除"
   },
   "upload": {
     "dropHere": "拖拽文件到这里",

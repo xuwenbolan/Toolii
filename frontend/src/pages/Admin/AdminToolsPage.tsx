@@ -30,7 +30,7 @@ import {
   type AdminToolUpdateRequest,
 } from '@/services/toolsApi'
 
-const CATEGORY_KEYS = ['image', 'pdf', 'facemap'] as const
+const CATEGORY_KEYS = ['image', 'pdf', 'photo', 'facemap'] as const
 const ACCESS_LEVELS = ['public', 'auth', 'verified', 'admin'] as const
 
 // -- Status helpers --

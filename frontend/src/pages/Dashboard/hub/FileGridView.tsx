@@ -42,13 +42,17 @@ function GridCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={[
-        'group relative flex flex-col overflow-hidden rounded-xl border',
+        'group relative flex cursor-pointer select-none flex-col overflow-hidden rounded-xl border',
         'transition-[border-color,box-shadow] duration-[var(--duration-fast)]',
         isSelected
           ? 'border-foreground/30 bg-muted/40'
-          : 'border-border/70 hover:border-border hover:shadow-md',
+          : 'border-border/70 hover:border-border hover:shadow-md active:bg-muted/30',
       ].join(' ')}
+      onClick={onToggleSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSelect() } }}
     >
       {/* Thumbnail / icon area */}
       <div className="relative flex aspect-[4/3] items-center justify-center bg-muted/30">
@@ -69,11 +73,14 @@ function GridCard({
             )}
           </div>
         )}
-        {/* Checkbox overlay */}
-        <div className={[
-          'absolute left-2 top-2 transition-opacity duration-[var(--duration-fast)]',
-          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        ].join(' ')}>
+        {/* Checkbox overlay — always visible on touch devices, hover-reveal on desktop */}
+        <div
+          className={[
+            'absolute left-2 top-2 transition-opacity duration-[var(--duration-fast)]',
+            isSelected ? 'opacity-100' : 'opacity-0 touch-device:opacity-100 group-hover:opacity-100',
+          ].join(' ')}
+          onClick={(e) => e.stopPropagation()}
+        >
           <Checkbox
             checked={isSelected}
             onCheckedChange={onToggleSelect}
@@ -81,8 +88,11 @@ function GridCard({
             className="bg-background/80"
           />
         </div>
-        {/* Actions overlay */}
-        <div className="absolute right-1 top-1 opacity-0 transition-opacity duration-[var(--duration-fast)] group-hover:opacity-100">
+        {/* Actions overlay — always visible on touch devices */}
+        <div
+          className="absolute right-1 top-1 opacity-0 transition-opacity duration-[var(--duration-fast)] touch-device:opacity-100 group-hover:opacity-100"
+          onClick={(e) => e.stopPropagation()}
+        >
           <FileRowActions
             isMarkdown={isMd}
             isPreviewable={isPdf || isImage}
@@ -103,7 +113,7 @@ function GridCard({
           <button
             type="button"
             className="w-full truncate text-left text-sm font-medium transition hover:text-primary"
-            onClick={onEdit}
+            onClick={(e) => { e.stopPropagation(); onEdit() }}
           >
             {item.file_name}
           </button>
@@ -111,7 +121,7 @@ function GridCard({
           <button
             type="button"
             className="w-full truncate text-left text-sm font-medium transition hover:text-primary"
-            onClick={onPreview}
+            onClick={(e) => { e.stopPropagation(); onPreview() }}
           >
             {item.file_name}
           </button>

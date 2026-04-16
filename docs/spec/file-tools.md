@@ -15,12 +15,12 @@ All file tools are free, no login required. Rate-limited to prevent abuse.
 | PDF page tools | Rotate / delete / extract / reorder pages (higher frequency than merge/compress) | pikepdf | P0 |
 | PDF split | Split PDF by page | pikepdf / PyPDF2 | P1 |
 | Image to PDF | Combine multiple images into PDF | Pillow + reportlab | P0 |
-| Word to PDF | docx to PDF conversion | Server-side engine, compatibility requires polish | P2 |
+| Word tools | Unified Word workspace: health check, auto-repair, merge, split, compress, convert to PDF | python-docx + LibreOffice headless; see [docx-tools.md](tools/docx-tools.md) | P1 |
 
 ---
 
 ## Processing Notes
 
-- All PDF tools run on CPU (Backend local processing). No GPU / Cortex dependency.
-- Single PDF file size limit: 50MB.
-- Word to PDF has compatibility challenges; defer to mature engine/service post-MVP.
+- All file tools run on CPU (Backend local processing). No GPU / Cortex dependency.
+- Single file size limit: 50 MB (PDF and DOCX).
+- Word tools require LibreOffice headless for PDF conversion.

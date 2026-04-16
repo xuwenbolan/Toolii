@@ -48,7 +48,7 @@ from app.core.token_blacklist import token_blacklist
 from app.processing.background_removal import prewarm_background_models
 from app.processing.face_detection import prewarm_face_landmarker
 from app.processing.face_similarity import prewarm_facenet
-from app.routers import auth, credits, download, face_reading, feedback, history, hub, image, pdf, photo, share, tools, users
+from app.routers import auth, credits, docx, download, face_reading, feedback, history, hub, image, pdf, photo, share, tools, users
 from app.routers.admin import router as admin_router
 from app.routers.hub import hub_og_router
 from app.routers.result_share import router as result_share_router, og_router as result_share_og_router
@@ -120,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(photo.router_public)
     app.include_router(image.router)
     app.include_router(pdf.router)
+    app.include_router(docx.router)
     app.include_router(download.router)
     app.include_router(history.router)
     app.include_router(face_reading.router)

@@ -31,6 +31,7 @@ session_factory = _default_session_factory
 # Categories where all endpoints share a single tool identity
 _CATEGORY_TOOL_OVERRIDES = {
     "pdf": "pdf/tools",
+    "docx": "docx/tools",
     "photo": "photo/idphoto",
 }
 

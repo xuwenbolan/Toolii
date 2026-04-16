@@ -238,6 +238,7 @@
     "categories": {
       "image": "图片",
       "pdf": "PDF",
+      "photo": "证件照",
       "facemap": "面部分析"
     },
     "section": {

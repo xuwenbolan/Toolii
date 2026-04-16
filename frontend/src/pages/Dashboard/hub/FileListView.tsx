@@ -45,18 +45,25 @@ export function FileListView({
         return (
           <div
             key={item.id}
+            role="button"
+            tabIndex={0}
             className={[
-              'flex items-center gap-3 px-3 py-3',
+              'relative flex items-center gap-3 px-3 py-3 cursor-pointer select-none',
               'transition-colors duration-[var(--duration-fast)]',
-              'hover:bg-muted/40',
+              'hover:bg-muted/40 active:bg-muted/60',
               isSelected ? 'bg-muted/40' : '',
             ].join(' ')}
+            onClick={() => onToggleSelect(item.id)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleSelect(item.id) } }}
           >
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={() => onToggleSelect(item.id)}
-              aria-label={item.file_name}
-            />
+            {/* Stop propagation so checkbox click does not double-toggle via the row handler */}
+            <div onClick={(e) => e.stopPropagation()}>
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => onToggleSelect(item.id)}
+                aria-label={item.file_name}
+              />
+            </div>
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted/60">
               <Icon className="h-4 w-4 text-muted-foreground" />
             </div>
@@ -65,7 +72,7 @@ export function FileListView({
                 <button
                   type="button"
                   className="truncate text-left text-sm font-medium transition hover:text-primary"
-                  onClick={() => onEdit(item)}
+                  onClick={(e) => { e.stopPropagation(); onEdit(item) }}
                 >
                   {item.file_name}
                 </button>
@@ -73,7 +80,7 @@ export function FileListView({
                 <button
                   type="button"
                   className="truncate text-left text-sm font-medium transition hover:text-primary"
-                  onClick={() => onPreview(item)}
+                  onClick={(e) => { e.stopPropagation(); onPreview(item) }}
                 >
                   {item.file_name}
                 </button>

@@ -19,6 +19,8 @@ type Props = {
   layout?: ToolPageLayout
   width?: ToolPageWidth
   sidebar?: ReactNode
+  /** Position of the sidebar relative to the main content */
+  sidebarPosition?: 'left' | 'right'
   className?: string
   contentClassName?: string
   sidebarClassName?: string
@@ -33,9 +35,15 @@ const WIDTH_CLASS_MAP: Record<ToolPageWidth, string> = {
   full: 'max-w-[88rem]',
 }
 
-const GRID_CLASS_MAP: Record<Exclude<ToolPageLayout, 'compact'>, string> = {
-  split: 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
-  workspace: 'xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]',
+const GRID_CLASS_MAP: Record<Exclude<ToolPageLayout, 'compact'>, Record<'left' | 'right', string>> = {
+  split: {
+    left: 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+    right: 'lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]',
+  },
+  workspace: {
+    right: 'xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]',
+    left: 'xl:grid-cols-[minmax(200px,240px)_minmax(0,1fr)]',
+  },
 }
 
 export function ToolPageShell({
@@ -45,6 +53,7 @@ export function ToolPageShell({
   layout = 'compact',
   width = 'content',
   sidebar,
+  sidebarPosition = 'right',
   className,
   contentClassName,
   sidebarClassName,
@@ -84,13 +93,18 @@ export function ToolPageShell({
           </CardContent>
         </Card>
       ) : useSidebar ? (
-        <div className={cn('grid items-start gap-4 xl:gap-5', GRID_CLASS_MAP[layout])}>
+        <div className={cn('grid items-start gap-4 xl:gap-5', GRID_CLASS_MAP[layout][sidebarPosition])}>
+          {sidebarPosition === 'left' && (
+            <div className={cn('space-y-4 motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]', sidebarClassName)}>{sidebar}</div>
+          )}
           <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">
             <CardContent className={cn('px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5', contentClassName)}>
               {children}
             </CardContent>
           </Card>
-          <div className={cn('space-y-4 motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.25s_both]', sidebarClassName)}>{sidebar}</div>
+          {sidebarPosition === 'right' && (
+            <div className={cn('space-y-4 motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.25s_both]', sidebarClassName)}>{sidebar}</div>
+          )}
         </div>
       ) : (
         <Card className="border-border/70 shadow-sm motion-safe:animate-[section-in_0.4s_var(--ease-out)_0.15s_both]">

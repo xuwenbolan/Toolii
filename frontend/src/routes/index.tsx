@@ -36,6 +36,7 @@ const OcrPage = lazy(() => import('@/pages/ImageTools/OcrPage').then((m) => ({ d
 const SegmentPage = lazy(() => import('@/pages/ImageTools/SegmentPage').then((m) => ({ default: m.SegmentPage })))
 
 const PdfToolsPage = lazy(() => import('@/pages/PdfTools/PdfToolsPage').then((m) => ({ default: m.PdfToolsPage })))
+const WordToolsPage = lazy(() => import('@/pages/WordTools/WordToolsPage').then((m) => ({ default: m.WordToolsPage })))
 
 const TextToolsIndexPage = lazy(() => import('@/pages/TextTools/TextToolsIndexPage').then((m) => ({ default: m.TextToolsIndexPage })))
 const WordCounterPage = lazy(() => import('@/pages/TextTools/WordCounterPage').then((m) => ({ default: m.WordCounterPage })))
@@ -128,6 +129,10 @@ export const router = createBrowserRouter([
           { path: 'from-images', element: <PdfToolsPage /> },
           { path: 'split', element: <PdfToolsPage /> },
         ],
+      },
+      {
+        path: 'word-tools',
+        element: <WordToolsPage />,
       },
       {
         path: 'text-tools',

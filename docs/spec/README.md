@@ -30,7 +30,7 @@ All specifications are organized by module. Each file covers one module or cross
 
 - [id-photo.md](id-photo.md) — ID photo processing (face detection, background removal, compliance, layout)
 - [image-tools.md](image-tools.md) — Image tools (compress, convert, HEIC, mosaic, scan enhance)
-- [file-tools.md](file-tools.md) — File/PDF tools (compress, merge, split, page ops, image-to-PDF)
+- [file-tools.md](file-tools.md) — File/PDF/Word tools (PDF ops, Word health check/repair/merge/split/convert)
 - [user-system.md](user-system.md) — User system (auth, OAuth, history, referral)
 - [credits-system.md](credits-system.md) — Credits & card code system (pricing, redemption, sharing)
 - [video-tools.md](video-tools.md) — Video & audio tools (compress, convert, GIF, trim, extract audio)
@@ -50,7 +50,7 @@ All specifications are organized by module. Each file covers one module or cross
 - [frontend-upgrade.md](frontend-upgrade.md) — Frontend upgrade roadmap (phases 0-6)
 - [cortex-dashboard.md](cortex-dashboard.md) — Cortex dashboard visualization and management enhancement
 - [tools/](tools/) — Per-tool interaction design (one file per tool):
-  - [compress.md](tools/compress.md), [mosaic.md](tools/mosaic.md), [remove-bg.md](tools/remove-bg.md), [scan-enhance.md](tools/scan-enhance.md), [format-convert.md](tools/format-convert.md), [pdf-tools.md](tools/pdf-tools.md), [id-photo.md](tools/id-photo.md), [word-counter.md](tools/word-counter.md)
+  - [compress.md](tools/compress.md), [mosaic.md](tools/mosaic.md), [remove-bg.md](tools/remove-bg.md), [scan-enhance.md](tools/scan-enhance.md), [format-convert.md](tools/format-convert.md), [pdf-tools.md](tools/pdf-tools.md), [docx-tools.md](tools/docx-tools.md), [id-photo.md](tools/id-photo.md), [word-counter.md](tools/word-counter.md)
   - [file-progress.md](tools/file-progress.md) -- Universal upload/download progress components
   - Video/audio tool interaction design: TBD
 
@@ -67,6 +67,7 @@ Detailed per-model technical data in [/docs/references/](../references/):
 - [realesrgan.md](../references/realesrgan.md) — Real-ESRGAN models, DNI, tiling
 - [gfpgan.md](../references/gfpgan.md) — GFPGAN pipeline, parameters, RetinaFace
 - [nafnet.md](../references/nafnet.md) — NAFNet denoise/deblur variants, tiling
+- [thesis-format-standard.md](../references/thesis-format-standard.md) — Chinese undergraduate thesis formatting standard (extracted from template)
 - [ddcolor.md](../references/ddcolor.md) — DDColor models, Lab pipeline, export
 - [inpainting.md](../references/inpainting.md) — LaMa + MI-GAN, mask semantics, routing
 - [rapidocr.md](../references/rapidocr.md) — RapidOCR pipeline, det/cls/rec parameters

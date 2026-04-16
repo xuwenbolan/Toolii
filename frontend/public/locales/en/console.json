@@ -238,6 +238,7 @@
     "categories": {
       "image": "Image",
       "pdf": "PDF",
+      "photo": "ID Photo",
       "facemap": "FaceMap"
     },
     "section": {

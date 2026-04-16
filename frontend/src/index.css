@@ -2,6 +2,7 @@
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant touch-device (@media (pointer: coarse));
 
 html,
 body {
@@ -288,6 +289,9 @@ svg {
 /* ── Mobile touch target (48px minimum) ───────────────────── */
 
 @media (pointer: coarse) {
+  button {
+    position: relative;
+  }
   button::after {
     content: '';
     position: absolute;
@@ -358,4 +362,182 @@ svg {
   --warning-light: oklch(0.25 0.03 85);
   --info: oklch(0.65 0.16 250);
   --info-light: oklch(0.25 0.03 250);
+
+  /* Canvas / SVG overlay - dark */
+  --canvas-score-high: oklch(0.75 0.17 145);
+  --canvas-score-mid: oklch(0.80 0.16 85);
+  --canvas-score-low: oklch(0.74 0.18 55);
+  --canvas-score-poor: oklch(0.70 0.20 25);
+}
+
+/* ---------------------------------------------------------------------------
+   DOCX Workspace — full-page document workbench
+   --------------------------------------------------------------------------- */
+
+/* Score ring SVG animation */
+@keyframes score-ring-fill {
+  from { stroke-dashoffset: var(--ring-circumference); }
+  to   { stroke-dashoffset: var(--ring-offset); }
+}
+
+.docx-score-ring-track {
+  fill: none;
+  stroke: oklch(0.93 0 0);
+  stroke-width: 5;
+}
+.dark .docx-score-ring-track {
+  stroke: oklch(0.25 0 0);
+}
+.docx-score-ring-value {
+  fill: none;
+  stroke-width: 5.5;
+  stroke-linecap: round;
+  stroke-dasharray: var(--ring-circumference);
+  stroke-dashoffset: var(--ring-offset);
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: score-ring-fill 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
+}
+
+/* Loading skeleton shimmer for preview */
+@keyframes docx-shimmer {
+  0%   { opacity: 0.4; }
+  50%  { opacity: 0.7; }
+  100% { opacity: 0.4; }
+}
+.docx-loading-skeleton {
+  animation: docx-shimmer 2s ease-in-out infinite;
+}
+
+/* Respect prefers-reduced-motion for docx-specific animations */
+@media (prefers-reduced-motion: reduce) {
+  .docx-score-ring-value {
+    animation: none;
+  }
+  .docx-loading-skeleton {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Heading tree connector lines */
+.docx-heading-tree {
+  --tree-line-color: oklch(0.88 0 0 / 70%);
+}
+.dark .docx-heading-tree {
+  --tree-line-color: oklch(0.40 0 0 / 50%);
+}
+.docx-heading-tree-node {
+  position: relative;
+  padding-left: 16px;
+}
+.docx-heading-tree-node::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--tree-line-color);
+}
+.docx-heading-tree-node::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 13px;
+  width: 8px;
+  height: 1px;
+  background: var(--tree-line-color);
+}
+.docx-heading-tree-node:last-child::before {
+  bottom: calc(100% - 14px);
+}
+
+/* Inspector panel sections */
+.docx-inspector-section + .docx-inspector-section {
+  border-top: 1px solid var(--border);
+}
+
+/* Issue severity accent bars */
+.docx-issue-critical .docx-issue-accent-bar { background: var(--destructive); }
+.docx-issue-warning .docx-issue-accent-bar { background: var(--warning); }
+.docx-issue-info .docx-issue-accent-bar { background: var(--info); }
+
+/* FIX badge pulse on hover */
+.docx-fix-badge {
+  transition: background-color 150ms, border-color 150ms;
+}
+.group:hover .docx-fix-badge {
+  background: color-mix(in oklch, var(--success), transparent 88%);
+}
+
+/* ---------------------------------------------------------------------------
+   DOCX Preview — override docx-preview library default styles
+   --------------------------------------------------------------------------- */
+
+/* Wrapper: replace heavy gray background with subtle muted tone */
+.docx-preview-container .docx-wrapper {
+  background: oklch(0.965 0.002 240);
+  padding: 24px 16px;
+  gap: 24px;
+}
+
+.dark .docx-preview-container .docx-wrapper {
+  background: oklch(0.18 0.005 240);
+}
+
+/* Page sections: softer shadow, rounded corners, refined spacing */
+.docx-preview-container .docx-wrapper > section.docx {
+  background: white;
+  border-radius: 4px;
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 8%),
+    0 4px 12px oklch(0 0 0 / 4%);
+  margin-bottom: 0;
+}
+
+.dark .docx-preview-container .docx-wrapper > section.docx {
+  background: oklch(0.22 0.005 240);
+  box-shadow:
+    0 1px 3px oklch(0 0 0 / 20%),
+    0 4px 12px oklch(0 0 0 / 12%);
+}
+
+/* Full-height scroll area for workspace mode */
+.docx-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.7 0 0 / 40%) transparent;
+}
+
+.docx-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.docx-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.docx-scroll-area::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 40%);
+  border-radius: 3px;
+}
+
+.docx-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.6 0 0 / 50%);
+}
+
+/* Inspector scrollbar */
+.docx-inspector-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.7 0 0 / 30%) transparent;
+}
+.docx-inspector-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+.docx-inspector-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.docx-inspector-scroll::-webkit-scrollbar-thumb {
+  background: oklch(0.7 0 0 / 30%);
+  border-radius: 3px;
 }
