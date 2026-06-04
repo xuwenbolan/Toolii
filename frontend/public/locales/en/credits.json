@@ -168,6 +168,8 @@
     },
     "password": {
       "title": "Change Password",
+      "setTitle": "Set Password",
+      "setDescription": "You currently sign in with Google. After setting a password, you can sign in with either email/password or Google.",
       "currentPassword": "Current Password",
       "currentPasswordRequired": "Please enter your current password",
       "newPassword": "New Password",
@@ -176,9 +178,12 @@
       "confirmPasswordRequired": "Please confirm your password",
       "mismatch": "Passwords do not match",
       "success": "Password changed successfully",
+      "setSuccess": "Password set successfully",
       "failed": "Failed to change password",
       "changing": "Changing...",
-      "submit": "Change Password"
+      "setting": "Setting...",
+      "submit": "Change Password",
+      "setSubmit": "Set Password"
     },
     "security": {
       "title": "Account Security",

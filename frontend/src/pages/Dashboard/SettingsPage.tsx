@@ -12,6 +12,7 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { api } from '@/services/api'
+import { fetchMe } from '@/services/authApi'
 import { getTranslatedApiError } from '@/lib/apiErrors'
 import { useAuthStore, type AuthUser } from '@/stores/authStore'
 
@@ -95,6 +96,10 @@ function ProfileSection() {
 }
 
 // --- Password form ---
+// Covers two modes:
+//   1. hasPassword: verify current password, then change to a new one.
+//   2. !hasPassword (Google-only account): set password for the first time —
+//      no current password required; the authenticated session is enough.
 type PasswordValues = { currentPassword: string; newPassword: string; confirmPassword: string }
 
 function PasswordSection() {
@@ -104,65 +109,82 @@ function PasswordSection() {
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const passwordSchema = useMemo(
-    () =>
-      z
-        .object({
-          currentPassword: z.string().min(1, t('settings.password.currentPasswordRequired')),
-          newPassword: z.string().min(8, t('settings.password.newPasswordMin')).max(128),
-          confirmPassword: z.string().min(1, t('settings.password.confirmPasswordRequired')),
-        })
-        .refine((v) => v.newPassword === v.confirmPassword, {
-          message: t('settings.password.mismatch'),
-          path: ['confirmPassword'],
-        }),
-    [t],
-  )
+  const passwordSchema = useMemo(() => {
+    // In set-password mode, currentPassword is not rendered — accept anything
+    // (including the default empty string) so zod doesn't block submission.
+    const base = z.object({
+      currentPassword: hasPassword
+        ? z.string().min(1, t('settings.password.currentPasswordRequired'))
+        : z.string(),
+      newPassword: z.string().min(8, t('settings.password.newPasswordMin')).max(128),
+      confirmPassword: z.string().min(1, t('settings.password.confirmPasswordRequired')),
+    })
+    return base.refine((v) => v.newPassword === v.confirmPassword, {
+      message: t('settings.password.mismatch'),
+      path: ['confirmPassword'],
+    })
+  }, [t, hasPassword])
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<PasswordValues>({ resolver: zodResolver(passwordSchema) })
+  } = useForm<PasswordValues>({
+    resolver: zodResolver(passwordSchema),
+    // Seed a default so the hidden currentPassword field is still a string
+    // (react-hook-form leaves unregistered fields undefined otherwise).
+    defaultValues: { currentPassword: '', newPassword: '', confirmPassword: '' },
+  })
 
   const onSubmit = async (values: PasswordValues) => {
     setMsg(null)
     setError(null)
     try {
       await api.put('/api/users/password', {
-        current_password: values.currentPassword,
+        current_password: hasPassword ? values.currentPassword : null,
         new_password: values.newPassword,
       })
-      setMsg(t('settings.password.success'))
+      setMsg(t(hasPassword ? 'settings.password.success' : 'settings.password.setSuccess'))
       reset()
+      if (!hasPassword) {
+        // Flip has_password to true so the form switches to change-mode.
+        await fetchMe()
+      }
     } catch (err: unknown) {
       setError(getTranslatedApiError(err, t('settings.password.failed')))
     }
   }
 
-  if (!hasPassword) return null
-
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('settings.password.title')}</CardTitle>
+        <CardTitle>
+          {t(hasPassword ? 'settings.password.title' : 'settings.password.setTitle')}
+        </CardTitle>
       </CardHeader>
       <CardContent>
+        {!hasPassword && (
+          <p className="mb-4 text-sm text-muted-foreground">
+            {t('settings.password.setDescription')}
+          </p>
+        )}
         <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-2">
-            <Label htmlFor="currentPassword">{t('settings.password.currentPassword')}</Label>
-            <PasswordInput
-              id="currentPassword"
-              autoComplete="current-password"
-              {...register('currentPassword')}
-            />
-            {errors.currentPassword ? (
-              <p className="text-sm text-destructive">
-                {errors.currentPassword.message}
-              </p>
-            ) : null}
-          </div>
+          {hasPassword && (
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">{t('settings.password.currentPassword')}</Label>
+              <PasswordInput
+                id="currentPassword"
+                autoComplete="current-password"
+                {...register('currentPassword')}
+              />
+              {errors.currentPassword ? (
+                <p className="text-sm text-destructive">
+                  {errors.currentPassword.message}
+                </p>
+              ) : null}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="newPassword">{t('settings.password.newPassword')}</Label>
             <PasswordInput
@@ -194,7 +216,9 @@ function PasswordSection() {
           ) : null}
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t('settings.password.changing') : t('settings.password.submit')}
+            {isSubmitting
+              ? t(hasPassword ? 'settings.password.changing' : 'settings.password.setting')
+              : t(hasPassword ? 'settings.password.submit' : 'settings.password.setSubmit')}
           </Button>
         </form>
       </CardContent>

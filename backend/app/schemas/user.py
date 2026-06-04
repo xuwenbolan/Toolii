@@ -26,7 +26,10 @@ class UserPublic(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    current_password: str = Field(max_length=128)
+    # Optional: Google-only accounts (hashed_password is NULL) setting a
+    # password for the first time don't need to supply the current one —
+    # the authenticated session is the proof of identity.
+    current_password: str | None = Field(default=None, max_length=128)
     new_password: StrongPassword
 
 

@@ -168,6 +168,8 @@
     },
     "password": {
       "title": "修改密码",
+      "setTitle": "设置密码",
+      "setDescription": "你当前通过 Google 登录。设置密码后，可同时使用邮箱密码和 Google 登录本账号。",
       "currentPassword": "当前密码",
       "currentPasswordRequired": "请输入当前密码",
       "newPassword": "新密码",
@@ -176,9 +178,12 @@
       "confirmPasswordRequired": "请确认密码",
       "mismatch": "两次输入的密码不一致",
       "success": "密码修改成功",
+      "setSuccess": "密码设置成功",
       "failed": "修改失败",
       "changing": "修改中...",
-      "submit": "修改密码"
+      "setting": "设置中...",
+      "submit": "修改密码",
+      "setSubmit": "设置密码"
     },
     "security": {
       "title": "账号安全",

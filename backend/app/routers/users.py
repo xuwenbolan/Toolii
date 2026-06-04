@@ -41,13 +41,20 @@ async def change_password(
     user: User = Depends(get_current_user),
     db=Depends(get_db),
 ) -> JSONResponse:
-    if not user.hashed_password:
-        raise AppError(
-            code="NO_PASSWORD",
-            message="This account uses Google login, password cannot be changed",
-            status_code=400,
-        )
-    if not verify_password(payload.current_password, user.hashed_password):
+    from slowapi.util import get_remote_address
+    ip = get_remote_address(request)
+
+    if user.hashed_password is None:
+        # First-time password set for a Google-only account. The authenticated
+        # session is sufficient identity proof — no prior password to verify.
+        user.hashed_password = hash_password(payload.new_password)
+        await db.commit()
+        log_auth_event("password_set", user_id=user.id, ip=ip)
+        return JSONResponse(content={"code": "PASSWORD_SET", "message": "Password set successfully"})
+
+    if not payload.current_password or not verify_password(
+        payload.current_password, user.hashed_password
+    ):
         raise AppError(
             code="WRONG_PASSWORD",
             message="Current password is incorrect",
@@ -55,8 +62,6 @@ async def change_password(
         )
     user.hashed_password = hash_password(payload.new_password)
     await db.commit()
-    from slowapi.util import get_remote_address
-    ip = get_remote_address(request)
     log_auth_event("password_changed", user_id=user.id, ip=ip)
     return JSONResponse(content={"code": "PASSWORD_CHANGED", "message": "Password changed successfully"})
 
